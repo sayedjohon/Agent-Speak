@@ -1,0 +1,37 @@
+{
+  "app_name": "Agent Speak",
+  "version": "1.0.0",
+  "general": {
+    "enabled": true,
+    "autostart": true
+  },
+  "audio": {
+    "engine": "macos_default",
+    "volume": 1.0
+  },
+  "notch_display": {
+    "enabled": true,
+    "notch_width": 185,
+    "notch_height": 30,
+    "follow_cursor_monitor": true,
+    "escape_dismiss_enabled": true
+  },
+  "watched_workspaces": {
+    "antigravity": {
+      "enabled": true,
+      "path": "~/.gemini/antigravity/brain"
+    },
+    "claude": {
+      "enabled": true,
+      "path": "~/.claude/projects"
+    },
+    "opencode": {
+      "enabled": true,
+      "path": "~/.opencode/sessions"
+    },
+    "unix_socket": {
+      "enabled": true,
+      "socket_path": "/tmp/agentspeak.sock"
+    }
+  }
+}

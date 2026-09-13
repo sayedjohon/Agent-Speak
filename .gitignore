@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Swift build caches
+.build/
+.swiftpm/
+
+# Logs & Local State
+*.log
+*.pid
+*.sock
+state.json
