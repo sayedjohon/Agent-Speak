@@ -55,7 +55,8 @@ All conversational text produced by AI agents interacting with the user is read 
   - `NotchWindowController.swift`: 120 FPS ProMotion liquid glass notch HUD window.
   - `DashboardView.swift`: Modern Raycast-inspired SwiftUI settings window.
   - `PocketTTSExtensionCardView.swift`: Offline neural voice cloning extension interface.
-  - `VoiceCloningStudioView.swift`: Interactive waveform trimming and voice clone studio.
+  - `VoiceCloningStudioView.swift`: Interactive voice cloning and audition studio.
+  - `AudioWaveformTrimmerView.swift`: Pocket TTS style waveform track with draggable cut overlay and bounded playback.
   - `TranscriptWatcher.swift`: Multi-agent file tailing (Antigravity, Claude Code, OpenCode).
   - `TextSanitizer.swift`: Markdown table, code block, and symbol sanitization regex.
   - `SpeechQueueManager.swift`: Playback state coordination, ducking, and engine dispatch.

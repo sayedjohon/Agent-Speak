@@ -97,8 +97,8 @@ def preprocess_audio(input_file: Path, out_wav: Path, start_time: float = 0.0, d
     else:
         total_sec = get_audio_duration(input_file)
         if total_sec > 0:
-            actual_start = max(0.0, min(actual_start, max(0.0, total_sec - 5.0)))
-            actual_dur = min(duration, max(5.0, total_sec - actual_start))
+            actual_start = max(0.0, min(actual_start, max(0.0, total_sec - 1.0)))
+            actual_dur = max(1.0, min(duration, total_sec - actual_start))
 
     cmd = [
         ffmpeg_bin, "-y",

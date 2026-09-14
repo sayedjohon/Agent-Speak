@@ -219,7 +219,8 @@ agent-speak/
 │   ├── DashboardView.swift      # Modern tabbed settings dashboard
 │   ├── NotchWindowController.swift # 120 FPS Liquid Glass notch HUD
 │   ├── PocketTTSExtensionCardView.swift # Pocket-TTS neural engine manager
-│   ├── VoiceCloningStudioView.swift     # Audio wave trimmer & clone studio
+│   ├── VoiceCloningStudioView.swift     # Interactive voice cloner studio
+│   ├── AudioWaveformTrimmerView.swift   # Pocket TTS style waveform track & cut tool
 │   ├── TranscriptWatcher.swift  # Auto-agent file watching engine
 │   ├── TextSanitizer.swift      # Markdown & code block quarantine parser
 │   ├── SpeechQueueManager.swift # Thread-safe audio speech queue

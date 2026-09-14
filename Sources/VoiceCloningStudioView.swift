@@ -1,5 +1,7 @@
 import SwiftUI
 import AppKit
+import AVFoundation
+import CoreMedia
 
 // MARK: - Raycast-grade Voice Cloning Studio
 public struct VoiceCloningStudioView: View {
@@ -14,13 +16,12 @@ public struct VoiceCloningStudioView: View {
     @State private var hasAuditioned = false
     @State private var auditionDuration: Double = 0.0
     
-    // Audio Trimming & Auto-Detection State
+    // Audio Trimming State (Pocket TTS Waveform & Cut)
+    @StateObject private var trimmerPlayer = AudioTrimmerPlayer()
     @State private var audioDuration: Double = 0.0
-    @State private var autoDetectSpeech: Bool = true
     @State private var trimStartTime: Double = 0.0
-    @State private var trimDuration: Double = 15.0
-    @State private var isPlayingSource: Bool = false
-    @State private var detectedSpeechInfo: String = ""
+    @State private var trimEndTime: Double = 15.0
+    @State private var isCutActive: Bool = true
     @State private var isHoveringDropzone: Bool = false
     
     public init(isPresented: Binding<Bool>, onVoiceSaved: @escaping (String) -> Void) {
@@ -119,10 +120,10 @@ public struct VoiceCloningStudioView: View {
     // MARK: - Guide Banner
     private var guideBanner: some View {
         HStack(spacing: 7) {
-            Image(systemName: "lightbulb.fill")
+            Image(systemName: "scissors")
                 .font(.system(size: 10))
-                .foregroundColor(.orange)
-            Text("Select 10–30s of clean speech, audition your test sentence, and save only when satisfied.")
+                .foregroundColor(Color(red: 0.05, green: 0.55, blue: 1.0))
+            Text("Pocket TTS manual trimmer: drag handles on the track to crop your voice window. Only the selected area will play & clone.")
                 .font(.system(size: 10))
                 .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
             Spacer()
@@ -276,9 +277,11 @@ public struct VoiceCloningStudioView: View {
                     .buttonStyle(PlainButtonStyle())
                     
                     Button(action: {
+                        trimmerPlayer.stop()
                         selectedAudioPath = ""
                         audioDuration = 0.0
-                        detectedSpeechInfo = ""
+                        trimStartTime = 0.0
+                        trimEndTime = 0.0
                         hasAuditioned = false
                     }) {
                         Image(systemName: "xmark.circle.fill")
@@ -296,189 +299,31 @@ public struct VoiceCloningStudioView: View {
         }
     }
     
-    // MARK: - 3. Trimming & Segment Selector
+    // MARK: - 3. Speech Trimming & Cut Selector (Pocket TTS Style)
     private var segmentTrimmingSection: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            // Header
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("SPEECH REFERENCE EXTRACTION")
+                Text("SPEECH REFERENCE & POCKET TTS CUT TOOL")
                     .font(.system(size: 9.5, weight: .bold))
                     .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
                 
                 Spacer()
                 
-                if !detectedSpeechInfo.isEmpty {
-                    Text(detectedSpeechInfo)
-                        .font(.system(size: 8.5, design: .monospaced))
+                if audioDuration > 0 {
+                    Text("Total: \(formatDuration(audioDuration))")
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
                         .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
                 }
             }
             
-            // Dual Selection Buttons: Auto-Detect vs Custom Range
-            HStack(spacing: 8) {
-                // Button 1: Auto-Detect
-                Button(action: { autoDetectSpeech = true }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "bolt.fill")
-                            .font(.system(size: 10))
-                            .foregroundColor(autoDetectSpeech ? .yellow : Color(red: 0.55, green: 0.56, blue: 0.62))
-                        Text("Auto-Detect Best Speech")
-                            .font(.system(size: 10.5, weight: .semibold))
-                        if autoDetectSpeech {
-                            Spacer()
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundColor(Color(red: 0.05, green: 0.50, blue: 1.0))
-                        }
-                    }
-                    .foregroundColor(autoDetectSpeech ? .white : Color(red: 0.55, green: 0.56, blue: 0.62))
-                    .padding(.horizontal, 10)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 28)
-                    .background(autoDetectSpeech ? Color(red: 0.14, green: 0.16, blue: 0.22) : Color(red: 0.09, green: 0.10, blue: 0.13))
-                    .cornerRadius(6)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(autoDetectSpeech ? Color(red: 0.05, green: 0.48, blue: 0.95) : Color(red: 0.18, green: 0.19, blue: 0.24), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                // Button 2: Custom Range
-                Button(action: { autoDetectSpeech = false }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "scissors")
-                            .font(.system(size: 10))
-                            .foregroundColor(!autoDetectSpeech ? Color(red: 0.05, green: 0.50, blue: 1.0) : Color(red: 0.55, green: 0.56, blue: 0.62))
-                        Text("Custom Range")
-                            .font(.system(size: 10.5, weight: .semibold))
-                        if !autoDetectSpeech {
-                            Spacer()
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundColor(Color(red: 0.05, green: 0.50, blue: 1.0))
-                        }
-                    }
-                    .foregroundColor(!autoDetectSpeech ? .white : Color(red: 0.55, green: 0.56, blue: 0.62))
-                    .padding(.horizontal, 10)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 28)
-                    .background(!autoDetectSpeech ? Color(red: 0.14, green: 0.16, blue: 0.22) : Color(red: 0.09, green: 0.10, blue: 0.13))
-                    .cornerRadius(6)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(!autoDetectSpeech ? Color(red: 0.05, green: 0.48, blue: 0.95) : Color(red: 0.18, green: 0.19, blue: 0.24), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-            
-            // Caption hint
-            Text(autoDetectSpeech
-                 ? "⚡ AI automatically finds the clearest speech segment without silent pauses."
-                 : "✂️ Drag the slider below to select your reference speech window."
+            AudioWaveformTrimmerView(
+                startTime: $trimStartTime,
+                endTime: $trimEndTime,
+                isCutActive: $isCutActive,
+                totalDuration: audioDuration,
+                player: trimmerPlayer
             )
-            .font(.system(size: 9.5))
-            .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
-            
-            Divider().background(Color.white.opacity(0.04))
-            
-            // Duration Selector Chips
-            HStack(spacing: 6) {
-                Text("Segment Length:")
-                    .font(.system(size: 9.5, weight: .medium))
-                    .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
-                
-                durationPill(label: "10s", value: 10.0)
-                durationPill(label: "15s • Optimal", value: 15.0)
-                durationPill(label: "20s", value: 20.0)
-                durationPill(label: "25s", value: 25.0)
-                
-                Spacer()
-            }
-            
-            // Precision Scrubber Slider (in Custom Range mode)
-            if !autoDetectSpeech && audioDuration > 5.0 {
-                HStack(spacing: 8) {
-                    Text("Start: \(formatSeconds(trimStartTime))")
-                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(Color(red: 0.16, green: 0.17, blue: 0.22))
-                        .cornerRadius(4)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(red: 0.24, green: 0.26, blue: 0.33), lineWidth: 1))
-                    
-                    Slider(
-                        value: $trimStartTime,
-                        in: 0...max(0.1, audioDuration - trimDuration),
-                        step: 1.0
-                    )
-                    .accentColor(Color(red: 0.05, green: 0.48, blue: 0.95))
-                    
-                    let endTime = min(audioDuration, trimStartTime + trimDuration)
-                    Text("End: \(formatSeconds(endTime))")
-                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                        .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(Color(red: 0.14, green: 0.15, blue: 0.19))
-                        .cornerRadius(4)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(red: 0.20, green: 0.22, blue: 0.28), lineWidth: 1))
-                }
-                .padding(.top, 2)
-            }
-            
-            // Audio Reference Preview Button (Fixed Height, Sleek Bar)
-            HStack {
-                Button(action: playSourceSegmentPreview) {
-                    HStack(spacing: 6) {
-                        Image(systemName: isPlayingSource ? "waveform" : "speaker.wave.2.fill")
-                            .font(.system(size: 11))
-                        Text(isPlayingSource ? "Playing Reference Clip..." : "▶ Listen to Reference Clip (\(Int(trimDuration))s)")
-                            .font(.system(size: 9.5, weight: .semibold))
-                    }
-                    .foregroundColor(isPlayingSource ? .white : Color(red: 0.05, green: 0.48, blue: 0.95))
-                    .padding(.horizontal, 10)
-                    .frame(height: 26)
-                    .background(Color(red: 0.16, green: 0.17, blue: 0.22))
-                    .cornerRadius(5)
-                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color(red: 0.24, green: 0.26, blue: 0.33), lineWidth: 1))
-                }
-                .buttonStyle(PlainButtonStyle())
-                .disabled(isPlayingSource)
-                
-                Spacer()
-            }
         }
-        .padding(10)
-        .background(Color(red: 0.09, green: 0.10, blue: 0.13))
-        .cornerRadius(7)
-        .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color(red: 0.18, green: 0.19, blue: 0.24), lineWidth: 1))
-    }
-    
-    // MARK: - Duration Pill Component
-    private func durationPill(label: String, value: Double) -> some View {
-        let isSelected = (trimDuration == value)
-        return Button(action: {
-            trimDuration = value
-            if trimStartTime > max(0.0, audioDuration - trimDuration) {
-                trimStartTime = max(0.0, audioDuration - trimDuration)
-            }
-        }) {
-            Text(label)
-                .font(.system(size: 9, weight: isSelected ? .bold : .medium))
-                .foregroundColor(isSelected ? .white : Color(red: 0.55, green: 0.56, blue: 0.62))
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3.5)
-                .background(isSelected ? Color(red: 0.16, green: 0.18, blue: 0.24) : Color(red: 0.12, green: 0.13, blue: 0.17))
-                .cornerRadius(4)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(isSelected ? Color(red: 0.05, green: 0.48, blue: 0.95) : Color(red: 0.20, green: 0.22, blue: 0.28), lineWidth: 1)
-                )
-        }
-        .buttonStyle(PlainButtonStyle())
     }
     
     // MARK: - 4. Test Verification Script
@@ -528,8 +373,9 @@ public struct VoiceCloningStudioView: View {
             .buttonStyle(PlainButtonStyle())
             .disabled(selectedAudioPath.isEmpty || manager.isCloning)
             
-            if manager.isCloning || SpeechQueueManager.shared.isSpeaking {
+            if manager.isCloning || SpeechQueueManager.shared.isSpeaking || trimmerPlayer.isPlaying {
                 Button(action: {
+                    trimmerPlayer.stop()
                     SpeechQueueManager.shared.stopCurrent()
                     let killProc = Process()
                     killProc.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
@@ -576,6 +422,7 @@ public struct VoiceCloningStudioView: View {
             
             // Cancel Button
             Button(action: {
+                trimmerPlayer.stop()
                 isPresented = false
                 hasAuditioned = false
             }) {
@@ -625,21 +472,24 @@ public struct VoiceCloningStudioView: View {
     }
     
     private func loadFile(url: URL) {
+        trimmerPlayer.stop()
         self.selectedAudioPath = url.path
         self.hasAuditioned = false
         if newVoiceName.isEmpty {
             self.newVoiceName = url.deletingPathExtension().lastPathComponent.replacingOccurrences(of: " ", with: "_")
         }
         
-        manager.getAudioFileInfo(audioPath: url.path, targetDuration: trimDuration) { dur, autoStart, _ in
-            self.audioDuration = dur
-            self.trimStartTime = autoStart
-            if dur > 0 {
-                let mins = Int(dur) / 60
-                let secs = Int(dur) % 60
-                self.detectedSpeechInfo = "\(mins)m \(secs)s total • Peak speech at \(Int(autoStart))s"
-            }
-        }
+        trimmerPlayer.loadAudio(url: url)
+        let dur = trimmerPlayer.duration > 0 ? trimmerPlayer.duration : {
+            let asset = AVURLAsset(url: url)
+            let s = CMTimeGetSeconds(asset.duration)
+            return s.isFinite ? s : 0.0
+        }()
+        
+        self.audioDuration = dur
+        self.trimStartTime = 0.0
+        self.trimEndTime = dur > 0 ? min(dur, 15.0) : 15.0
+        self.isCutActive = true
     }
     
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
@@ -664,30 +514,19 @@ public struct VoiceCloningStudioView: View {
         }
     }
     
-    private func playSourceSegmentPreview() {
-        guard !selectedAudioPath.isEmpty else { return }
-        isPlayingSource = true
-        manager.playSourceSegment(
-            audioPath: selectedAudioPath,
-            startTime: trimStartTime,
-            duration: trimDuration,
-            autoTrim: autoDetectSpeech
-        ) { _, _ in
-            DispatchQueue.main.asyncAfter(deadline: .now() + trimDuration) {
-                self.isPlayingSource = false
-            }
-        }
-    }
-    
     private func auditionVoiceSample() {
         guard !selectedAudioPath.isEmpty else { return }
+        trimmerPlayer.stop()
         let textToTest = testSentence.isEmpty ? "This is a viral and proven voice  currently used by hundreds successful of youtube channels. so Do you like this voice? " : testSentence
+        let actualStart = isCutActive ? trimStartTime : 0.0
+        let actualDur = isCutActive ? max(1.0, trimEndTime - trimStartTime) : max(1.0, audioDuration)
+        
         manager.auditionVoice(
             audioPath: selectedAudioPath,
             text: textToTest,
-            startTime: trimStartTime,
-            duration: trimDuration,
-            autoTrim: autoDetectSpeech
+            startTime: actualStart,
+            duration: actualDur,
+            autoTrim: false
         ) { success, _, dur in
             if success {
                 self.hasAuditioned = true
@@ -698,13 +537,17 @@ public struct VoiceCloningStudioView: View {
     
     private func saveAuditionedVoice() {
         guard !newVoiceName.isEmpty, !selectedAudioPath.isEmpty else { return }
+        trimmerPlayer.stop()
         let targetName = newVoiceName
+        let actualStart = isCutActive ? trimStartTime : 0.0
+        let actualDur = isCutActive ? max(1.0, trimEndTime - trimStartTime) : max(1.0, audioDuration)
+        
         manager.cloneVoice(
             name: targetName,
             audioPath: selectedAudioPath,
-            startTime: trimStartTime,
-            duration: trimDuration,
-            autoTrim: autoDetectSpeech
+            startTime: actualStart,
+            duration: actualDur,
+            autoTrim: false
         ) { success, _ in
             if success {
                 self.onVoiceSaved(targetName)
