@@ -9,6 +9,7 @@ public struct PocketTTSExtensionCardView: View {
     @State private var showingCloneSheet = false
     @State private var showingGuideSheet = false
     @State private var isAuditioning = false
+    @State private var activeAuditionProcess: Process? = nil
     
     public init(pocketVoice: Binding<String>, onSave: @escaping () -> Void) {
         self._pocketVoice = pocketVoice
@@ -253,6 +254,23 @@ public struct PocketTTSExtensionCardView: View {
                         .buttonStyle(PlainButtonStyle())
                         .disabled(isAuditioning)
                         
+                        if isAuditioning || SpeechQueueManager.shared.isSpeaking {
+                            Button(action: stopAudition) {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "stop.fill")
+                                        .font(.system(size: 9))
+                                    Text("Stop")
+                                        .font(.system(size: 11, weight: .bold))
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.red)
+                                .cornerRadius(6)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                        
                         // Clone Custom Voice Button
                         Button(action: {
                             let hasSeen = UserDefaults.standard.bool(forKey: "hasSeenCloningGuide")
@@ -351,16 +369,32 @@ public struct PocketTTSExtensionCardView: View {
         DispatchQueue.global(qos: .userInitiated).async {
             let proc = Process()
             proc.executableURL = URL(fileURLWithPath: py)
-            let testPhrase = "Hello! This is a voice audition for \(selectedVoiceLabel) in Agent Speak."
+            let testPhrase = "This is a viral and proven voice  currently used by hundreds successful of youtube channels. so Do you like this voice? "
             proc.arguments = [script, testPhrase, "--voice", self.pocketVoice, "--play"]
+            
+            DispatchQueue.main.async {
+                self.activeAuditionProcess = proc
+            }
             
             try? proc.run()
             proc.waitUntilExit()
             
             DispatchQueue.main.async {
+                self.activeAuditionProcess = nil
                 self.isAuditioning = false
             }
         }
+    }
+    
+    private func stopAudition() {
+        activeAuditionProcess?.terminate()
+        activeAuditionProcess = nil
+        isAuditioning = false
+        SpeechQueueManager.shared.stopCurrent()
+        let killProc = Process()
+        killProc.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+        killProc.arguments = ["afplay"]
+        try? killProc.run()
     }
 }
 

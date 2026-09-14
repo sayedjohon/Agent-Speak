@@ -49,7 +49,7 @@ public struct DashboardView: View {
     @State private var skipSeconds: Int = 5
     @State private var showTrayIcon: Bool = true
     @State private var availableSystemVoices: [SystemVoiceItem] = []
-    @State private var customTestText: String = "Hello Johon! Agent Speak is live with multilingual speech."
+    @State private var customTestText: String = "This is a viral and proven voice  currently used by hundreds successful of youtube channels. so Do you like this voice? "
     
     // Workspace States
     @State private var watchAntigravity: Bool = true
@@ -593,9 +593,28 @@ public struct DashboardView: View {
                                 .stroke(Color.white.opacity(0.12), lineWidth: 1)
                         )
                     
+                    if queueManager.isSpeaking {
+                        Button(action: {
+                            SpeechQueueManager.shared.stopCurrent()
+                        }) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "stop.fill")
+                                    .font(.system(size: 9))
+                                Text("Stop")
+                                    .font(.system(size: 11, weight: .bold))
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color.red)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
                     Button(action: {
                         let textToSpeak = customTestText.trimmingCharacters(in: .whitespacesAndNewlines)
-                        let prompt = textToSpeak.isEmpty ? "Testing Agent Speak voice playback." : textToSpeak
+                        let prompt = textToSpeak.isEmpty ? "This is a viral and proven voice  currently used by hundreds successful of youtube channels. so Do you like this voice? " : textToSpeak
                         LastVoiceManager.shared.prepareForNewVoice(text: prompt)
                         SpeechQueueManager.shared.enqueue(
                             source: "Voice Test",

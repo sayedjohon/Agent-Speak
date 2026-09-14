@@ -10,7 +10,7 @@ public struct VoiceCloningStudioView: View {
     @State private var showingGuideSheet = false
     @State private var newVoiceName = ""
     @State private var selectedAudioPath = ""
-    @State private var testSentence = "Hello! This is an audition of my newly cloned voice persona."
+    @State private var testSentence = "This is a viral and proven voice  currently used by hundreds successful of youtube channels. so Do you like this voice? "
     @State private var hasAuditioned = false
     @State private var auditionDuration: Double = 0.0
     
@@ -528,6 +528,29 @@ public struct VoiceCloningStudioView: View {
             .buttonStyle(PlainButtonStyle())
             .disabled(selectedAudioPath.isEmpty || manager.isCloning)
             
+            if manager.isCloning || SpeechQueueManager.shared.isSpeaking {
+                Button(action: {
+                    SpeechQueueManager.shared.stopCurrent()
+                    let killProc = Process()
+                    killProc.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+                    killProc.arguments = ["afplay"]
+                    try? killProc.run()
+                }) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "stop.fill")
+                            .font(.system(size: 9))
+                        Text("Stop")
+                            .font(.system(size: 11, weight: .bold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .frame(height: 30)
+                    .background(Color.red)
+                    .cornerRadius(6)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            
             // Save & Activate Button (Only after auditioning)
             if hasAuditioned {
                 Button(action: saveAuditionedVoice) {
@@ -658,7 +681,7 @@ public struct VoiceCloningStudioView: View {
     
     private func auditionVoiceSample() {
         guard !selectedAudioPath.isEmpty else { return }
-        let textToTest = testSentence.isEmpty ? "Hello! This is an audition of my newly cloned voice persona." : testSentence
+        let textToTest = testSentence.isEmpty ? "This is a viral and proven voice  currently used by hundreds successful of youtube channels. so Do you like this voice? " : testSentence
         manager.auditionVoice(
             audioPath: selectedAudioPath,
             text: textToTest,
