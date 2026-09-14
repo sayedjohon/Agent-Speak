@@ -6,7 +6,7 @@ struct PointyTopNotchBarView: View {
     @ObservedObject var state: StreamingAudioManager
     let hasNotch: Bool
     
-    let notchWidth: CGFloat = 212.0
+    let notchWidth: CGFloat = 185.0
     let barHeight: CGFloat = 30.0
     
     var topRadius: CGFloat { hasNotch ? 0 : 10 }
@@ -14,14 +14,6 @@ struct PointyTopNotchBarView: View {
     
     var body: some View {
         HStack(spacing: 5) {
-            // Mini Jarvis Hologram Arc Reactor Orb
-            JarvisOrbVisualizerView(
-                isSpeaking: state.isPlaying,
-                isPlayingMusic: BackgroundMusicManager.shared.isPlaying,
-                size: 20
-            )
-            .frame(width: 20, height: 20)
-            
             // Play / Pause
             Button(action: { state.togglePlayPause() }) {
                 Image(systemName: state.isPlaying ? "pause.fill" : "play.fill")
@@ -114,3 +106,26 @@ struct PointyTopNotchBarView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }
+
+// MARK: - Floating Full-Screen Holographic Jarvis Arc Reactor
+struct FloatingJarvisHologramOverlayView: View {
+    @ObservedObject var state: StreamingAudioManager
+    let size: CGFloat
+    
+    init(state: StreamingAudioManager, size: CGFloat = 340.0) {
+        self.state = state
+        self.size = size
+    }
+    
+    public var body: some View {
+        JarvisOrbVisualizerView(
+            isSpeaking: state.isPlaying,
+            isPlayingMusic: BackgroundMusicManager.shared.isPlaying,
+            size: size
+        )
+        .opacity(0.32) // ~70% transparency so text, code, and windows underneath are clearly visible!
+        .allowsHitTesting(false)
+        .frame(width: size, height: size)
+    }
+}
+

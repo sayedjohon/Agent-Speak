@@ -483,6 +483,7 @@ public class NotchWindowController {
     public static let shared = NotchWindowController()
     
     private var window: KeyablePanel?
+    private var hologramPanel: NSPanel?
     private var audioManager: StreamingAudioManager?
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -492,6 +493,41 @@ public class NotchWindowController {
     private var eventHandlerRef: EventHandlerRef?
     
     private init() {}
+    
+    private func createHologramPanel(targetScreen: NSScreen, audioManager: StreamingAudioManager) -> NSPanel {
+        let holoSize: CGFloat = 340.0
+        let screenW = targetScreen.frame.width
+        let screenH = targetScreen.frame.height
+        let screenX = targetScreen.frame.origin.x
+        let screenY = targetScreen.frame.origin.y
+        
+        let holoX = screenX + (screenW - holoSize) / 2.0
+        // Centered horizontally, shifted slightly upward into primary visual field
+        let holoY = screenY + (screenH - holoSize) / 2.0 + (screenH * 0.10)
+        let holoFrame = NSRect(x: holoX, y: holoY, width: holoSize, height: holoSize)
+        
+        let panel = NSPanel(
+            contentRect: holoFrame,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isFloatingPanel = true
+        panel.level = .statusBar - 1
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = false
+        panel.ignoresMouseEvents = true // 100% click-through: user can click and select text/code underneath
+        
+        let hosting = NSHostingView(
+            rootView: FloatingJarvisHologramOverlayView(state: audioManager, size: holoSize)
+        )
+        hosting.frame = NSRect(x: 0, y: 0, width: holoSize, height: holoSize)
+        hosting.wantsLayer = true
+        panel.contentView = hosting
+        return panel
+    }
     
     public func presentSpeech(text: String, project: String = "Agent Speak", onFinished: (() -> Void)? = nil) {
         DispatchQueue.main.async { [weak self] in
@@ -508,7 +544,7 @@ public class NotchWindowController {
                 hasNotch = false
             }
             
-            let notchWidth: CGFloat = 212.0
+            let notchWidth: CGFloat = 185.0
             let barHeight: CGFloat = 30.0
             let windowWidth = notchWidth + 24.0
             let windowHeight = barHeight + 20.0
@@ -556,6 +592,10 @@ public class NotchWindowController {
             panel.contentView = hosting
             panel.orderFront(nil)
             self.window = panel
+            
+            let hPanel = self.createHologramPanel(targetScreen: targetScreen, audioManager: self.audioManager!)
+            hPanel.orderFront(nil)
+            self.hologramPanel = hPanel
             
             // Watchdog: dismiss if speech synthesis fails completely after timeout
             let targetMgr = self.audioManager
@@ -635,6 +675,10 @@ public class NotchWindowController {
             panel.orderFront(nil)
             self.window = panel
             
+            let hPanel = self.createHologramPanel(targetScreen: targetScreen, audioManager: self.audioManager!)
+            hPanel.orderFront(nil)
+            self.hologramPanel = hPanel
+            
             // Instant Autoplay Verification
             let targetMgr = self.audioManager
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
@@ -669,6 +713,8 @@ public class NotchWindowController {
         
         window?.orderOut(nil)
         window = nil
+        hologramPanel?.orderOut(nil)
+        hologramPanel = nil
     }
     
     public func updateVolume() {
