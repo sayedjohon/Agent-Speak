@@ -495,19 +495,9 @@ public class NotchWindowController {
     private init() {}
     
     private func createHologramPanel(targetScreen: NSScreen, audioManager: StreamingAudioManager) -> NSPanel {
-        let holoSize: CGFloat = 340.0
-        let screenW = targetScreen.frame.width
-        let screenH = targetScreen.frame.height
-        let screenX = targetScreen.frame.origin.x
-        let screenY = targetScreen.frame.origin.y
-        
-        let holoX = screenX + (screenW - holoSize) / 2.0
-        // Centered horizontally, shifted slightly upward into primary visual field
-        let holoY = screenY + (screenH - holoSize) / 2.0 + (screenH * 0.10)
-        let holoFrame = NSRect(x: holoX, y: holoY, width: holoSize, height: holoSize)
-        
+        let screenFrame = targetScreen.frame
         let panel = NSPanel(
-            contentRect: holoFrame,
+            contentRect: screenFrame,
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -518,12 +508,12 @@ public class NotchWindowController {
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = false
-        panel.ignoresMouseEvents = true // 100% click-through: user can click and select text/code underneath
+        panel.ignoresMouseEvents = true // 100% click-through anywhere on screen: clicks pass straight through!
         
         let hosting = NSHostingView(
-            rootView: FloatingJarvisHologramOverlayView(state: audioManager, size: holoSize)
+            rootView: FloatingJarvisHologramOverlayView(state: audioManager)
         )
-        hosting.frame = NSRect(x: 0, y: 0, width: holoSize, height: holoSize)
+        hosting.frame = NSRect(x: 0, y: 0, width: screenFrame.width, height: screenFrame.height)
         hosting.wantsLayer = true
         panel.contentView = hosting
         return panel

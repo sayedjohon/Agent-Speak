@@ -110,22 +110,96 @@ struct PointyTopNotchBarView: View {
 // MARK: - Floating Full-Screen Holographic Jarvis Arc Reactor
 struct FloatingJarvisHologramOverlayView: View {
     @ObservedObject var state: StreamingAudioManager
-    let size: CGFloat
+    @ObservedObject var meter = JarvisAudioLevelMeter.shared
     
-    init(state: StreamingAudioManager, size: CGFloat = 340.0) {
+    let reactorSize: CGFloat = 480.0
+    
+    init(state: StreamingAudioManager) {
         self.state = state
-        self.size = size
     }
     
-    public var body: some View {
-        JarvisOrbVisualizerView(
-            isSpeaking: state.isPlaying,
-            isPlayingMusic: BackgroundMusicManager.shared.isPlaying,
-            size: size
-        )
-        .opacity(0.32) // ~70% transparency so text, code, and windows underneath are clearly visible!
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let energy = state.isPlaying ? meter.level : 0.0
+            
+            ZStack(alignment: .center) {
+                // Invisible click-through container
+                Color.clear
+                
+                // 1. Ambient Scene Wave Glow (Radiates across the room/screen when speaking)
+                if state.isPlaying {
+                    TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
+                        let now = timeline.date.timeIntervalSinceReferenceDate
+                        let pulse = sin(now * 2.6) * 0.5 + 0.5
+                        let waveRadius: CGFloat = 460.0 + CGFloat(pulse) * 45.0 + CGFloat(energy) * 80.0
+                        let rippleProgress = CGFloat((now.truncatingRemainder(dividingBy: 2.2)) / 2.2)
+                        
+                        ZStack {
+                            // Soft atmospheric warm amber room illumination
+                            Circle()
+                                .fill(
+                                    RadialGradient(
+                                        colors: [
+                                            Color(red: 1.0, green: 0.60, blue: 0.12).opacity(0.18 + Double(energy) * 0.20),
+                                            Color(red: 0.95, green: 0.30, blue: 0.02).opacity(0.08 + Double(energy) * 0.10),
+                                            Color.clear
+                                        ],
+                                        center: .center,
+                                        startRadius: 30,
+                                        endRadius: waveRadius
+                                    )
+                                )
+                                .frame(width: waveRadius * 2, height: waveRadius * 2)
+                                .blur(radius: 60)
+                                .blendMode(.plusLighter)
+                            
+                            // Outward propagating harmonic ripple wave ring
+                            Circle()
+                                .stroke(
+                                    Color(red: 1.0, green: 0.72, blue: 0.25).opacity((1.0 - Double(rippleProgress)) * (0.28 + Double(energy) * 0.30)),
+                                    lineWidth: 1.8
+                                )
+                                .frame(width: 240 + rippleProgress * 440, height: 240 + rippleProgress * 440)
+                                .blur(radius: 2.5)
+                                .blendMode(.plusLighter)
+                        }
+                        // Center ambient glow precisely behind the reactor
+                        .position(x: w / 2.0, y: h * 0.36)
+                    }
+                }
+                
+                // 2. Large Tony Stark Holographic Arc Reactor (100% Opacity + Dual Bloom Glow)
+                ZStack {
+                    // Layer A: Intense Bloom Glow Pass
+                    JarvisOrbVisualizerView(
+                        isSpeaking: state.isPlaying,
+                        isPlayingMusic: BackgroundMusicManager.shared.isPlaying,
+                        size: reactorSize
+                    )
+                    .blur(radius: 16)
+                    .opacity(state.isPlaying ? 0.95 : 0.40)
+                    .blendMode(.plusLighter)
+                    
+                    // Layer B: Crisp 100% Opacity Hologram Pass
+                    JarvisOrbVisualizerView(
+                        isSpeaking: state.isPlaying,
+                        isPlayingMusic: BackgroundMusicManager.shared.isPlaying,
+                        size: reactorSize
+                    )
+                    .blendMode(.plusLighter)
+                }
+                .frame(width: reactorSize, height: reactorSize)
+                // Position in the upper-middle of the screen, floating right below notch
+                .position(x: w / 2.0, y: h * 0.36)
+            }
+            .frame(width: w, height: h)
+            .allowsHitTesting(false)
+        }
         .allowsHitTesting(false)
-        .frame(width: size, height: size)
+        .ignoresSafeArea()
     }
 }
+
 

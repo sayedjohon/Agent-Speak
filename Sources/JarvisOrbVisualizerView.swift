@@ -97,7 +97,7 @@ public struct JarvisOrbVisualizerView: View {
         let baseEnergy = isSpeaking ? meter.level : 0
         let energy = max(baseEnergy, isSpeaking ? 0.18 : 0.0)
         let bass = isPlayingMusic ? meter.bass : 0
-        let radius = min(canvasSize.width, canvasSize.height) * 0.46
+        let radius = min(canvasSize.width, canvasSize.height) * 0.31
         let scale = max(0.42, radius / 68.0)
         let breathing = 0.5 + 0.5 * sin(time * (isSpeaking ? 4.8 : 1.35))
         let hologramCenter = CGPoint(
@@ -119,27 +119,42 @@ public struct JarvisOrbVisualizerView: View {
 
     private func drawGlassVolume(_ context: inout GraphicsContext, center: CGPoint, radius: CGFloat, energy: CGFloat, time: TimeInterval) {
         let sphere = CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
-        let warmGlow = Path(ellipseIn: sphere.insetBy(dx: -radius * 0.05, dy: -radius * 0.05))
+        let warmGlow = Path(ellipseIn: sphere.insetBy(dx: -radius * 0.12, dy: -radius * 0.12))
 
+        // Outer intense atmospheric bloom
         var blurred = context
-        blurred.addFilter(.blur(radius: radius * (0.18 + energy * 0.08)))
+        blurred.addFilter(.blur(radius: radius * (0.24 + energy * 0.12)))
         blurred.fill(warmGlow, with: .radialGradient(
             Gradient(colors: [
-                Self.hotWhite.opacity(0.20 + energy * 0.24),
-                Self.amber.opacity(0.22 + energy * 0.34),
-                Self.deepAmber.opacity(0.10),
+                Self.hotWhite.opacity(0.50 + energy * 0.40),
+                Self.amber.opacity(0.55 + energy * 0.35),
+                Self.deepAmber.opacity(0.20),
                 .clear
             ]),
             center: center,
             startRadius: radius * 0.04,
-            endRadius: radius * 1.10
+            endRadius: radius * 1.25
+        ))
+
+        // Secondary rich core bloom
+        var coreBloom = context
+        coreBloom.addFilter(.blur(radius: radius * 0.14))
+        coreBloom.fill(Path(ellipseIn: sphere.insetBy(dx: radius * 0.10, dy: radius * 0.10)), with: .radialGradient(
+            Gradient(colors: [
+                Self.hotWhite.opacity(0.65 + energy * 0.30),
+                Self.amber.opacity(0.50 + energy * 0.30),
+                .clear
+            ]),
+            center: center,
+            startRadius: 0,
+            endRadius: radius * 0.90
         ))
 
         context.fill(Path(ellipseIn: sphere), with: .radialGradient(
             Gradient(colors: [
-                Self.hotWhite.opacity(0.035 + energy * 0.035),
-                Self.amber.opacity(0.050 + energy * 0.055),
-                Self.deepAmber.opacity(0.035),
+                Self.hotWhite.opacity(0.08 + energy * 0.06),
+                Self.amber.opacity(0.12 + energy * 0.08),
+                Self.deepAmber.opacity(0.05),
                 .clear
             ]),
             center: center,
