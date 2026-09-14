@@ -570,6 +570,28 @@ public class TranscriptWatcher {
                         DispatchQueue.main.async {
                             SpeechQueueManager.shared.enqueue(source: greeting.character, text: greeting.text)
                         }
+                    } else if raw == "__CMD_HOLOGRAM_ON__" {
+                        DispatchQueue.main.async {
+                            HologramManager.shared.setEnabled(true)
+                        }
+                    } else if raw == "__CMD_HOLOGRAM_OFF__" {
+                        DispatchQueue.main.async {
+                            HologramManager.shared.setEnabled(false)
+                        }
+                    } else if raw == "__CMD_HOLOGRAM_TOGGLE__" {
+                        DispatchQueue.main.async {
+                            let cur = HologramManager.shared.isEnabled
+                            HologramManager.shared.setEnabled(!cur)
+                        }
+                    } else if raw == "__CMD_HOLOGRAM_PREVIEW__" {
+                        DispatchQueue.main.async {
+                            HologramManager.shared.triggerPreview()
+                        }
+                    } else if raw.hasPrefix("__CMD_HOLOGRAM_COLOR_") && raw.hasSuffix("__") {
+                        let colorId = raw.replacingOccurrences(of: "__CMD_HOLOGRAM_COLOR_", with: "").replacingOccurrences(of: "__", with: "").lowercased()
+                        DispatchQueue.main.async {
+                            HologramManager.shared.setTheme(id: colorId)
+                        }
                     } else {
                         let clean = TextSanitizer.sanitizeForSpeech(raw)
                         if !clean.isEmpty {

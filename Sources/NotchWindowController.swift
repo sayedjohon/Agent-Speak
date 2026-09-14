@@ -483,7 +483,6 @@ public class NotchWindowController {
     public static let shared = NotchWindowController()
     
     private var window: KeyablePanel?
-    private var hologramPanel: NSPanel?
     private var audioManager: StreamingAudioManager?
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -493,31 +492,6 @@ public class NotchWindowController {
     private var eventHandlerRef: EventHandlerRef?
     
     private init() {}
-    
-    private func createHologramPanel(targetScreen: NSScreen, audioManager: StreamingAudioManager) -> NSPanel {
-        let screenFrame = targetScreen.frame
-        let panel = NSPanel(
-            contentRect: screenFrame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        panel.isFloatingPanel = true
-        panel.level = .statusBar - 1
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-        panel.backgroundColor = .clear
-        panel.isOpaque = false
-        panel.hasShadow = false
-        panel.ignoresMouseEvents = true // 100% click-through anywhere on screen: clicks pass straight through!
-        
-        let hosting = NSHostingView(
-            rootView: FloatingJarvisHologramOverlayView(state: audioManager)
-        )
-        hosting.frame = NSRect(x: 0, y: 0, width: screenFrame.width, height: screenFrame.height)
-        hosting.wantsLayer = true
-        panel.contentView = hosting
-        return panel
-    }
     
     public func presentSpeech(text: String, project: String = "Agent Speak", onFinished: (() -> Void)? = nil) {
         DispatchQueue.main.async { [weak self] in
@@ -570,7 +544,7 @@ public class NotchWindowController {
             panel.hasShadow = false
             
             self.audioManager = StreamingAudioManager(text: text) { [weak self] in
-                self?.dismiss()
+                self?.dismissNotchBarOnly()
                 onFinished?()
             }
             
@@ -583,9 +557,7 @@ public class NotchWindowController {
             panel.orderFront(nil)
             self.window = panel
             
-            let hPanel = self.createHologramPanel(targetScreen: targetScreen, audioManager: self.audioManager!)
-            hPanel.orderFront(nil)
-            self.hologramPanel = hPanel
+            HologramManager.shared.showHologram(targetScreen: targetScreen, audioManager: self.audioManager!)
             
             // Watchdog: dismiss if speech synthesis fails completely after timeout
             let targetMgr = self.audioManager
@@ -652,7 +624,7 @@ public class NotchWindowController {
             panel.hasShadow = false
             
             self.audioManager = StreamingAudioManager(audioFilePath: filePath) { [weak self] in
-                self?.dismiss()
+                self?.dismissNotchBarOnly()
                 onFinished?()
             }
             
@@ -665,9 +637,7 @@ public class NotchWindowController {
             panel.orderFront(nil)
             self.window = panel
             
-            let hPanel = self.createHologramPanel(targetScreen: targetScreen, audioManager: self.audioManager!)
-            hPanel.orderFront(nil)
-            self.hologramPanel = hPanel
+            HologramManager.shared.showHologram(targetScreen: targetScreen, audioManager: self.audioManager!)
             
             // Instant Autoplay Verification
             let targetMgr = self.audioManager
@@ -689,6 +659,12 @@ public class NotchWindowController {
         }
     }
     
+    public func dismissNotchBarOnly() {
+        window?.orderOut(nil)
+        window = nil
+        HologramManager.shared.onSpeechFinished()
+    }
+    
     private var isDismissing = false
     public func dismiss() {
         guard !isDismissing else { return }
@@ -703,8 +679,7 @@ public class NotchWindowController {
         
         window?.orderOut(nil)
         window = nil
-        hologramPanel?.orderOut(nil)
-        hologramPanel = nil
+        HologramManager.shared.dismissHologramImmediately()
     }
     
     public func updateVolume() {

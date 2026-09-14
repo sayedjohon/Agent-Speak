@@ -70,15 +70,22 @@ public final class JarvisAudioLevelMeter: ObservableObject {
 /// A scalable, native SwiftUI Jarvis-style holographic reactor driven by `JarvisAudioLevelMeter.shared`.
 public struct JarvisOrbVisualizerView: View {
     @ObservedObject private var meter = JarvisAudioLevelMeter.shared
+    @ObservedObject private var hologram = HologramManager.shared
 
     public var isSpeaking: Bool
     public var isPlayingMusic: Bool
     public var size: CGFloat
+    public var theme: HologramTheme?
 
-    public init(isSpeaking: Bool = false, isPlayingMusic: Bool = false, size: CGFloat = 68) {
+    public init(isSpeaking: Bool = false, isPlayingMusic: Bool = false, size: CGFloat = 68, theme: HologramTheme? = nil) {
         self.isSpeaking = isSpeaking
         self.isPlayingMusic = isPlayingMusic
         self.size = size
+        self.theme = theme
+    }
+
+    private var activeTheme: HologramTheme {
+        theme ?? hologram.currentTheme
     }
 
     public var body: some View {
@@ -94,12 +101,13 @@ public struct JarvisOrbVisualizerView: View {
 
     private func draw(in context: inout GraphicsContext, canvasSize: CGSize, time: TimeInterval) {
         let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
-        let baseEnergy = isSpeaking ? meter.level : 0
-        let energy = max(baseEnergy, isSpeaking ? 0.18 : 0.0)
-        let bass = isPlayingMusic ? meter.bass : 0
+        let baseEnergy = meter.level
+        let musicEnergy = isPlayingMusic ? max(0.16, CGFloat(meter.bass) * 0.32) : 0.0
+        let energy = max(baseEnergy, isSpeaking ? 0.18 : musicEnergy)
+        let bass = isPlayingMusic ? max(meter.bass, 0.18) : 0
         let radius = min(canvasSize.width, canvasSize.height) * 0.31
         let scale = max(0.42, radius / 68.0)
-        let breathing = 0.5 + 0.5 * sin(time * (isSpeaking ? 4.8 : 1.35))
+        let breathing = 0.5 + 0.5 * sin(time * (isSpeaking ? 4.8 : (isPlayingMusic ? 2.4 : 1.35)))
         let hologramCenter = CGPoint(
             x: center.x + radius * (0.035 + energy * 0.018),
             y: center.y - radius * 0.018
@@ -126,8 +134,8 @@ public struct JarvisOrbVisualizerView: View {
         blurred.addFilter(.blur(radius: radius * (0.20 + energy * 0.10)))
         blurred.fill(warmGlow, with: .radialGradient(
             Gradient(colors: [
-                Self.amber.opacity(0.30 + energy * 0.20),
-                Self.deepAmber.opacity(0.14 + energy * 0.10),
+                activeTheme.amber.opacity(0.30 + energy * 0.20),
+                activeTheme.deepAmber.opacity(0.14 + energy * 0.10),
                 .clear
             ]),
             center: center,
@@ -137,8 +145,8 @@ public struct JarvisOrbVisualizerView: View {
 
         context.fill(Path(ellipseIn: sphere), with: .radialGradient(
             Gradient(colors: [
-                Self.amber.opacity(0.06 + energy * 0.04),
-                Self.deepAmber.opacity(0.04),
+                activeTheme.amber.opacity(0.06 + energy * 0.04),
+                activeTheme.deepAmber.opacity(0.04),
                 .clear
             ]),
             center: center,
@@ -153,7 +161,7 @@ public struct JarvisOrbVisualizerView: View {
             width: radius * 1.46,
             height: radius * 1.84
         )
-        context.stroke(Path(ellipseIn: lens), with: .color(Self.lensAmber.opacity(0.14 + energy * 0.08)), lineWidth: max(0.45, radius * 0.006))
+        context.stroke(Path(ellipseIn: lens), with: .color(activeTheme.lensAmber.opacity(0.14 + energy * 0.08)), lineWidth: max(0.45, radius * 0.006))
     }
 
     private func drawBrokenReactorRings(
@@ -190,7 +198,7 @@ public struct JarvisOrbVisualizerView: View {
                 let sweep = (.pi * ringInfo.2) * (0.42 + random(segmentIndex, ringIndex, 5) * 0.82)
                 let flicker = 0.55 + 0.45 * sin(CGFloat(time) * (1.6 + random(segmentIndex, 4, ringIndex) * 5.7) + base * 4)
                 let alpha = (0.13 + flicker * 0.25 + energy * 0.28) * (ringIndex == 0 ? 1.20 : 1.0)
-                let color = segmentIndex % 13 == 0 ? Self.hotWhite.opacity(alpha * 0.72) : Self.amber.opacity(alpha)
+                let color = segmentIndex % 13 == 0 ? activeTheme.hotWhite.opacity(alpha * 0.72) : activeTheme.amber.opacity(alpha)
 
                 let squash = 0.72 + random(segmentIndex, ringIndex, 41) * 0.22
                 let offset = CGPoint(
@@ -249,9 +257,9 @@ public struct JarvisOrbVisualizerView: View {
             if index % 5 == 0 {
                 var glow = context
                 glow.addFilter(.blur(radius: max(0.7, scale * 1.6)))
-                glow.stroke(path, with: .color(Self.amber.opacity(alpha * 0.38)), style: StrokeStyle(lineWidth: lineWidth * 4.2, lineCap: .round, lineJoin: .round))
+                glow.stroke(path, with: .color(activeTheme.amber.opacity(alpha * 0.38)), style: StrokeStyle(lineWidth: lineWidth * 4.2, lineCap: .round, lineJoin: .round))
             }
-            context.stroke(path, with: .color(Self.amber.opacity(alpha)), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
+            context.stroke(path, with: .color(activeTheme.amber.opacity(alpha)), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
         }
 
         for index in 0..<(size < 42 ? 14 : 54) {
@@ -275,7 +283,7 @@ public struct JarvisOrbVisualizerView: View {
 
             let flicker = 0.35 + 0.65 * max(0, sin(CGFloat(time) * (2.5 + random(index, 593, 5) * 7.0) + angle))
             let alpha = 0.12 + flicker * 0.35 + energy * 0.40
-            context.stroke(trace, with: .color(Self.hotWhite.opacity(alpha * 0.54)), style: StrokeStyle(lineWidth: max(0.22, scale * 0.46), lineCap: .round, lineJoin: .round))
+            context.stroke(trace, with: .color(activeTheme.hotWhite.opacity(alpha * 0.54)), style: StrokeStyle(lineWidth: max(0.22, scale * 0.46), lineCap: .round, lineJoin: .round))
         }
     }
 
@@ -325,7 +333,7 @@ public struct JarvisOrbVisualizerView: View {
             }
 
             let lineWidth = max(0.22, scale * (0.24 + random(index, 29, 2) * 0.46))
-            let color = index % 11 == 0 ? Self.hotWhite.opacity(alpha * 0.78) : Self.amber.opacity(alpha)
+            let color = index % 11 == 0 ? activeTheme.hotWhite.opacity(alpha * 0.78) : activeTheme.amber.opacity(alpha)
             context.stroke(trace, with: .color(color), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
         }
     }
@@ -374,9 +382,9 @@ public struct JarvisOrbVisualizerView: View {
             if index % 9 == 0 {
                 var glow = context
                 glow.addFilter(.blur(radius: max(0.45, scale * 1.15)))
-                glow.stroke(path, with: .color(Self.amber.opacity(alpha * 0.35)), style: StrokeStyle(lineWidth: lineWidth * 3.4, lineCap: .round, lineJoin: .round))
+                glow.stroke(path, with: .color(activeTheme.amber.opacity(alpha * 0.35)), style: StrokeStyle(lineWidth: lineWidth * 3.4, lineCap: .round, lineJoin: .round))
             }
-            context.stroke(path, with: .color(Self.amber.opacity(alpha)), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
+            context.stroke(path, with: .color(activeTheme.amber.opacity(alpha)), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
         }
 
         for index in 0..<(size < 42 ? 18 : 72) {
@@ -392,7 +400,7 @@ public struct JarvisOrbVisualizerView: View {
                 endAngle: .radians(Double(angle + sweep)),
                 clockwise: false
             )
-            context.stroke(shard, with: .color(Self.hotWhite.opacity(0.15 + energy * 0.32)), style: StrokeStyle(lineWidth: max(0.22, scale * 0.42), lineCap: .butt))
+            context.stroke(shard, with: .color(activeTheme.hotWhite.opacity(0.15 + energy * 0.32)), style: StrokeStyle(lineWidth: max(0.22, scale * 0.42), lineCap: .butt))
         }
     }
 
@@ -425,9 +433,9 @@ public struct JarvisOrbVisualizerView: View {
             if index % 6 == 0 {
                 var glow = context
                 glow.addFilter(.blur(radius: max(0.8, scale * 1.4)))
-                glow.stroke(ray, with: .color(Self.amber.opacity(alpha * 0.42)), style: StrokeStyle(lineWidth: width * 3, lineCap: .round))
+                glow.stroke(ray, with: .color(activeTheme.amber.opacity(alpha * 0.42)), style: StrokeStyle(lineWidth: width * 3, lineCap: .round))
             }
-            context.stroke(ray, with: .color(Self.hotWhite.opacity(alpha * 0.55)), style: StrokeStyle(lineWidth: width, lineCap: .round))
+            context.stroke(ray, with: .color(activeTheme.hotWhite.opacity(alpha * 0.55)), style: StrokeStyle(lineWidth: width, lineCap: .round))
         }
     }
 
@@ -455,7 +463,7 @@ public struct JarvisOrbVisualizerView: View {
 
             let alpha = 0.08 + beat * 0.38 + energy * 0.42
             let width = max(0.25, scale * (0.28 + beat * 1.1))
-            context.stroke(bar, with: .color(Self.hotWhite.opacity(alpha * 0.58)), style: StrokeStyle(lineWidth: width, lineCap: .round))
+            context.stroke(bar, with: .color(activeTheme.hotWhite.opacity(alpha * 0.58)), style: StrokeStyle(lineWidth: width, lineCap: .round))
         }
 
         for index in 0..<(size < 42 ? 8 : 24) {
@@ -465,7 +473,7 @@ public struct JarvisOrbVisualizerView: View {
             var spark = Path()
             spark.move(to: CGPoint(x: center.x + cos(angle) * base, y: center.y + sin(angle) * base * 0.76))
             spark.addLine(to: CGPoint(x: center.x + cos(angle) * (base + jitter + radius * 0.12), y: center.y + sin(angle) * (base + jitter + radius * 0.12) * 0.76))
-            context.stroke(spark, with: .color(Self.hotWhite.opacity(0.16 + energy * 0.55)), style: StrokeStyle(lineWidth: max(0.28, scale * 0.55), lineCap: .round))
+            context.stroke(spark, with: .color(activeTheme.hotWhite.opacity(0.16 + energy * 0.55)), style: StrokeStyle(lineWidth: max(0.28, scale * 0.55), lineCap: .round))
         }
     }
 
@@ -495,9 +503,9 @@ public struct JarvisOrbVisualizerView: View {
             if index % 19 == 0 {
                 var glow = context
                 glow.addFilter(.blur(radius: dotSize * 1.7))
-                glow.fill(Path(ellipseIn: rect.insetBy(dx: -dotSize * 1.2, dy: -dotSize * 1.2)), with: .color(Self.hotWhite.opacity(alpha * 0.28)))
+                glow.fill(Path(ellipseIn: rect.insetBy(dx: -dotSize * 1.2, dy: -dotSize * 1.2)), with: .color(activeTheme.hotWhite.opacity(alpha * 0.28)))
             }
-            context.fill(Path(ellipseIn: rect), with: .color(Self.amber.opacity(alpha)))
+            context.fill(Path(ellipseIn: rect), with: .color(activeTheme.amber.opacity(alpha)))
         }
     }
 
@@ -517,8 +525,8 @@ public struct JarvisOrbVisualizerView: View {
         coreGlow.addFilter(.blur(radius: max(1.2, scale * 2.0)))
         coreGlow.fill(Path(ellipseIn: coreRect.insetBy(dx: -coreRadius * 0.35, dy: -coreRadius * 0.35)), with: .radialGradient(
             Gradient(colors: [
-                Self.goldGlint.opacity(0.40 + energy * 0.22),
-                Self.amber.opacity(0.30),
+                activeTheme.glint.opacity(0.40 + energy * 0.22),
+                activeTheme.amber.opacity(0.30),
                 .clear
             ]),
             center: center,
@@ -528,8 +536,8 @@ public struct JarvisOrbVisualizerView: View {
 
         context.fill(Path(ellipseIn: coreRect), with: .radialGradient(
             Gradient(colors: [
-                Self.goldGlint.opacity(0.65 + energy * 0.15),
-                Self.amber.opacity(0.40),
+                activeTheme.glint.opacity(0.65 + energy * 0.15),
+                activeTheme.amber.opacity(0.40),
                 .clear
             ]),
             center: center,
@@ -563,8 +571,8 @@ public struct JarvisOrbVisualizerView: View {
             let alpha = 0.34 + energy * 0.35
             var glow = context
             glow.addFilter(.blur(radius: max(0.7, scale * 1.4)))
-            glow.stroke(filament, with: .color(Self.amber.opacity(alpha * 0.50)), style: StrokeStyle(lineWidth: max(0.65, scale * 1.6), lineCap: .round, lineJoin: .round))
-            context.stroke(filament, with: .color(Self.goldGlint.opacity(alpha)), style: StrokeStyle(lineWidth: max(0.34, scale * 0.65), lineCap: .round, lineJoin: .round))
+            glow.stroke(filament, with: .color(activeTheme.amber.opacity(alpha * 0.50)), style: StrokeStyle(lineWidth: max(0.65, scale * 1.6), lineCap: .round, lineJoin: .round))
+            context.stroke(filament, with: .color(activeTheme.glint.opacity(alpha)), style: StrokeStyle(lineWidth: max(0.34, scale * 0.65), lineCap: .round, lineJoin: .round))
         }
     }
 
@@ -611,10 +619,4 @@ public struct JarvisOrbVisualizerView: View {
 
         return path
     }
-
-    private static let goldGlint = Color(red: 1.00, green: 0.85, blue: 0.35)
-    private static let hotWhite = Color(red: 1.00, green: 0.72, blue: 0.16)
-    private static let amber = Color(red: 1.00, green: 0.52, blue: 0.04)
-    private static let deepAmber = Color(red: 0.90, green: 0.28, blue: 0.02)
-    private static let lensAmber = Color(red: 1.00, green: 0.65, blue: 0.15)
 }

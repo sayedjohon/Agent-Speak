@@ -18,6 +18,7 @@ public class BackgroundMusicManager: ObservableObject {
     @Published public var isFadingOut: Bool = false
     @Published public var currentTrackTitle: String = ""
     @Published public var availableTracks: [URL] = []
+    @Published public var fadeProgress: Double = 0.0
     
     // CoreAudio / AVFoundation Objects
     private var engine = AVAudioEngine()
@@ -199,6 +200,8 @@ public class BackgroundMusicManager: ObservableObject {
             
             DispatchQueue.main.async {
                 self.isPlaying = true
+                self.isFadingOut = false
+                self.fadeProgress = 0.0
                 self.currentTrackTitle = url.deletingPathExtension().lastPathComponent
             }
             
@@ -250,6 +253,7 @@ public class BackgroundMusicManager: ObservableObject {
                 }
                 currentStep += 1
                 let progress = Float(currentStep) / Float(steps)
+                self.fadeProgress = Double(progress)
                 
                 let curVol = max(0.0, startVol * (1.0 - progress))
                 self.playerNode.volume = curVol
@@ -265,7 +269,9 @@ public class BackgroundMusicManager: ObservableObject {
                     DispatchQueue.main.async {
                         self.isPlaying = false
                         self.isFadingOut = false
+                        self.fadeProgress = 1.0
                         self.currentTrackTitle = ""
+                        HologramManager.shared.dismissHologramImmediately()
                     }
                     completion?()
                     
@@ -289,7 +295,9 @@ public class BackgroundMusicManager: ObservableObject {
         DispatchQueue.main.async {
             self.isPlaying = false
             self.isFadingOut = false
+            self.fadeProgress = 1.0
             self.currentTrackTitle = ""
+            HologramManager.shared.dismissHologramImmediately()
         }
     }
     

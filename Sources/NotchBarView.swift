@@ -111,6 +111,8 @@ struct PointyTopNotchBarView: View {
 struct FloatingJarvisHologramOverlayView: View {
     @ObservedObject var state: StreamingAudioManager
     @ObservedObject var meter = JarvisAudioLevelMeter.shared
+    @ObservedObject var bgm = BackgroundMusicManager.shared
+    @ObservedObject var hologram = HologramManager.shared
     
     let reactorSize: CGFloat = 820.0
     
@@ -119,72 +121,98 @@ struct FloatingJarvisHologramOverlayView: View {
     }
     
     var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            let energy = state.isPlaying ? meter.level : 0.0
-            
-            ZStack(alignment: .center) {
-                // Invisible click-through container
+        Group {
+            if !hologram.isEnabled {
                 Color.clear
-                
-                // 1. Ambient Scene Wave Glow (Warm golden-amber ripples across the screen when speaking)
-                if state.isPlaying {
-                    TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
-                        let now = timeline.date.timeIntervalSinceReferenceDate
-                        let pulse = sin(now * 2.4) * 0.5 + 0.5
-                        let waveRadius: CGFloat = 520.0 + CGFloat(pulse) * 50.0 + CGFloat(energy) * 80.0
-                        let rippleProgress = CGFloat((now.truncatingRemainder(dividingBy: 2.5)) / 2.5)
-                        
-                        ZStack {
-                            // Soft atmospheric warm amber room illumination (pure warm glow, no white wash)
-                            Circle()
-                                .fill(
-                                    RadialGradient(
-                                        colors: [
-                                            Color(red: 1.0, green: 0.52, blue: 0.04).opacity(0.13 + Double(energy) * 0.12),
-                                            Color(red: 0.90, green: 0.26, blue: 0.02).opacity(0.05 + Double(energy) * 0.05),
-                                            Color.clear
-                                        ],
-                                        center: .center,
-                                        startRadius: 40,
-                                        endRadius: waveRadius
-                                    )
-                                )
-                                .frame(width: waveRadius * 2, height: waveRadius * 2)
-                                .blur(radius: 70)
-                                .blendMode(.plusLighter)
-                            
-                            // Outward propagating harmonic ripple wave ring
-                            Circle()
-                                .stroke(
-                                    Color(red: 1.0, green: 0.65, blue: 0.15).opacity((1.0 - Double(rippleProgress)) * (0.22 + Double(energy) * 0.20)),
-                                    lineWidth: 2.0
-                                )
-                                .frame(width: 300 + rippleProgress * 500, height: 300 + rippleProgress * 500)
-                                .blur(radius: 3)
-                                .blendMode(.plusLighter)
+            } else {
+                GeometryReader { geo in
+                    let w = geo.size.width
+                    let h = geo.size.height
+                    
+                    let isSpeechActive = state.isPlaying
+                    let isMusicActive = bgm.isPlaying || bgm.isFadingOut
+                    let isAnyActive = isSpeechActive || isMusicActive
+                    
+                    // Smooth opacity: fades out in lockstep with background music fade
+                    let dynamicOpacity: Double = {
+                        if !isAnyActive { return 0.0 }
+                        if isSpeechActive { return 1.0 }
+                        if bgm.isFadingOut {
+                            return max(0.0, min(1.0, 1.0 - bgm.fadeProgress))
                         }
-                        // Center ambient glow in the perfect middle of the screen
-                        .position(x: w / 2.0, y: h / 2.0)
+                        return 0.88
+                    }()
+                    
+                    let theme = hologram.currentTheme
+                    let energy = isSpeechActive ? meter.level : (isMusicActive ? max(0.15, CGFloat(meter.bass) * 0.30) : 0.0)
+                    
+                    ZStack(alignment: .center) {
+                        // Invisible click-through container
+                        Color.clear
+                        
+                        // 1. Ambient Scene Wave Glow (Radiates across the room/screen in chosen theme color)
+                        if isAnyActive && dynamicOpacity > 0.02 {
+                            TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
+                                let now = timeline.date.timeIntervalSinceReferenceDate
+                                let pulse = sin(now * 2.4) * 0.5 + 0.5
+                                let waveRadius: CGFloat = 520.0 + CGFloat(pulse) * 50.0 + CGFloat(energy) * 80.0
+                                let rippleProgress = CGFloat((now.truncatingRemainder(dividingBy: 2.5)) / 2.5)
+                                
+                                ZStack {
+                                    // Atmospheric room illumination in selected theme color
+                                    Circle()
+                                        .fill(
+                                            RadialGradient(
+                                                colors: [
+                                                    theme.amber.opacity((0.13 + Double(energy) * 0.12) * dynamicOpacity),
+                                                    theme.deepAmber.opacity((0.05 + Double(energy) * 0.05) * dynamicOpacity),
+                                                    Color.clear
+                                                ],
+                                                center: .center,
+                                                startRadius: 40,
+                                                endRadius: waveRadius
+                                            )
+                                        )
+                                        .frame(width: waveRadius * 2, height: waveRadius * 2)
+                                        .blur(radius: 70)
+                                        .blendMode(.plusLighter)
+                                    
+                                    // Outward propagating harmonic ripple wave ring
+                                    Circle()
+                                        .stroke(
+                                            theme.lensAmber.opacity((1.0 - Double(rippleProgress)) * (0.22 + Double(energy) * 0.20) * dynamicOpacity),
+                                            lineWidth: 2.0
+                                        )
+                                        .frame(width: 300 + rippleProgress * 500, height: 300 + rippleProgress * 500)
+                                        .blur(radius: 3)
+                                        .blendMode(.plusLighter)
+                                }
+                                // Center ambient glow in the perfect middle of the screen
+                                .position(x: w / 2.0, y: h / 2.0)
+                            }
+                        }
+                        
+                        // 2. Large Tony Stark Holographic Arc Reactor (Double size, crisp 100% opacity, theme colored)
+                        if dynamicOpacity > 0.02 {
+                            JarvisOrbVisualizerView(
+                                isSpeaking: isSpeechActive,
+                                isPlayingMusic: isMusicActive,
+                                size: reactorSize,
+                                theme: theme
+                            )
+                            .frame(width: reactorSize, height: reactorSize)
+                            .opacity(dynamicOpacity)
+                            // Position in the PERFECT MIDDLE of the screen
+                            .position(x: w / 2.0, y: h / 2.0)
+                        }
                     }
+                    .frame(width: w, height: h)
+                    .allowsHitTesting(false)
                 }
-                
-                // 2. Large Tony Stark Holographic Arc Reactor (Double size, crisp 100% opacity, pure golden amber)
-                JarvisOrbVisualizerView(
-                    isSpeaking: state.isPlaying,
-                    isPlayingMusic: BackgroundMusicManager.shared.isPlaying,
-                    size: reactorSize
-                )
-                .frame(width: reactorSize, height: reactorSize)
-                // Position in the PERFECT MIDDLE of the screen
-                .position(x: w / 2.0, y: h / 2.0)
+                .allowsHitTesting(false)
+                .ignoresSafeArea()
             }
-            .frame(width: w, height: h)
-            .allowsHitTesting(false)
         }
-        .allowsHitTesting(false)
-        .ignoresSafeArea()
     }
 }
 

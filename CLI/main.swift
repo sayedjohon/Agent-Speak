@@ -45,6 +45,7 @@ func printHelp() {
       pb          Speak copied clipboard text (alias: clipboard)
       settings    Open the Agent Speak Settings window (alias: dashboard)
       tray        Toggle or set menu bar tray icon (tray on | off | toggle)
+      hologram    Manage holographic reactor overlay (on | off | color <name> | preview | status)
       voice       Manage voices and volume (status | list | set | vol <1-200> | install | clone)
       bgm         Manage Iron Man background soundtrack (on | off | vol | test | open | status)
       greet       Speak active persona's signature greeting (alias: intro)
@@ -424,6 +425,56 @@ case "bgm":
     } else {
         print("Unknown bgm subcommand: \(sub)")
         print("Available subcommands: on, off, toggle, vol <0-100>, test, open, status")
+    }
+
+case "hologram", "holo":
+    guard args.count > 2 else {
+        print("Usage: agentspeak hologram <on | off | toggle | color <name> | preview | status>")
+        print("Available colors: amber, cyan, green, red, purple, white")
+        exit(0)
+    }
+    let sub = args[2].lowercased()
+    if sub == "on" {
+        _ = ensureAppRunningAndSend("__CMD_HOLOGRAM_ON__")
+        print("[Agent Speak] Hologram overlay: 🟢 ON")
+    } else if sub == "off" {
+        _ = ensureAppRunningAndSend("__CMD_HOLOGRAM_OFF__")
+        print("[Agent Speak] Hologram overlay: 🔴 OFF")
+    } else if sub == "toggle" {
+        _ = ensureAppRunningAndSend("__CMD_HOLOGRAM_TOGGLE__")
+        print("[Agent Speak] Toggled hologram overlay.")
+    } else if sub == "preview" || sub == "test" {
+        _ = ensureAppRunningAndSend("__CMD_HOLOGRAM_PREVIEW__")
+        print("[Agent Speak] Triggered 4-second hologram preview.")
+    } else if sub == "color" || sub == "theme" {
+        if args.count > 3 {
+            let colorName = args[3].lowercased()
+            let valid = ["amber", "cyan", "green", "red", "purple", "white"]
+            if valid.contains(colorName) {
+                _ = ensureAppRunningAndSend("__CMD_HOLOGRAM_COLOR_\(colorName.uppercased())__")
+                print("[Agent Speak] Hologram color set to: \(colorName.capitalized)")
+            } else {
+                print("Unknown color: '\(colorName)'. Available: amber, cyan, green, red, purple, white")
+            }
+        } else {
+            print("Usage: agentspeak hologram color <amber | cyan | green | red | purple | white>")
+        }
+    } else if sub == "status" {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let cfgURL = URL(fileURLWithPath: "\(home)/.agentspeak/config.json")
+        var isEnabled = true
+        var theme = "amber"
+        if let data = try? Data(contentsOf: cfgURL),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let holo = json["hologram"] as? [String: Any] {
+            isEnabled = holo["enabled"] as? Bool ?? true
+            theme = holo["theme"] as? String ?? "amber"
+        }
+        print("Hologram Overlay: \(isEnabled ? "🟢 ENABLED" : "🔴 DISABLED")")
+        print("Current Theme:    \(theme.capitalized)")
+    } else {
+        print("Unknown hologram subcommand: \(sub)")
+        print("Available subcommands: on, off, toggle, color <name>, preview, status")
     }
 
 case "greet", "welcome", "intro":

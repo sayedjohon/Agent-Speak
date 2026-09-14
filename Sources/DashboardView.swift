@@ -19,7 +19,7 @@ enum DashboardTab: String, CaseIterable, Identifiable {
     case voice = "Voice & Audio"
     case bgm = "Background Music"
     case workspaces = "Connected AI"
-    case hardware = "Notch & Menu Bar"
+    case hardware = "Hologram & HUD"
     case shortcuts = "Shortcuts & CLI"
     
     var id: String { rawValue }
@@ -29,7 +29,7 @@ enum DashboardTab: String, CaseIterable, Identifiable {
         case .voice: return "waveform"
         case .bgm: return "music.quarternote.3"
         case .workspaces: return "circle.hexagongrid.fill"
-        case .hardware: return "macbook.and.ipad"
+        case .hardware: return "atom"
         case .shortcuts: return "command.square.fill"
         }
     }
