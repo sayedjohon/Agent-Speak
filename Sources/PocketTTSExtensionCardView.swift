@@ -178,44 +178,69 @@ public struct PocketTTSExtensionCardView: View {
                         
                         Spacer()
                         
-                        Menu {
-                            ForEach(manager.availableVoices) { item in
-                                Button(action: {
-                                    pocketVoice = item.tag
-                                    onSave()
-                                    if let p = PersonaGreetingManager.shared.getProfile(for: item.tag) {
-                                        SpeechQueueManager.shared.enqueue(source: p.characterName, text: p.greeting, immediate: true)
-                                    }
-                                }) {
-                                    HStack {
-                                        Text("\(item.displayName) — \(item.subtitle)")
-                                        if pocketVoice == item.tag {
-                                            Image(systemName: "checkmark")
+                        HStack(spacing: 6) {
+                            Menu {
+                                ForEach(manager.availableVoices) { item in
+                                    Button(action: {
+                                        pocketVoice = item.tag
+                                        onSave()
+                                        if let p = PersonaGreetingManager.shared.getProfile(for: item.tag) {
+                                            SpeechQueueManager.shared.enqueue(source: p.characterName, text: p.greeting, immediate: true)
+                                        }
+                                    }) {
+                                        HStack {
+                                            Text("\(item.displayName) — \(item.subtitle)")
+                                            if pocketVoice == item.tag {
+                                                Image(systemName: "checkmark")
+                                            }
                                         }
                                     }
                                 }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Text(selectedVoiceLabel)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.white)
+                                        .lineLimit(1)
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color(red: 0.16, green: 0.17, blue: 0.22))
+                                .cornerRadius(6)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color(red: 0.24, green: 0.26, blue: 0.33), lineWidth: 1)
+                                )
                             }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Text(selectedVoiceLabel)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                                Image(systemName: "chevron.up.chevron.down")
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                            .menuStyle(BorderlessButtonMenuStyle())
+                            .frame(maxWidth: 220)
+                            
+                            // Direct Play / Stop Button right next to selected voice
+                            Button(action: {
+                                if isAuditioning || SpeechQueueManager.shared.isSpeaking {
+                                    stopAudition()
+                                } else {
+                                    testCurrentVoice()
+                                }
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: (isAuditioning || SpeechQueueManager.shared.isSpeaking) ? "stop.fill" : "play.fill")
+                                        .font(.system(size: 10, weight: .bold))
+                                    Text((isAuditioning || SpeechQueueManager.shared.isSpeaking) ? "Stop" : "Play")
+                                        .font(.system(size: 11, weight: .bold))
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background((isAuditioning || SpeechQueueManager.shared.isSpeaking) ? Color.red : Color(red: 0.05, green: 0.48, blue: 0.95))
+                                .cornerRadius(6)
                             }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color(red: 0.16, green: 0.17, blue: 0.22))
-                            .cornerRadius(6)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color(red: 0.24, green: 0.26, blue: 0.33), lineWidth: 1)
-                            )
+                            .buttonStyle(PlainButtonStyle())
+                            .help("Listen to selected voice")
                         }
-                        .menuStyle(BorderlessButtonMenuStyle())
-                        .frame(maxWidth: 240)
                     }
                     
                     Divider().background(Color.white.opacity(0.06))

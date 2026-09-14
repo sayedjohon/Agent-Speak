@@ -212,7 +212,7 @@ public struct AudioWaveformTrimmerView: View {
                 HStack(spacing: 5) {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                         .font(.system(size: 11, weight: .bold))
-                    Text(player.isPlaying ? "Pause" : "Play Segment")
+                    Text(player.isPlaying ? "Pause" : (isCutActive ? "Play Selected Area" : "Play Audio"))
                         .font(.system(size: 10.5, weight: .semibold))
                 }
                 .foregroundColor(.white)
@@ -236,7 +236,7 @@ public struct AudioWaveformTrimmerView: View {
                         .font(.system(size: 10, weight: .semibold, design: .monospaced))
                         .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
                 } else if isCutActive {
-                    Text("Cut: \(formatClock(startTime)) – \(formatClock(endTime))")
+                    Text("Selected: \(formatClock(startTime)) – \(formatClock(endTime))")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .foregroundColor(Color(red: 0.20, green: 0.75, blue: 1.0))
                     Text("(\(String(format: "%.1fs", max(0.1, endTime - startTime))))")

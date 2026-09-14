@@ -342,7 +342,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         window.title = "Agent Speak"
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
-        window.isMovableByWindowBackground = true
+        window.isMovableByWindowBackground = false
         window.level = .normal
         window.isOpaque = true
         window.backgroundColor = NSColor(red: 0.07, green: 0.08, blue: 0.10, alpha: 1.0)

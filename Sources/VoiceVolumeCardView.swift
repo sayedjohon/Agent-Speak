@@ -61,25 +61,50 @@ public struct VoiceVolumeCardView: View {
                 
                 Spacer()
                 
-                // Live Status Badge
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(volumeManager.isBoosted ? Color.orange : (volumeManager.volume == 100 ? Color.green : Color.blue))
-                        .frame(width: 6, height: 6)
-                    Text(statusBadgeText)
-                        .font(.system(size: 11.5, weight: .bold))
-                        .foregroundColor(volumeManager.isBoosted ? .orange : (volumeManager.volume == 100 ? .green : .white))
+                // Live Status Badge & Volume Test Button
+                HStack(spacing: 8) {
+                    Button(action: {
+                        if SpeechQueueManager.shared.isSpeaking {
+                            SpeechQueueManager.shared.stopCurrent()
+                        } else {
+                            let testText = "Voice volume is set to \(volumeManager.volume) percent."
+                            SpeechQueueManager.shared.enqueue(source: "Volume Test", text: testText, immediate: true)
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: SpeechQueueManager.shared.isSpeaking ? "stop.fill" : "play.fill")
+                                .font(.system(size: 9, weight: .bold))
+                            Text(SpeechQueueManager.shared.isSpeaking ? "Stop" : "Test Vol")
+                                .font(.system(size: 11, weight: .bold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(SpeechQueueManager.shared.isSpeaking ? Color.red : Color(red: 0.05, green: 0.48, blue: 0.95))
+                        .cornerRadius(6)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .help("Listen to test speech at this volume level")
+                    
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(volumeManager.isBoosted ? Color.orange : (volumeManager.volume == 100 ? Color.green : Color.blue))
+                            .frame(width: 6, height: 6)
+                        Text(statusBadgeText)
+                            .font(.system(size: 11.5, weight: .bold))
+                            .foregroundColor(volumeManager.isBoosted ? .orange : (volumeManager.volume == 100 ? .green : .white))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(volumeManager.isBoosted ? Color.orange.opacity(0.12) : Color.white.opacity(0.06))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(volumeManager.isBoosted ? Color.orange.opacity(0.35) : Color.white.opacity(0.1), lineWidth: 1)
+                    )
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(volumeManager.isBoosted ? Color.orange.opacity(0.12) : Color.white.opacity(0.06))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(volumeManager.isBoosted ? Color.orange.opacity(0.35) : Color.white.opacity(0.1), lineWidth: 1)
-                )
             }
             
             // Slider Row with Visual Scale

@@ -485,40 +485,66 @@ public struct DashboardView: View {
                         
                         Spacer()
                         
-                        Menu {
-                            ForEach(availableSystemVoices) { v in
-                                Button(action: {
-                                    macosVoice = v.tag
-                                    saveConfig()
-                                }) {
-                                    HStack {
-                                        Text(v.label)
-                                        if macosVoice == v.tag {
-                                            Image(systemName: "checkmark")
+                        HStack(spacing: 6) {
+                            Menu {
+                                ForEach(availableSystemVoices) { v in
+                                    Button(action: {
+                                        macosVoice = v.tag
+                                        saveConfig()
+                                    }) {
+                                        HStack {
+                                            Text(v.label)
+                                            if macosVoice == v.tag {
+                                                Image(systemName: "checkmark")
+                                            }
                                         }
                                     }
                                 }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Text(selectedVoiceDisplayName)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.white)
+                                        .lineLimit(1)
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color(red: 0.16, green: 0.17, blue: 0.22))
+                                .cornerRadius(6)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color(red: 0.24, green: 0.26, blue: 0.33), lineWidth: 1)
+                                )
                             }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Text(selectedVoiceDisplayName)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                                Image(systemName: "chevron.up.chevron.down")
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                            .menuStyle(BorderlessButtonMenuStyle())
+                            
+                            // Direct Play / Stop Button for selected system voice
+                            Button(action: {
+                                if queueManager.isSpeaking {
+                                    queueManager.stopCurrent()
+                                } else {
+                                    let sampleText = "This is a viral and proven voice currently used by hundreds of successful YouTube channels. So do you like this voice?"
+                                    queueManager.enqueue(source: selectedVoiceDisplayName, text: sampleText, immediate: true)
+                                }
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: queueManager.isSpeaking ? "stop.fill" : "play.fill")
+                                        .font(.system(size: 10, weight: .bold))
+                                    Text(queueManager.isSpeaking ? "Stop" : "Play")
+                                        .font(.system(size: 11, weight: .bold))
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(queueManager.isSpeaking ? Color.red : Color(red: 0.05, green: 0.48, blue: 0.95))
+                                .cornerRadius(6)
                             }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color(red: 0.16, green: 0.17, blue: 0.22))
-                            .cornerRadius(6)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color(red: 0.24, green: 0.26, blue: 0.33), lineWidth: 1)
-                            )
+                            .buttonStyle(PlainButtonStyle())
+                            .help("Listen to selected voice")
                         }
-                        .menuStyle(BorderlessButtonMenuStyle())
                     }
                 }
                 .padding(14)
