@@ -359,7 +359,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         window.isMovableByWindowBackground = false
         window.level = .normal
         window.isOpaque = true
-        window.backgroundColor = NSColor(red: 0.07, green: 0.08, blue: 0.10, alpha: 1.0)
+        window.backgroundColor = .windowBackgroundColor
         
         window.delegate = self
         

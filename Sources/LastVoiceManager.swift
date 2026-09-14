@@ -341,4 +341,24 @@ public class LastVoiceManager: NSObject, ObservableObject, AVAudioPlayerDelegate
             }
         }
     }
+    
+    public func saveAudioToDownloads() {
+        downloadAudio()
+    }
+    
+    public func copyAudioFileToClipboard() {
+        guard hasVoice, FileManager.default.fileExists(atPath: lastVoiceFile.path) else { return }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.writeObjects([lastVoiceFile as NSURL])
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.downloadStatusMessage = "Copied audio file to clipboard!"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                if self?.downloadStatusMessage == "Copied audio file to clipboard!" {
+                    self?.downloadStatusMessage = nil
+                }
+            }
+        }
+    }
 }

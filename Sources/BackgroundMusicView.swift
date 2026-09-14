@@ -88,11 +88,11 @@ public struct BackgroundMusicView: View {
             .labelsHidden()
         }
         .padding(14)
-        .background(Color(red: 0.11, green: 0.12, blue: 0.16))
-        .cornerRadius(10)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(bgmManager.isEnabled ? Color.purple.opacity(0.3) : Color.white.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(bgmManager.isEnabled ? Color.purple.opacity(0.3) : Color(nsColor: .separatorColor), lineWidth: 0.5)
         )
     }
     
@@ -101,8 +101,9 @@ public struct BackgroundMusicView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("MUSIC VOLUME")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.secondary)
+                    .tracking(0.5)
                 Spacer()
                 Text("\(Int(bgmManager.volume * 100))%")
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
@@ -145,11 +146,11 @@ public struct BackgroundMusicView: View {
             .padding(.top, 2)
         }
         .padding(14)
-        .background(Color(red: 0.11, green: 0.12, blue: 0.16))
-        .cornerRadius(10)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
         )
     }
     
@@ -260,11 +261,11 @@ public struct BackgroundMusicView: View {
             }
         }
         .padding(14)
-        .background(Color(red: 0.11, green: 0.12, blue: 0.16))
-        .cornerRadius(10)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
         )
     }
     
@@ -409,11 +410,11 @@ public struct BackgroundMusicView: View {
             }
         }
         .padding(14)
-        .background(Color(red: 0.11, green: 0.12, blue: 0.16))
-        .cornerRadius(10)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
         )
     }
     

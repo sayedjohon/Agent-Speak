@@ -146,125 +146,137 @@ public struct DashboardHardwareView: View {
                     }
                 }
             }
-            .padding(12)
-            .background(Color.white.opacity(0.04))
-            .cornerRadius(10)
+            .padding(14)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(hologram.isEnabled ? hologram.currentTheme.previewColor.opacity(0.25) : Color.white.opacity(0.06), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(hologram.isEnabled ? hologram.currentTheme.previewColor.opacity(0.3) : Color(nsColor: .separatorColor), lineWidth: 0.5)
             )
             
             // MARK: - Notch Section
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("DYNAMIC NOTCH HUD")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.secondary)
+                    .tracking(0.5)
                 
-                HStack {
-                    Image(systemName: "macbook.gen2")
-                        .foregroundColor(.blue)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Camera Notch Overlay")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white)
-                        Text("Floats smoothly under the camera notch on MacBook Pro and Air")
-                            .font(.system(size: 10))
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    Text("Active")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.green)
-                }
-                
-                Divider().background(Color.white.opacity(0.06))
-                
-                HStack {
-                    Image(systemName: "escape")
-                        .foregroundColor(.yellow)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Quick Silence Key (Esc)")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white)
-                        Text("Press Escape anywhere on macOS to immediately stop speech, hologram and music")
-                            .font(.system(size: 10))
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    if isAccessibilityTrusted {
-                        Text("Active 🟢")
+                VStack(spacing: 0) {
+                    HStack {
+                        Image(systemName: "macbook.gen2")
+                            .foregroundColor(.blue)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Camera Notch Overlay")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.primary)
+                            Text("Floats smoothly under the camera notch on MacBook Pro and Air")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Text("Active")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(.green)
-                    } else {
-                        Button(action: {
-                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                                NSWorkspace.shared.open(url)
-                            }
-                        }) {
-                            Text("Enable Accessibility")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.black)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Color.yellow)
-                                .cornerRadius(5)
-                        }
-                        .buttonStyle(.plain)
                     }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    
+                    Divider().padding(.horizontal, 14)
+                    
+                    HStack {
+                        Image(systemName: "escape")
+                            .foregroundColor(.orange)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Quick Silence Key (Esc)")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.primary)
+                            Text("Press Escape anywhere on macOS to immediately stop speech, hologram and music")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        if isAccessibilityTrusted {
+                            Text("Active 🟢")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(.green)
+                        } else {
+                            Button(action: {
+                                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }) {
+                                Text("Enable Accessibility")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 4)
+                                    .background(Color.orange)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
                 }
+                .background(Color(nsColor: .controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Color(nsColor: .separatorColor), lineWidth: 0.5))
             }
-            .padding(12)
-            .background(Color.white.opacity(0.04))
-            .cornerRadius(10)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
             
             // MARK: - Menu Bar Tray Section
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("MENU BAR STATUS ICON")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.secondary)
+                    .tracking(0.5)
                 
-                HStack {
-                    Image(systemName: "menubar.rectangle")
-                        .foregroundColor(.cyan)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Show Menu Bar Icon")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white)
-                        Text("Quickly access controls and settings from the top macOS status bar")
-                            .font(.system(size: 10))
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    Toggle("", isOn: $showTrayIcon)
-                        .toggleStyle(.switch)
-                        .onChange(of: showTrayIcon) { newValue in
-                            onSaveConfig()
-                            AppDelegate.shared?.setTrayIconVisible(newValue)
+                VStack(spacing: 0) {
+                    HStack {
+                        Image(systemName: "menubar.rectangle")
+                            .foregroundColor(.cyan)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Show Menu Bar Icon")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.primary)
+                            Text("Quickly access controls and settings from the top macOS status bar")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
                         }
-                }
-                
-                Divider().background(Color.white.opacity(0.06))
-                
-                HStack {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(queueManager.isSpeaking ? Color.green : Color(red: 0.2, green: 0.85, blue: 0.5))
-                            .frame(width: 7, height: 7)
-                        Text(queueManager.isSpeaking ? "Menu Bar Status: Speaking (Active)" : "Menu Bar Status: Ready (Standby)")
-                            .font(.system(size: 11))
-                            .foregroundColor(.white)
+                        Spacer()
+                        Toggle("", isOn: $showTrayIcon)
+                            .toggleStyle(.switch)
+                            .onChange(of: showTrayIcon) { newValue in
+                                onSaveConfig()
+                                AppDelegate.shared?.setTrayIconVisible(newValue)
+                            }
                     }
-                    Spacer()
-                    Text(showTrayIcon ? "Visible in Menu Bar" : "Hidden")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(showTrayIcon ? .green : .secondary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    
+                    Divider().padding(.horizontal, 14)
+                    
+                    HStack {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(queueManager.isSpeaking ? Color.green : Color.blue)
+                                .frame(width: 7, height: 7)
+                            Text(queueManager.isSpeaking ? "Menu Bar Status: Speaking" : "Menu Bar Status: Ready")
+                                .font(.system(size: 11))
+                                .foregroundColor(.primary)
+                        }
+                        Spacer()
+                        Text(showTrayIcon ? "Visible in Menu Bar" : "Hidden")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(showTrayIcon ? .green : .secondary)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
                 }
+                .background(Color(nsColor: .controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Color(nsColor: .separatorColor), lineWidth: 0.5))
             }
-            .padding(12)
-            .background(Color.white.opacity(0.04))
-            .cornerRadius(10)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
     }
 }

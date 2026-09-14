@@ -27,10 +27,20 @@ enum DashboardTab: String, CaseIterable, Identifiable {
     var iconName: String {
         switch self {
         case .voice: return "waveform"
-        case .bgm: return "music.quarternote.3"
+        case .bgm: return "music.note"
         case .workspaces: return "circle.hexagongrid.fill"
         case .hardware: return "atom"
-        case .shortcuts: return "command.square.fill"
+        case .shortcuts: return "command"
+        }
+    }
+    
+    var iconGradient: [Color] {
+        switch self {
+        case .voice: return [Color.blue, Color.cyan]
+        case .bgm: return [Color.pink, Color.purple]
+        case .workspaces: return [Color.indigo, Color.purple]
+        case .hardware: return [Color.teal, Color.blue]
+        case .shortcuts: return [Color.orange, Color.red]
         }
     }
 }
@@ -40,6 +50,7 @@ public struct DashboardView: View {
     @ObservedObject var queueManager = SpeechQueueManager.shared
     @State private var selectedTab: DashboardTab = .voice
     @State private var hoveredTab: DashboardTab? = nil
+    @State private var showingCloneSheet: Bool = false
     
     // Config States
     @State private var isEnabled: Bool = true
@@ -163,27 +174,31 @@ public struct DashboardView: View {
     
     public var body: some View {
         HStack(spacing: 0) {
-            // Left Sidebar with solid dark background
+            // Left Sidebar with macOS controlBackgroundColor
             sidebarView
-                .frame(width: 215)
-                .background(Color(red: 0.09, green: 0.10, blue: 0.13))
+                .frame(width: 220)
+                .background(Color(nsColor: .controlBackgroundColor))
             
-            // Thin Solid Divider (eliminates see-through gap)
-            Rectangle()
-                .fill(Color(red: 0.18, green: 0.20, blue: 0.25))
-                .frame(width: 1)
+            // Native macOS vertical divider
+            Divider()
             
-            // Right Detail Area (Zero Scrolling)
+            // Right Detail Area
             detailContentView
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(red: 0.06, green: 0.07, blue: 0.09))
+                .background(Color(nsColor: .windowBackgroundColor))
         }
-        .frame(minWidth: 740, idealWidth: 750, maxWidth: 950, minHeight: 580, idealHeight: 720, maxHeight: .infinity)
-        .background(Color(red: 0.07, green: 0.08, blue: 0.10))
+        .frame(minWidth: 760, idealWidth: 820, maxWidth: 960, minHeight: 600, idealHeight: 740, maxHeight: .infinity)
+        .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             loadConfig()
             availableSystemVoices = loadAvailableVoices()
             isAccessibilityTrusted = AXIsProcessTrusted()
+        }
+        .sheet(isPresented: $showingCloneSheet) {
+            VoiceCloningStudioSheet(isPresented: $showingCloneSheet) { newVoiceTag in
+                pocketVoice = newVoiceTag
+                saveConfig()
+            }
         }
     }
     
@@ -191,53 +206,57 @@ public struct DashboardView: View {
     
     private var sidebarView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Brand Header
-            HStack(spacing: 9) {
+            // Brand Header in Apple Settings style
+            HStack(spacing: 10) {
                 if let logo = brandLogoImage {
                     Image(nsImage: logo)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: 24, height: 24)
-                        .cornerRadius(6)
+                        .frame(width: 28, height: 28)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("AGENT SPEAK")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .tracking(1.2)
-                        .foregroundColor(.white)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Agent Speak")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.primary)
                     
                     HStack(spacing: 4) {
                         Circle()
-                            .fill(queueManager.isSpeaking ? Color.green : (isEnabled ? Color(red: 0.2, green: 0.85, blue: 0.5) : Color.orange))
+                            .fill(queueManager.isSpeaking ? Color.green : (isEnabled ? Color.blue : Color.orange))
                             .frame(width: 6, height: 6)
-                        Text(queueManager.isSpeaking ? "SPEAKING" : (isEnabled ? "READY" : "PAUSED"))
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(queueManager.isSpeaking ? .green : (isEnabled ? Color(red: 0.2, green: 0.85, blue: 0.5) : .orange))
+                        Text(queueManager.isSpeaking ? "Speaking" : (isEnabled ? "Ready" : "Paused"))
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.secondary)
                     }
                 }
                 Spacer()
             }
             .padding(.horizontal, 16)
-            .padding(.top, 22)
-            .padding(.bottom, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
             
-            // Nav Tab List
-            VStack(spacing: 4) {
+            // Nav Tab List (macOS System Settings Style)
+            VStack(spacing: 2) {
                 ForEach(DashboardTab.allCases) { tab in
                     Button(action: {
-                        withAnimation(.easeInOut(duration: 0.12)) {
+                        withAnimation(.easeInOut(duration: 0.15)) {
                             selectedTab = tab
                         }
                     }) {
                         HStack(spacing: 10) {
-                            Image(systemName: tab.iconName)
-                                .font(.system(size: 13, weight: selectedTab == tab ? .semibold : .regular))
-                                .foregroundColor(selectedTab == tab ? .cyan : .secondary)
-                                .frame(width: 20)
+                            // Apple Squircle Badge with Gradient
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                    .fill(LinearGradient(colors: tab.iconGradient, startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    .frame(width: 20, height: 20)
+                                Image(systemName: tab.iconName)
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(.white)
+                            }
                             
                             Text(tab.rawValue)
-                                .font(.system(size: 12, weight: selectedTab == tab ? .semibold : .medium))
-                                .foregroundColor(selectedTab == tab ? .white : .secondary)
+                                .font(.system(size: 13, weight: selectedTab == tab ? .semibold : .regular))
+                                .foregroundColor(selectedTab == tab ? .white : .primary)
                             
                             Spacer()
                             
@@ -247,18 +266,14 @@ public struct DashboardView: View {
                                 Circle().fill(Color.purple).frame(width: 6, height: 6)
                             }
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 9)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(selectedTab == tab ? Color.white.opacity(0.12) : (hoveredTab == tab ? Color.white.opacity(0.06) : Color.clear))
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(selectedTab == tab ? Color.accentColor : (hoveredTab == tab ? Color(nsColor: .quaternaryLabelColor).opacity(0.3) : Color.clear))
                         )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(selectedTab == tab ? Color.white.opacity(0.14) : Color.clear, lineWidth: 1)
-                        )
-                        .contentShape(RoundedRectangle(cornerRadius: 8))
+                        .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     }
                     .buttonStyle(.plain)
                     .onHover { isHovered in
@@ -266,12 +281,15 @@ public struct DashboardView: View {
                     }
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 10)
             
             Spacer()
             
             // Sidebar Footer Deck
-            VStack(spacing: 10) {
+            VStack(spacing: 8) {
+                Divider()
+                    .padding(.horizontal, 12)
+                
                 Button(action: {
                     if queueManager.isSpeaking {
                         queueManager.stopCurrent()
@@ -283,26 +301,23 @@ public struct DashboardView: View {
                     HStack(spacing: 6) {
                         Image(systemName: queueManager.isSpeaking ? "stop.fill" : (isEnabled ? "speaker.slash.fill" : "speaker.wave.2.fill"))
                             .font(.system(size: 11))
-                        Text(queueManager.isSpeaking ? "Stop Speech (Esc)" : (isEnabled ? "Pause Speech" : "Resume Speech"))
-                            .font(.system(size: 11, weight: .semibold))
+                        Text(queueManager.isSpeaking ? "Stop Speech (Esc)" : (isEnabled ? "Mute All Speech" : "Unmute Speech"))
+                            .font(.system(size: 11, weight: .medium))
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 7)
-                    .background(queueManager.isSpeaking ? Color.red.opacity(0.25) : Color.white.opacity(0.08))
-                    .foregroundColor(queueManager.isSpeaking ? .red : .white)
-                    .cornerRadius(7)
-                    .contentShape(RoundedRectangle(cornerRadius: 7))
+                    .padding(.vertical, 6)
+                    .background(queueManager.isSpeaking ? Color.red.opacity(0.15) : Color(nsColor: .quaternaryLabelColor).opacity(0.3))
+                    .foregroundColor(queueManager.isSpeaking ? .red : .primary)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 
                 Text("100% On-Device & Private")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.secondary.opacity(0.8))
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
             }
             .padding(14)
-            .background(Color.black.opacity(0.25))
         }
-        .background(Color(red: 0.08, green: 0.09, blue: 0.12))
     }
     
     // MARK: - Detail Content View
@@ -314,23 +329,23 @@ public struct DashboardView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(selectedTab.rawValue)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(.white)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.primary)
                     Text(tabSubtitle)
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
                 Spacer()
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 18)
-            .padding(.bottom, 12)
+            .padding(.horizontal, 28)
+            .padding(.top, 22)
+            .padding(.bottom, 16)
             
-            Divider().background(Color.white.opacity(0.08))
+            Divider()
             
             // Tab Specific Content (Smooth Scrolling)
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 14) {
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(alignment: .leading, spacing: 18) {
                     switch selectedTab {
                     case .voice:
                         voiceSettingsTab
@@ -344,7 +359,7 @@ public struct DashboardView: View {
                         shortcutsTab
                     }
                 }
-                .padding(22)
+                .padding(24)
             }
         }
     }
@@ -362,166 +377,66 @@ public struct DashboardView: View {
     // MARK: - Tab 1: Voice & Playback
     
     private var voiceSettingsTab: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Compact Orb Visualizer
-            CompactVisualizerOrbView(isSpeaking: $queueManager.isSpeaking)
-                .padding(.vertical, 2)
-            
-            // Engine Switcher: Dual Prominent Raycast Cards
+        VStack(alignment: .leading, spacing: 18) {
+            // MARK: - Section 1: Engine Selector (Native Segmented Control)
             VStack(alignment: .leading, spacing: 8) {
-                Text("SPEECH ENGINE")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                Text("SPEECH SYNTHESIS ENGINE")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.secondary)
+                    .tracking(0.5)
                 
-                HStack(spacing: 12) {
-                    // Option 1: MacBook Built-in Voice
-                    Button(action: {
-                        voiceEngine = "macos_default"
-                        saveConfig()
-                    }) {
-                        HStack(spacing: 12) {
-                            ZStack {
-                                Circle()
-                                    .fill(voiceEngine == "macos_default" ? Color.green.opacity(0.2) : Color.white.opacity(0.06))
-                                    .frame(width: 38, height: 38)
-                                Image(systemName: "leaf.fill")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(voiceEngine == "macos_default" ? .green : Color(red: 0.6, green: 0.62, blue: 0.68))
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 3) {
-                                HStack {
-                                    Text("MacBook Built-in")
-                                        .font(.system(size: 13, weight: .bold))
-                                        .foregroundColor(.white)
-                                    Spacer()
-                                    if voiceEngine == "macos_default" {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundColor(Color(red: 0.05, green: 0.50, blue: 1.0))
-                                            .font(.system(size: 15))
-                                    } else {
-                                        Circle()
-                                            .stroke(Color(red: 0.3, green: 0.32, blue: 0.38), lineWidth: 1)
-                                            .frame(width: 14, height: 14)
-                                    }
-                                }
-                                Text("Zero CPU • 100% Native & Fast")
-                                    .font(.system(size: 10.5))
-                                    .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
-                            }
-                        }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(voiceEngine == "macos_default" ? Color(red: 0.16, green: 0.18, blue: 0.23) : Color(red: 0.11, green: 0.12, blue: 0.15))
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(voiceEngine == "macos_default" ? Color(red: 0.15, green: 0.55, blue: 1.0) : Color(red: 0.20, green: 0.22, blue: 0.27), lineWidth: voiceEngine == "macos_default" ? 1.5 : 1)
-                        )
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    
-                    // Option 2: Pocket-TTS Neural AI
-                    Button(action: {
-                        voiceEngine = "pocket_tts"
-                        saveConfig()
-                    }) {
-                        HStack(spacing: 12) {
-                            ZStack {
-                                Circle()
-                                    .fill(voiceEngine == "pocket_tts" ? Color.purple.opacity(0.25) : Color.white.opacity(0.06))
-                                    .frame(width: 38, height: 38)
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(voiceEngine == "pocket_tts" ? .purple : Color(red: 0.6, green: 0.62, blue: 0.68))
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 3) {
-                                HStack {
-                                    Text("Pocket-TTS Neural")
-                                        .font(.system(size: 13, weight: .bold))
-                                        .foregroundColor(.white)
-                                    Spacer()
-                                    if voiceEngine == "pocket_tts" {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundColor(Color(red: 0.05, green: 0.50, blue: 1.0))
-                                            .font(.system(size: 15))
-                                    } else {
-                                        Circle()
-                                            .stroke(Color(red: 0.3, green: 0.32, blue: 0.38), lineWidth: 1)
-                                            .frame(width: 14, height: 14)
-                                    }
-                                }
-                                Text("Custom Clones • Offline AI")
-                                    .font(.system(size: 10.5))
-                                    .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
-                            }
-                        }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(voiceEngine == "pocket_tts" ? Color(red: 0.16, green: 0.18, blue: 0.23) : Color(red: 0.11, green: 0.12, blue: 0.15))
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(voiceEngine == "pocket_tts" ? Color(red: 0.15, green: 0.55, blue: 1.0) : Color(red: 0.20, green: 0.22, blue: 0.27), lineWidth: voiceEngine == "pocket_tts" ? 1.5 : 1)
-                        )
-                    }
-                    .buttonStyle(PlainButtonStyle())
+                Picker("Speech Engine", selection: $voiceEngine) {
+                    Text("MacBook Built-in (Zero CPU)").tag("macos_default")
+                    Text("Pocket-TTS Neural AI").tag("pocket_tts")
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: voiceEngine) { _ in
+                    saveConfig()
                 }
             }
             
-            // Active Voice Details Card
-            if voiceEngine == "macos_default" {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("System Voice Persona")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.white)
-                            Text("Native Apple Silicon speech synthesizer (100% Zero CPU)")
-                                .font(.system(size: 11))
-                                .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
-                        }
-                        
-                        Spacer()
-                        
-                        HStack(spacing: 6) {
-                            Menu {
-                                ForEach(availableSystemVoices) { v in
-                                    Button(action: {
-                                        macosVoice = v.tag
-                                        saveConfig()
-                                    }) {
-                                        HStack {
-                                            Text(v.label)
-                                            if macosVoice == v.tag {
-                                                Image(systemName: "checkmark")
-                                            }
-                                        }
-                                    }
-                                }
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Text(selectedVoiceDisplayName)
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(.white)
-                                        .lineLimit(1)
-                                    Image(systemName: "chevron.up.chevron.down")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
-                                }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Color(red: 0.16, green: 0.17, blue: 0.22))
-                                .cornerRadius(6)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(Color(red: 0.24, green: 0.26, blue: 0.33), lineWidth: 1)
-                                )
+            // MARK: - Section 2: Active Voice Persona Card
+            VStack(alignment: .leading, spacing: 8) {
+                Text("ACTIVE VOICE")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.secondary)
+                    .tracking(0.5)
+                
+                VStack(spacing: 0) {
+                    if voiceEngine == "macos_default" {
+                        // System Voice Row
+                        HStack(spacing: 12) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(LinearGradient(colors: [Color.blue, Color.cyan], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    .frame(width: 28, height: 28)
+                                Image(systemName: "person.wave.2.fill")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.white)
                             }
-                            .menuStyle(BorderlessButtonMenuStyle())
                             
-                            // Direct Play / Stop Button for selected system voice
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("System Voice")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.primary)
+                                Text("Native Apple Silicon speech synthesizer")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Picker("", selection: $macosVoice) {
+                                ForEach(availableSystemVoices) { v in
+                                    Text(v.label).tag(v.tag)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(maxWidth: 240)
+                            .onChange(of: macosVoice) { _ in
+                                saveConfig()
+                            }
+                            
                             Button(action: {
                                 if queueManager.isSpeaking {
                                     queueManager.stopCurrent()
@@ -530,80 +445,319 @@ public struct DashboardView: View {
                                     queueManager.enqueue(source: selectedVoiceDisplayName, text: sampleText, immediate: true)
                                 }
                             }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: queueManager.isSpeaking ? "stop.fill" : "play.fill")
-                                        .font(.system(size: 10, weight: .bold))
-                                    Text(queueManager.isSpeaking ? "Stop" : "Play")
-                                        .font(.system(size: 11, weight: .bold))
-                                }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(queueManager.isSpeaking ? Color.red : Color(red: 0.05, green: 0.48, blue: 0.95))
-                                .cornerRadius(6)
+                                Image(systemName: queueManager.isSpeaking ? "stop.fill" : "play.fill")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(queueManager.isSpeaking ? .red : .accentColor)
+                                    .frame(width: 26, height: 26)
+                                    .background(Color(nsColor: .quaternaryLabelColor).opacity(0.3))
+                                    .clipShape(Circle())
                             }
-                            .buttonStyle(PlainButtonStyle())
-                            .help("Listen to selected voice")
+                            .buttonStyle(.plain)
+                            .help("Audition selected voice")
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                    } else {
+                        // Pocket-TTS Neural Engine
+                        if !PocketTTSManager.shared.isInstalled {
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                            .fill(Color.purple.opacity(0.15))
+                                            .frame(width: 28, height: 28)
+                                        Image(systemName: "sparkles")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundColor(.purple)
+                                    }
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Pocket-TTS Neural Extension Required")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundColor(.primary)
+                                        Text("Kyutai FlowLM models run 100% offline on Apple Silicon (~650MB setup).")
+                                            .font(.system(size: 11))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Spacer()
+                                }
+                                
+                                if PocketTTSManager.shared.isInstalling {
+                                    HStack(spacing: 8) {
+                                        ProgressView().scaleEffect(0.7)
+                                        Text("Setting up neural models...")
+                                            .font(.system(size: 11))
+                                            .foregroundColor(.secondary)
+                                    }
+                                } else {
+                                    Button(action: {
+                                        PocketTTSManager.shared.installExtension { success, _ in
+                                            if success { saveConfig() }
+                                        }
+                                    }) {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "arrow.down.circle.fill")
+                                            Text("Download & Set Up Engine (~650MB)")
+                                        }
+                                        .font(.system(size: 12, weight: .medium))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(Color.purple)
+                                        .foregroundColor(.white)
+                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                        } else {
+                            // Installed Pocket-TTS Row
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                        .fill(LinearGradient(colors: [Color.purple, Color.indigo], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                        .frame(width: 28, height: 28)
+                                    Image(systemName: "sparkles")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.white)
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Neural Persona")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundColor(.primary)
+                                    Text("On-device Kyutai neural clone")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Picker("", selection: $pocketVoice) {
+                                    ForEach(PocketTTSManager.shared.availableVoices) { item in
+                                        Text(item.displayName).tag(item.tag)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .frame(maxWidth: 220)
+                                .onChange(of: pocketVoice) { _ in
+                                    saveConfig()
+                                }
+                                
+                                Button(action: {
+                                    if queueManager.isSpeaking {
+                                        queueManager.stopCurrent()
+                                    } else {
+                                        let sample = "Hello! This is a preview of your Pocket-TTS neural voice running on Apple Silicon."
+                                        queueManager.enqueue(source: pocketVoice, text: sample, immediate: true)
+                                    }
+                                }) {
+                                    Image(systemName: queueManager.isSpeaking ? "stop.fill" : "play.fill")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(queueManager.isSpeaking ? .red : .accentColor)
+                                        .frame(width: 26, height: 26)
+                                        .background(Color(nsColor: .quaternaryLabelColor).opacity(0.3))
+                                        .clipShape(Circle())
+                                }
+                                .buttonStyle(.plain)
+                                .help("Audition persona")
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                            
+                            Divider().padding(.horizontal, 14)
+                            
+                            // Voice Cloning Studio Row
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                        .fill(Color.blue.opacity(0.15))
+                                        .frame(width: 28, height: 28)
+                                    Image(systemName: "waveform.badge.plus")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.blue)
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Voice Cloning Studio")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundColor(.primary)
+                                    Text("Clone any voice from a 5–10s audio sample")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Button(action: {
+                                    showingCloneSheet = true
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "plus")
+                                            .font(.system(size: 11, weight: .semibold))
+                                        Text("Clone Voice...")
+                                            .font(.system(size: 12, weight: .medium))
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Color.accentColor)
+                                    .foregroundColor(.white)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
                         }
                     }
                 }
-                .padding(14)
-                .background(Color(red: 0.11, green: 0.12, blue: 0.15))
-                .cornerRadius(8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(red: 0.18, green: 0.19, blue: 0.24), lineWidth: 1))
-            } else {
-                PocketTTSExtensionCardView(pocketVoice: $pocketVoice, onSave: { saveConfig() })
+                .background(Color(nsColor: .controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                )
             }
             
-            // Playback & Skip Controls Card (Raycast Style Row)
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Skip Forward / Backward Step")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.white)
-                        Text("Interval leaped by the Notch Player scrub buttons")
-                            .font(.system(size: 11))
-                            .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
-                    }
-                    
-                    Spacer()
-                    
-                    Menu {
-                        Button("5 seconds (Default)") { skipSeconds = 5; saveConfig() }
-                        Button("10 seconds") { skipSeconds = 10; saveConfig() }
-                        Button("15 seconds") { skipSeconds = 15; saveConfig() }
-                        Button("30 seconds") { skipSeconds = 30; saveConfig() }
-                    } label: {
+            // MARK: - Section 3: Playback & Volume Inset Grouped Card
+            VStack(alignment: .leading, spacing: 8) {
+                Text("PLAYBACK & VOLUME")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.secondary)
+                    .tracking(0.5)
+                
+                VStack(spacing: 0) {
+                    // Volume / Gain Row
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 12) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(LinearGradient(colors: [Color.green, Color.teal], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    .frame(width: 28, height: 28)
+                                Image(systemName: VoiceVolumeManager.shared.isBoosted ? "bolt.shield.fill" : "speaker.wave.2.fill")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.white)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 6) {
+                                    Text("Speech Gain")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundColor(.primary)
+                                    if VoiceVolumeManager.shared.isBoosted {
+                                        Text("+\(String(format: "%.1f", VoiceVolumeManager.shared.decibelBoost)) dB")
+                                            .font(.system(size: 9.5, weight: .bold))
+                                            .foregroundColor(.orange)
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 1.5)
+                                            .background(Color.orange.opacity(0.15))
+                                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                    }
+                                }
+                                Text(VoiceVolumeManager.shared.isBoosted ? "Studio soft-saturation limiter prevents clipping" : "Standard audio playback loudness")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Text("\(VoiceVolumeManager.shared.volume)%")
+                                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                                .foregroundColor(VoiceVolumeManager.shared.isBoosted ? .orange : .primary)
+                        }
+                        
+                        // Slider
+                        HStack(spacing: 10) {
+                            Image(systemName: "speaker.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                            
+                            Slider(
+                                value: Binding(
+                                    get: { Double(VoiceVolumeManager.shared.volume) },
+                                    set: { VoiceVolumeManager.shared.setVolume(Int(round($0))) }
+                                ),
+                                in: 1...200,
+                                step: 1
+                            )
+                            .accentColor(VoiceVolumeManager.shared.isBoosted ? .orange : .accentColor)
+                            
+                            Image(systemName: "bolt.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(VoiceVolumeManager.shared.isBoosted ? .orange : .secondary)
+                        }
+                        
+                        // Quick Presets
                         HStack(spacing: 8) {
-                            Text("\(skipSeconds) seconds")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white)
-                            Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                            ForEach([80, 100, 140, 200], id: \.self) { preset in
+                                Button(action: {
+                                    VoiceVolumeManager.shared.setVolume(preset)
+                                }) {
+                                    Text(preset == 100 ? "100% (Default)" : (preset == 200 ? "200% (Max)" : "\(preset)%"))
+                                        .font(.system(size: 11, weight: VoiceVolumeManager.shared.volume == preset ? .semibold : .regular))
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 4)
+                                        .background(VoiceVolumeManager.shared.volume == preset ? Color.accentColor.opacity(0.2) : Color(nsColor: .quaternaryLabelColor).opacity(0.2))
+                                        .foregroundColor(VoiceVolumeManager.shared.volume == preset ? .accentColor : .primary)
+                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            Spacer()
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color(red: 0.16, green: 0.17, blue: 0.22))
-                        .cornerRadius(6)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color(red: 0.24, green: 0.26, blue: 0.33), lineWidth: 1)
-                        )
                     }
-                    .menuStyle(BorderlessButtonMenuStyle())
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    
+                    Divider().padding(.horizontal, 14)
+                    
+                    // Skip Interval Row
+                    HStack(spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(LinearGradient(colors: [Color.blue, Color.purple], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .frame(width: 28, height: 28)
+                            Image(systemName: "goforward")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("HUD Skip Step")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.primary)
+                            Text("Interval leaped by notch player scrub buttons")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Picker("", selection: $skipSeconds) {
+                            Text("5 seconds").tag(5)
+                            Text("10 seconds").tag(10)
+                            Text("15 seconds").tag(15)
+                            Text("30 seconds").tag(30)
+                        }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: 160)
+                        .onChange(of: skipSeconds) { _ in
+                            saveConfig()
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
                 }
+                .background(Color(nsColor: .controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                )
             }
-            .padding(14)
-            .background(Color(red: 0.11, green: 0.12, blue: 0.15))
-            .cornerRadius(8)
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(red: 0.18, green: 0.19, blue: 0.24), lineWidth: 1))
             
-            // Voice Playback Volume & Force Decibel Gain Card
-            VoiceVolumeCardView()
-            
-            // Studio Script Editor (Apple HIG Multi-Line Prompter & Presets)
+            // MARK: - Section 4: Studio Script Editor (Apple HIG Multi-Line Prompter & Presets)
             StudioScriptEditorView(
                 text: $customTestText,
                 isSpeaking: queueManager.isSpeaking,
@@ -621,7 +775,7 @@ public struct DashboardView: View {
                 }
             )
             
-            // Downward: Last Voice Player, Scrubber & Download
+            // MARK: - Section 5: Last Voice Player, Scrubber & Download (Shown only when available)
             LastVoiceCardView()
         }
     }
@@ -629,108 +783,12 @@ public struct DashboardView: View {
     // MARK: - Tab 2: Connected AI
     
     private var workspacesTab: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Privacy Reassurance Card
-            HStack(spacing: 12) {
-                Image(systemName: "lock.shield.fill")
-                    .font(.system(size: 18))
-                    .foregroundColor(Color(red: 0.2, green: 0.85, blue: 0.5))
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("100% Private • Zero Microphone Access")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(.white)
-                    Text("Agent Speak only vocalizes text generated by your AI tools. It never uses, records, or monitors your microphone.")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                }
-                Spacer()
-            }
-            .padding(10)
-            .background(Color(red: 0.2, green: 0.85, blue: 0.5).opacity(0.08))
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(red: 0.2, green: 0.85, blue: 0.5).opacity(0.2), lineWidth: 1)
-            )
-            
-            Text("CONNECTED AI CODING ASSISTANTS")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(.secondary)
-                .padding(.top, 2)
-            
-            VStack(spacing: 0) {
-                workspaceRow(
-                    icon: "circle.hexagongrid.circle.fill",
-                    color: .purple,
-                    title: "Antigravity Assistant",
-                    subtitle: "Speaks conversational responses from Antigravity IDE and CLI",
-                    isOn: $watchAntigravity
-                )
-                Divider().background(Color.white.opacity(0.06)).padding(.horizontal, 12)
-                
-                workspaceRow(
-                    icon: "terminal.fill",
-                    color: .orange,
-                    title: "Claude Code",
-                    subtitle: "Speaks session answers and output from Claude Code CLI",
-                    isOn: $watchClaude
-                )
-                Divider().background(Color.white.opacity(0.06)).padding(.horizontal, 12)
-                
-                workspaceRow(
-                    icon: "chevron.left.forwardslash.chevron.right",
-                    color: .cyan,
-                    title: "OpenCode & Other Agents",
-                    subtitle: "Speaks activity logs and answers from supported developer agents",
-                    isOn: $watchOpenCode
-                )
-                Divider().background(Color.white.opacity(0.06)).padding(.horizontal, 12)
-                
-                workspaceRow(
-                    icon: "apple.terminal.on.rectangle.fill",
-                    color: .green,
-                    title: "Terminal & UNIX Socket",
-                    subtitle: "Accepts speech commands from custom scripts, shortcuts, and CLI",
-                    isOn: $watchTerminal
-                )
-            }
-            .background(Color.white.opacity(0.04))
-            .cornerRadius(10)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
-            
-            HStack(spacing: 8) {
-                Image(systemName: "bolt.fill")
-                    .foregroundColor(.yellow)
-                Text("Instant Streaming: Automatically begins speaking sentences in real-time as your AI responds.")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-            }
-            .padding(.top, 4)
-        }
-    }
-    
-    private func workspaceRow(icon: String, color: Color, title: String, subtitle: String, isOn: Binding<Bool>) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 15))
-                .foregroundColor(color)
-                .frame(width: 20)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white)
-                Text(subtitle)
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
-            }
-            Spacer()
-            Toggle("", isOn: isOn)
-                .toggleStyle(.switch)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        DashboardWorkspacesView(
+            watchAntigravity: $watchAntigravity,
+            watchClaude: $watchClaude,
+            watchOpenCode: $watchOpenCode,
+            watchTerminal: $watchTerminal
+        )
     }
     
     // MARK: - Tab 3: Notch & Menu Bar
