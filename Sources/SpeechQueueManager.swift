@@ -16,6 +16,7 @@ public class SpeechQueueManager: ObservableObject {
     }
     @Published public var queueCount: Int = 0
     @Published public var currentSpeakerSource: String = ""
+    @Published public var audioLevel: Float = 0.0
     
     private var queue: [(source: String, text: String)] = []
     private let queueLock = NSLock()
@@ -41,6 +42,7 @@ public class SpeechQueueManager: ObservableObject {
             NotchWindowController.shared.presentAudioFile(filePath: filePath, project: source) {
                 DispatchQueue.main.async {
                     self?.isSpeaking = false
+                    self?.audioLevel = 0.0
                     self?.currentSpeakerSource = ""
                 }
             }
@@ -55,6 +57,7 @@ public class SpeechQueueManager: ObservableObject {
         DispatchQueue.main.async {
             NotchWindowController.shared.dismiss()
             self.isSpeaking = false
+            self.audioLevel = 0.0
             self.queueCount = 0
             self.currentSpeakerSource = ""
         }
@@ -86,6 +89,7 @@ public class SpeechQueueManager: ObservableObject {
                 
                 DispatchQueue.main.async {
                     self?.currentSpeakerSource = ""
+                    self?.audioLevel = 0.0
                     self?.queueCount = self?.queue.count ?? 0
                     self?.cleanupTmpAudio()
                     self?.processNext()

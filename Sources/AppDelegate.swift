@@ -6,6 +6,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     
     var statusItem: NSStatusItem?
     var dashboardWindow: NSWindow?
+    var trayHostingView: PassthroughHostingView<TrayGradientOrbView>?
     
     private var idleIcon: NSImage?
     private var speakingIcon: NSImage?
@@ -160,15 +161,24 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     
     public func setupMenuBar() {
         if statusItem == nil {
-            statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+            statusItem = NSStatusBar.system.statusItem(withLength: 28)
             statusItem?.autosaveName = "AgentSpeakTray"
         }
         
         guard let item = statusItem, let button = item.button else { return }
         
+        // Use live 3D gradient orb view in the menu bar
+        button.image = nil
         let isSpeaking = SpeechQueueManager.shared.isSpeaking
-        button.image = isSpeaking ? (speakingIcon ?? idleIcon) : idleIcon
         button.toolTip = isSpeaking ? "Agent Speak: Speaking... (Click for options)" : "Agent Speak: Ready & Monitoring (Click for options)"
+        
+        if trayHostingView == nil {
+            let hosting = PassthroughHostingView(rootView: TrayGradientOrbView())
+            hosting.frame = NSRect(x: 3, y: 1, width: 22, height: 20)
+            hosting.autoresizingMask = [.minXMargin, .maxXMargin, .minYMargin, .maxYMargin]
+            button.addSubview(hosting)
+            trayHostingView = hosting
+        }
         
         let menu = NSMenu()
         menu.delegate = self
@@ -179,7 +189,6 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     public func updateTrayIcon(isSpeaking: Bool) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self, let button = self.statusItem?.button else { return }
-            button.image = isSpeaking ? (self.speakingIcon ?? self.idleIcon) : self.idleIcon
             button.toolTip = isSpeaking ? "Agent Speak: Speaking... (Click for options)" : "Agent Speak: Ready & Monitoring (Click for options)"
         }
     }
