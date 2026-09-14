@@ -189,26 +189,28 @@ Spoken audio output is active. Format all explanations as natural conversational
 
 ```mermaid
 flowchart TD
-    subgraph Input Sources
-        A1[Antigravity Watcher] --> IPC[/tmp/agentspeak.sock]
-        A2[Claude Code Watcher] --> IPC
-        A3[Selected Text Hotkey] --> IPC
-        A4[CLI: agentspeak say] --> IPC
+    subgraph S1["Input Sources"]
+        A1["Antigravity Watcher"] --> IPC["UNIX Domain Socket: /tmp/agentspeak.sock"]
+        A2["Claude Code Watcher"] --> IPC
+        A3["Selected Text Hotkey"] --> IPC
+        A4["CLI: agentspeak say"] --> IPC
     end
 
-    subgraph Core Engine [Agent Speak Daemon]
-        IPC --> Sanitizer[Text Sanitizer & Code Stripper]
-        Sanitizer --> Queue[Speech Queue Manager]
-        Queue --> EnginePicker{Engine Active?}
-        EnginePicker -->|Zero CPU| AppleTTS[AVFoundation Native Voice]
-        EnginePicker -->|Neural| PocketTTS[Pocket-TTS Offline Cloner]
-        Queue --> BGM[Ambient Soundtrack Cross-Fader]
+    subgraph S2["Core Engine (Agent Speak Daemon)"]
+        IPC --> Sanitizer["Text Sanitizer & Code Stripper"]
+        Sanitizer --> Queue["Speech Queue Manager"]
+        Queue --> EnginePicker{"Engine Selection"}
+        EnginePicker -->|"Zero CPU"| AppleTTS["AVFoundation Native Voice"]
+        EnginePicker -->|"Neural"| PocketTTS["Pocket-TTS Offline Cloner"]
+        Queue --> BGM["Ambient Soundtrack Engine"]
+        Queue --> HoloManager["Hologram & Theme Engine"]
     end
 
-    subgraph Visual Interface
-        Queue --> NotchController[120 FPS Notch Window Controller]
-        NotchController --> ProMotion[MacBook Notch / Floating Pill]
-        NotchController --> Waveform[Real-Time Frequency Visualizer]
+    subgraph S3["Visual Interface (120 FPS ProMotion)"]
+        Queue --> NotchController["120 FPS Notch Controller"]
+        NotchController --> ProMotion["MacBook Camera Notch HUD"]
+        HoloManager --> HoloReactor["Holographic Arc Reactor (6 Themes)"]
+        HoloManager --> AmbientGlow["Audio-Reactive Ambient Wave Glow"]
     end
 ```
 
