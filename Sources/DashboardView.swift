@@ -71,6 +71,41 @@ public struct DashboardView: View {
     @State private var watchClaude: Bool = true
     @State private var watchOpenCode: Bool = true
     @State private var watchTerminal: Bool = true
+    @State private var voiceEngine: String = "macos_default"
+    @State private var pocketVoice: String = "Jarvis"
+    
+    private func loadVoiceConfig() {
+        let configPath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".agentspeak/config.json")
+        guard let data = try? Data(contentsOf: configPath),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let audio = json["audio"] as? [String: Any] else { return }
+        
+        if let engine = audio["engine"] as? String {
+            voiceEngine = engine
+        }
+        if let ptts = audio["pocket_tts"] as? [String: Any],
+           let v = ptts["voice"] as? String {
+            pocketVoice = v
+        }
+    }
+    
+    private func saveVoiceConfig() {
+        let configPath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".agentspeak/config.json")
+        guard let data = try? Data(contentsOf: configPath),
+              var json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+        
+        var audio = json["audio"] as? [String: Any] ?? [:]
+        audio["engine"] = voiceEngine
+        var ptts = audio["pocket_tts"] as? [String: Any] ?? [:]
+        ptts["voice"] = pocketVoice
+        ptts["enabled"] = (voiceEngine == "pocket_tts")
+        audio["pocket_tts"] = ptts
+        json["audio"] = audio
+        
+        if let updated = try? JSONSerialization.data(withJSONObject: json, options: .prettyPrinted) {
+            try? updated.write(to: configPath)
+        }
+    }
     
     public init() {}
     
@@ -137,34 +172,93 @@ public struct DashboardView: View {
                 VisualizerOrbView(isSpeaking: $queueManager.isSpeaking)
                     .padding(.vertical, 4)
                 
-                // Active Voice Info Card (Default System Voice)
-                HStack(spacing: 12) {
-                    Image(systemName: "speaker.wave.3.fill")
-                        .font(.system(size: 18))
-                        .foregroundColor(.cyan)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Active Voice Engine")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(.secondary)
-                        Text("Default Apple Silicon Voice (Native)")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(.white)
-                    }
-                    Spacer()
-                    Text("0ms Delay")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.green)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.green.opacity(0.15))
-                        .cornerRadius(6)
+                // Engine Segmented Switch
+                Picker("", selection: $voiceEngine) {
+                    Text("MacBook Voice (Built-in)").tag("macos_default")
+                    Text("Pocket-TTS Extension").tag("pocket_tts")
                 }
-                .padding(12)
-                .background(Color.white.opacity(0.04))
-                .cornerRadius(12)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                .pickerStyle(.segmented)
                 .padding(.horizontal, 20)
-                .padding(.bottom, 12)
+                .padding(.bottom, 8)
+                .onChange(of: voiceEngine) { _ in saveVoiceConfig() }
+                
+                // Active Voice Info Card
+                if voiceEngine == "macos_default" {
+                    HStack(spacing: 12) {
+                        Image(systemName: "speaker.wave.3.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(.cyan)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Active Voice Engine")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(.secondary)
+                            Text("Default Apple Silicon Voice (Native)")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                        Spacer()
+                        Text("0ms Delay")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.green)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color.green.opacity(0.15))
+                            .cornerRadius(6)
+                    }
+                    .padding(12)
+                    .background(Color.white.opacity(0.04))
+                    .cornerRadius(12)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
+                } else {
+                    VStack(spacing: 8) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 18))
+                                .foregroundColor(.purple)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Pocket-TTS Extension (Neural)")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                                Text("\(pocketVoice) Voice")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(.white)
+                            }
+                            Spacer()
+                            Text("Extension")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.purple)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color.purple.opacity(0.15))
+                                .cornerRadius(6)
+                        }
+                        
+                        // Voice Selector
+                        HStack {
+                            Text("Voice Persona:")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Picker("", selection: $pocketVoice) {
+                                Text("Jarvis (British Butler AI)").tag("Jarvis")
+                                Text("Sayed Johon (Avatar Clone)").tag("Sayed_Johon_Primary")
+                                Text("Alba (Crisp Storyteller)").tag("alba")
+                                Text("George (Warm Narrator)").tag("george")
+                            }
+                            .pickerStyle(.menu)
+                            .frame(width: 190)
+                            .onChange(of: pocketVoice) { _ in saveVoiceConfig() }
+                        }
+                    }
+                    .padding(12)
+                    .background(Color.white.opacity(0.04))
+                    .cornerRadius(12)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.purple.opacity(0.3), lineWidth: 1))
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
+                }
                 
                 // Scrollable Controls
                 ScrollView(.vertical, showsIndicators: false) {
@@ -319,5 +413,8 @@ public struct DashboardView: View {
             }
         }
         .frame(width: 420, height: 560)
+        .onAppear {
+            loadVoiceConfig()
+        }
     }
 }

@@ -7,6 +7,16 @@
   },
   "audio": {
     "engine": "macos_default",
+    "pocket_tts": {
+      "enabled": false,
+      "voice": "Jarvis",
+      "available_voices": [
+        "Jarvis",
+        "Sayed_Johon_Primary",
+        "alba",
+        "george"
+      ]
+    },
     "volume": 1.0
   },
   "notch_display": {

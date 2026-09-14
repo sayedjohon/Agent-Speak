@@ -125,15 +125,67 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         guard index < chunks.count, !isCancelled else { return }
         let c = chunks[index]
         
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/say")
-        // No -v flag: Uses your Mac's natural default system voice!
-        proc.arguments = ["-o", c.filePath, c.text]
+        // Read audio engine preference from config
+        var engine = "macos_default"
+        var voice = "Jarvis"
+        let configPath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".agentspeak/config.json")
+        if let data = try? Data(contentsOf: configPath),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let audio = json["audio"] as? [String: Any] {
+            engine = audio["engine"] as? String ?? "macos_default"
+            if let ptts = audio["pocket_tts"] as? [String: Any],
+               let v = ptts["voice"] as? String {
+                voice = v
+            }
+        }
         
-        self.activeRenderProcess = proc
-        try? proc.run()
-        proc.waitUntilExit()
-        self.activeRenderProcess = nil
+        var renderedSuccessfully = false
+        
+        // 1. If Pocket-TTS extension is selected, attempt synthesis
+        if engine == "pocket_tts" {
+            let possibleScripts = [
+                FileManager.default.homeDirectoryForCurrentUser.path + "/Documents/DEV_AREA/ssh linux/pocket-tts/speak.py",
+                FileManager.default.homeDirectoryForCurrentUser.path + "/.agentspeak/extensions/pocket-tts/speak.py"
+            ]
+            let possiblePythons = [
+                FileManager.default.homeDirectoryForCurrentUser.path + "/Documents/DEV_AREA/ssh linux/pocket-tts/venv/bin/python",
+                FileManager.default.homeDirectoryForCurrentUser.path + "/.agentspeak/extensions/pocket-tts/venv/bin/python"
+            ]
+            
+            var scriptPath: String?
+            var pythonPath: String?
+            for s in possibleScripts { if FileManager.default.fileExists(atPath: s) { scriptPath = s; break } }
+            for p in possiblePythons { if FileManager.default.fileExists(atPath: p) { pythonPath = p; break } }
+            
+            if let script = scriptPath, let py = pythonPath {
+                let proc = Process()
+                proc.executableURL = URL(fileURLWithPath: py)
+                proc.arguments = [script, c.text, "--voice", voice, "--output", c.filePath, "--no-play"]
+                self.activeRenderProcess = proc
+                try? proc.run()
+                proc.waitUntilExit()
+                self.activeRenderProcess = nil
+                
+                if FileManager.default.fileExists(atPath: c.filePath),
+                   let attrs = try? FileManager.default.attributesOfItem(atPath: c.filePath),
+                   (attrs[.size] as? Int64 ?? 0) > 1000 {
+                    renderedSuccessfully = true
+                }
+            }
+        }
+        
+        // 2. Native Apple Silicon voice (macos_default or fallback)
+        if !renderedSuccessfully {
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/say")
+            // No -v flag: Uses your Mac's natural default system voice!
+            proc.arguments = ["-o", c.filePath, c.text]
+            
+            self.activeRenderProcess = proc
+            try? proc.run()
+            proc.waitUntilExit()
+            self.activeRenderProcess = nil
+        }
         
         if FileManager.default.fileExists(atPath: c.filePath),
            let p = try? AVAudioPlayer(contentsOf: URL(fileURLWithPath: c.filePath)) {
