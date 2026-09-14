@@ -348,7 +348,7 @@ public struct BackgroundMusicView: View {
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                             Button(action: { bgmManager.restoreDefaultTrack() }) {
-                                Text("Restore AC/DC Back In Black")
+                                Text("Restore Iron Man Theme")
                                     .font(.system(size: 11, weight: .semibold))
                                     .foregroundColor(.purple)
                             }
@@ -401,7 +401,7 @@ public struct BackgroundMusicView: View {
                 Spacer()
                 
                 Button(action: { bgmManager.restoreDefaultTrack() }) {
-                    Text("Restore Default AC/DC")
+                    Text("Restore Iron Man Theme")
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
                 }

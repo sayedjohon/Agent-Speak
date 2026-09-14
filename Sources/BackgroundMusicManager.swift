@@ -9,7 +9,7 @@ public class BackgroundMusicManager: ObservableObject {
     // Published State
     @Published public var isEnabled: Bool = true
     @Published public var volume: Float = 0.20
-    @Published public var randomOffset: Bool = true
+    @Published public var randomOffset: Bool = false
     @Published public var shuffle: Bool = true
     @Published public var reverbEnabled: Bool = true
     @Published public var fadeOutDuration: Double = 2.5
@@ -63,15 +63,14 @@ public class BackgroundMusicManager: ObservableObject {
     }
     
     public func restoreDefaultTrack() {
-        let defaultDest = bgmFolderURL.appendingPathComponent("AC_DC - Back In Black.mp3")
+        let defaultDest = bgmFolderURL.appendingPathComponent("Iron_Man.mp3")
         if FileManager.default.fileExists(atPath: defaultDest.path) {
             return
         }
         
         let candidateSources = [
-            Bundle.main.resourceURL?.appendingPathComponent("bgm/AC_DC - Back In Black.mp3"),
-            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/DEV_AREA/ssh linux/agent-speak/Resources/bgm/AC_DC - Back In Black.mp3"),
-            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads/AC_DC - Back In Black (Official 4K Video) [pAgnJDJN4VA].mp3")
+            Bundle.main.resourceURL?.appendingPathComponent("bgm/Iron_Man.mp3"),
+            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/DEV_AREA/ssh linux/agent-speak/Resources/bgm/Iron_Man.mp3")
         ]
         
         for candidate in candidateSources {
