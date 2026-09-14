@@ -18,8 +18,12 @@ tell application "System Events"
     if exists login item "Agent Speak" then
         delete login item "Agent Speak"
     end if
+    if exists login item "AntigravityVoiceWatcher" then
+        delete login item "AntigravityVoiceWatcher"
+    end if
 end tell
 ' 2>/dev/null || true
+rm -rf "$HOME/Applications/AntigravityVoiceWatcher.app" 2>/dev/null || true
 
 # Remove binaries and application
 rm -f "$HOME/.local/bin/agentspeak"

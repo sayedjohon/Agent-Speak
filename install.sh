@@ -102,13 +102,25 @@ if [[ -d "$CONFIG_DIR/extensions/pocket-tts/voices" && -d "$SCRIPT_DIR/Resources
     cp "$SCRIPT_DIR/Resources/voices/"*.wav "$CONFIG_DIR/extensions/pocket-tts/voices/" 2>/dev/null || true
 fi
 
-# 5. Clean Obsolete Legacy LaunchAgents & Register 24/7 Daemon
+# 5. Clean Obsolete Legacy LaunchAgents, Login Items & Register 24/7 Daemon
 echo -e "${CYAN}→ Registering Agent Speak as a permanent background service...${NC}"
 launchctl unload "$HOME/Library/LaunchAgents/com.sayedjohon.antigravity-voice-watcher.plist" 2>/dev/null || true
 rm -f "$HOME/Library/LaunchAgents/com.sayedjohon.antigravity-voice-watcher.plist"
 launchctl unload "$HOME/Library/LaunchAgents/com.antigravity.jarvis.plist" 2>/dev/null || true
 rm -f "$HOME/Library/LaunchAgents/com.antigravity.jarvis.plist"
+
+# Remove obsolete legacy Login Item and processes
+osascript -e '
+tell application "System Events"
+    if exists login item "AntigravityVoiceWatcher" then
+        delete login item "AntigravityVoiceWatcher"
+    end if
+end tell
+' 2>/dev/null || true
+pkill -9 -f "AntigravityVoiceWatcher" 2>/dev/null || true
 pkill -9 -f "antigravity_voice_watcher" 2>/dev/null || true
+pkill -9 -f "speech-bar" 2>/dev/null || true
+rm -rf "$APPS_DIR/AntigravityVoiceWatcher.app" 2>/dev/null || true
 
 PLIST_PATH="$HOME/Library/LaunchAgents/com.agentspeak.app.plist"
 launchctl unload "$PLIST_PATH" 2>/dev/null || true
