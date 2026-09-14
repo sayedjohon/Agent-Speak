@@ -2,6 +2,7 @@ import Cocoa
 import SwiftUI
 import AVFoundation
 import Carbon
+import NaturalLanguage
 
 // MARK: - Sentence Chunker
 func splitTextIntoChunks(text: String) -> [String] {
@@ -235,10 +236,26 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         if !renderedSuccessfully {
             let proc = Process()
             proc.executableURL = URL(fileURLWithPath: "/usr/bin/say")
+            
+            var sayVoice: String? = nil
             if (voice == "Jarvis" || voice == "Daniel") && engine == "pocket_tts" {
-                proc.arguments = ["-v", "Daniel", "-o", c.filePath, c.text]
-            } else if macosVoice != "default" && !macosVoice.isEmpty {
-                proc.arguments = ["-v", macosVoice, "-o", c.filePath, c.text]
+                sayVoice = "Daniel"
+            } else {
+                // Multilingual Auto-Detection: Detect language of incoming sentence
+                let recognizer = NLLanguageRecognizer()
+                recognizer.processString(c.text)
+                let lang = recognizer.dominantLanguage?.rawValue
+                
+                if let lang = lang, !lang.starts(with: "en"), lang != "und",
+                   let matchVoice = AVSpeechSynthesisVoice(language: lang) {
+                    sayVoice = matchVoice.name
+                } else if macosVoice != "default" && !macosVoice.isEmpty {
+                    sayVoice = macosVoice
+                }
+            }
+            
+            if let v = sayVoice {
+                proc.arguments = ["-v", v, "-o", c.filePath, c.text]
             } else {
                 // Default system voice
                 proc.arguments = ["-o", c.filePath, c.text]
