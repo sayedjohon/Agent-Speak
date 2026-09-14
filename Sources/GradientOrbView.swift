@@ -8,9 +8,9 @@ public class PassthroughHostingView<Content: View>: NSHostingView<Content> {
     }
 }
 
-// MARK: - Native 3D Gradient Orb Visualizer (Audio & Equalizer Reactive)
-/// Replaces the React/Three.js shader with a 100% native Apple Silicon GPU visualizer.
-/// Audio-reactive: modulates scale, fluid turbulence, rotation speed, and glow from live decibel meters.
+// MARK: - Refined Liquid 3D Gradient Orb (Calm, Silk-Smooth & Audio-Reactive)
+/// Apple-grade fluid gradient orb with soft Gaussian dispersion and serene rotation.
+/// Modulates scale and core luminescence smoothly with voice decibel levels.
 public struct GradientOrbVisualizerView: View {
     @ObservedObject var queueManager = SpeechQueueManager.shared
     
@@ -22,10 +22,10 @@ public struct GradientOrbVisualizerView: View {
     
     public init(
         isSpeaking: Bool = false,
-        size: CGFloat = 68,
-        color1: Color = Color(red: 0.24, green: 0.35, blue: 1.0),   // Electric Blue #3D5AFF
-        color2: Color = Color(red: 0.61, green: 0.0, blue: 1.0),    // Cyber Purple #9D00FF
-        color3: Color = Color(red: 1.0, green: 0.37, blue: 0.12)    // Neon Amber #FF5F1F
+        size: CGFloat = 66,
+        color1: Color = Color(red: 0.24, green: 0.35, blue: 1.0),   // Electric Blue
+        color2: Color = Color(red: 0.61, green: 0.0, blue: 1.0),    // Cyber Purple
+        color3: Color = Color(red: 1.0, green: 0.40, blue: 0.15)    // Sunset Amber
     ) {
         self.isSpeaking = isSpeaking
         self.size = size
@@ -39,44 +39,43 @@ public struct GradientOrbVisualizerView: View {
             let now = timeline.date.timeIntervalSinceReferenceDate
             let level = CGFloat(queueManager.audioLevel) // 0.0 ... 1.0
             
-            // Speed accelerates with volume
-            let baseSpeed = isSpeaking ? 1.7 : 0.65
-            let speed = baseSpeed + Double(level) * 2.5
+            // Calm, elegant rotation speed (no aggressive spinning)
+            let baseSpeed = isSpeaking ? 0.42 : 0.22
+            let speed = baseSpeed + Double(level) * 0.30
             let rot1 = Angle.radians(now * speed)
-            let rot2 = Angle.radians(-now * (speed * 0.72))
+            let rot2 = Angle.radians(-now * (speed * 0.75))
             
-            // Equalizer pulse: gentle breathing + reactive sound boost
-            let breath = sin(now * (isSpeaking ? 3.6 : 1.6)) * (isSpeaking ? 0.04 : 0.02)
-            let audioPulse = level * 0.16
+            // Organic, gentle breathing swell (max 4.5% variation)
+            let breath = sin(now * (isSpeaking ? 2.4 : 1.2)) * 0.018
+            let audioPulse = isSpeaking ? (level * 0.05) : 0.0
             let scale = 1.0 + CGFloat(breath) + audioPulse
             
             ZStack {
-                // 1. Ambient Outer Bloom Aura
+                // 1. Soft Ambient Halo Glow
                 Circle()
                     .fill(
                         RadialGradient(
                             colors: [
-                                color1.opacity(isSpeaking ? (0.45 + Double(level) * 0.35) : 0.22),
-                                color2.opacity(isSpeaking ? (0.35 + Double(level) * 0.25) : 0.15),
-                                color3.opacity(isSpeaking ? (0.20 + Double(level) * 0.20) : 0.06),
+                                color1.opacity(isSpeaking ? (0.35 + Double(level) * 0.20) : 0.16),
+                                color2.opacity(isSpeaking ? (0.22 + Double(level) * 0.15) : 0.08),
                                 Color.clear
                             ],
                             center: .center,
-                            startRadius: size * 0.15,
-                            endRadius: size * (0.65 + level * 0.2)
+                            startRadius: size * 0.18,
+                            endRadius: size * 0.65
                         )
                     )
-                    .frame(width: size * (1.35 + level * 0.25), height: size * (1.35 + level * 0.25))
-                    .blur(radius: isSpeaking ? (12 + level * 8) : 8)
+                    .frame(width: size * 1.30, height: size * 1.30)
+                    .blur(radius: isSpeaking ? 10 : 6)
                 
-                // 2. Main 3D Spherical Plasma Orb
+                // 2. 3D Glass Sphere Body
                 ZStack {
-                    // Deep space black base
+                    // Deep Obsidian Space Base
                     Circle()
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    Color(red: 0.08, green: 0.10, blue: 0.20),
+                                    Color(red: 0.06, green: 0.08, blue: 0.18),
                                     Color(red: 0.02, green: 0.02, blue: 0.05)
                                 ],
                                 center: .center,
@@ -85,7 +84,7 @@ public struct GradientOrbVisualizerView: View {
                             )
                         )
                     
-                    // Rotating Gradient Layer 1 (Electric Blue -> Purple -> Amber)
+                    // Liquid Swirl Layer 1: Electric Blue & Cyber Purple
                     Circle()
                         .fill(
                             AngularGradient(
@@ -93,83 +92,49 @@ public struct GradientOrbVisualizerView: View {
                                     color1,
                                     color2,
                                     color3,
-                                    Color(red: 0.08, green: 0.85, blue: 0.95),
+                                    Color(red: 0.10, green: 0.80, blue: 0.95),
                                     color1
                                 ]),
                                 center: .center
                             )
                         )
                         .rotationEffect(rot1)
-                        .blur(radius: size * 0.08)
-                        .opacity(0.88)
+                        .blur(radius: size * 0.14)
+                        .opacity(0.86)
                     
-                    // Rotating Gradient Layer 2 (Cross-directional plasma swirl)
+                    // Liquid Swirl Layer 2: Sunset Amber & Magenta Highlights
                     Ellipse()
                         .fill(
                             AngularGradient(
                                 gradient: Gradient(colors: [
-                                    color3.opacity(0.9),
-                                    color2.opacity(0.85),
-                                    color1.opacity(0.75),
-                                    color3.opacity(0.9)
+                                    color3.opacity(0.85),
+                                    Color(red: 0.70, green: 0.10, blue: 0.95).opacity(0.75),
+                                    color1.opacity(0.65),
+                                    color3.opacity(0.85)
                                 ]),
                                 center: .center
                             )
                         )
-                        .frame(width: size * (0.88 + level * 0.15), height: size * (0.68 + level * 0.12))
+                        .frame(width: size * 0.86, height: size * 0.66)
                         .rotationEffect(rot2)
-                        .blur(radius: size * 0.06)
+                        .blur(radius: size * 0.12)
                         .blendMode(.plusLighter)
                     
-                    // Fluid Equalizer Wave Contours (Height modulated by live audio)
-                    Canvas { context, canvasSize in
-                        let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
-                        let baseR = min(canvasSize.width, canvasSize.height) * 0.38
-                        let waveCount = isSpeaking ? 3 : 2
-                        
-                        for w in 0..<waveCount {
-                            let phaseOffset = now * (speed * 1.25) + Double(w) * 1.55
-                            var path = Path()
-                            let steps = 48
-                            
-                            // Audio-reactive wave amplitude
-                            let baseAmp = isSpeaking ? (size * 0.07) : (size * 0.035)
-                            let amp = baseAmp + (level * size * 0.12)
-                            
-                            for s in 0...steps {
-                                let angle = (CGFloat(s) / CGFloat(steps)) * 2 * .pi
-                                let harmonic = sin(angle * 3 + CGFloat(phaseOffset)) * amp
-                                let r = baseR + harmonic - CGFloat(w * 6)
-                                let pt = CGPoint(
-                                    x: center.x + cos(angle) * r,
-                                    y: center.y + sin(angle) * r
-                                )
-                                if s == 0 { path.move(to: pt) } else { path.addLine(to: pt) }
-                            }
-                            path.closeSubpath()
-                            
-                            let strokeColor = (w == 0)
-                                ? Color(red: 0.4, green: 0.82, blue: 1.0).opacity(0.65 + Double(level) * 0.35)
-                                : Color(red: 1.0, green: 0.65, blue: 0.35).opacity(0.45 + Double(level) * 0.35)
-                            context.stroke(path, with: .color(strokeColor), lineWidth: 1.5 + level * 1.2)
-                        }
-                    }
-                    
-                    // High-Intensity Audio-Reactive Core Glow
+                    // Soft Luminescent Core (Flares smoothly with speech volume)
                     Circle()
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    Color.white.opacity(isSpeaking ? (0.85 + Double(level) * 0.15) : 0.75),
-                                    Color(red: 0.3, green: 0.85, blue: 1.0).opacity(0.6 + Double(level) * 0.3),
+                                    Color.white.opacity(isSpeaking ? (0.85 + Double(level) * 0.15) : 0.70),
+                                    Color(red: 0.35, green: 0.78, blue: 1.0).opacity(0.45),
                                     Color.clear
                                 ],
                                 center: .center,
                                 startRadius: 0,
-                                endRadius: size * (0.22 + level * 0.12)
+                                endRadius: size * (0.24 + level * 0.08)
                             )
                         )
-                        .frame(width: size * (0.44 + level * 0.25), height: size * (0.44 + level * 0.25))
+                        .frame(width: size * 0.50, height: size * 0.50)
                         .blendMode(.plusLighter)
                     
                     // 3D Glass Specular Reflection Highlight (top-left glint)
@@ -177,50 +142,50 @@ public struct GradientOrbVisualizerView: View {
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    Color.white.opacity(0.65),
-                                    Color.white.opacity(0.12),
+                                    Color.white.opacity(0.55),
+                                    Color.white.opacity(0.10),
                                     Color.clear
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .frame(width: size * 0.46, height: size * 0.22)
-                        .offset(x: -size * 0.15, y: -size * 0.22)
-                        .rotationEffect(.degrees(-25))
+                        .frame(width: size * 0.44, height: size * 0.22)
+                        .offset(x: -size * 0.16, y: -size * 0.22)
+                        .rotationEffect(.degrees(-28))
                     
-                    // Glass Rim Border
+                    // Subtle Glass Rim Border
                     Circle()
                         .strokeBorder(
                             LinearGradient(
                                 colors: [
-                                    Color.white.opacity(0.75),
-                                    Color(red: 0.3, green: 0.6, blue: 1.0).opacity(0.4),
-                                    Color.white.opacity(0.1),
-                                    Color(red: 1.0, green: 0.5, blue: 0.2).opacity(0.45)
+                                    Color.white.opacity(0.65),
+                                    Color(red: 0.3, green: 0.6, blue: 1.0).opacity(0.30),
+                                    Color.white.opacity(0.08),
+                                    Color(red: 1.0, green: 0.5, blue: 0.2).opacity(0.35)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
-                            lineWidth: 1.2
+                            lineWidth: 1.0
                         )
                 }
                 .frame(width: size, height: size)
                 .clipShape(Circle())
                 .scaleEffect(scale)
                 .shadow(
-                    color: color1.opacity(isSpeaking ? (0.55 + Double(level) * 0.35) : 0.26),
-                    radius: isSpeaking ? (12 + level * 10) : 7,
+                    color: color1.opacity(isSpeaking ? 0.38 : 0.18),
+                    radius: isSpeaking ? 10 : 5,
                     x: 0,
-                    y: 3
+                    y: 2
                 )
             }
-            .frame(width: size * 1.35, height: size * 1.35)
+            .frame(width: size * 1.25, height: size * 1.25)
         }
     }
 }
 
-// MARK: - Live Menu Bar Tray Gradient Orb (18x18 pt)
+// MARK: - Native macOS Menu Bar Tray (Crisp Icon Idle, Dancing Equalizer Speaking)
 public struct TrayGradientOrbView: View {
     @ObservedObject var queueManager = SpeechQueueManager.shared
     
@@ -232,98 +197,41 @@ public struct TrayGradientOrbView: View {
             let level = CGFloat(queueManager.audioLevel)
             let now = timeline.date.timeIntervalSinceReferenceDate
             
-            let speed = isSpeaking ? (2.2 + Double(level) * 3.0) : 0.8
-            let rot1 = Angle.radians(now * speed)
-            let rot2 = Angle.radians(-now * (speed * 0.75))
-            let pulse = isSpeaking ? (1.0 + level * 0.22 + CGFloat(sin(now * 4.0) * 0.05)) : 1.0
-            
-            ZStack {
-                // Outer Ambient Halo
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                Color(red: 0.24, green: 0.35, blue: 1.0).opacity(isSpeaking ? (0.6 + Double(level) * 0.4) : 0.3),
-                                Color(red: 0.61, green: 0.0, blue: 1.0).opacity(isSpeaking ? 0.4 : 0.15),
-                                Color.clear
-                            ],
-                            center: .center,
-                            startRadius: 2,
-                            endRadius: 9
-                        )
-                    )
-                    .frame(width: 20, height: 20)
-                    .blur(radius: isSpeaking ? 2.5 : 1.5)
-                
-                // Orb Body
-                ZStack {
-                    // Base Dark
-                    Circle()
-                        .fill(Color(red: 0.05, green: 0.06, blue: 0.15))
-                    
-                    // Rotating Color Swirl 1
-                    Circle()
-                        .fill(
-                            AngularGradient(
-                                gradient: Gradient(colors: [
-                                    Color(red: 0.24, green: 0.35, blue: 1.0),   // Blue
-                                    Color(red: 0.61, green: 0.0, blue: 1.0),    // Purple
-                                    Color(red: 1.0, green: 0.37, blue: 0.12),   // Amber
-                                    Color(red: 0.1, green: 0.9, blue: 1.0),     // Cyan
-                                    Color(red: 0.24, green: 0.35, blue: 1.0)
-                                ]),
-                                center: .center
-                            )
-                        )
-                        .rotationEffect(rot1)
-                        .blur(radius: 1.5)
-                    
-                    // Rotating Color Swirl 2
-                    Ellipse()
-                        .fill(
-                            AngularGradient(
-                                gradient: Gradient(colors: [
-                                    Color(red: 1.0, green: 0.37, blue: 0.12).opacity(0.85),
-                                    Color(red: 0.61, green: 0.0, blue: 1.0).opacity(0.8),
-                                    Color(red: 0.2, green: 0.6, blue: 1.0).opacity(0.7)
-                                ]),
-                                center: .center
-                            )
-                        )
-                        .frame(width: 14, height: 10)
-                        .rotationEffect(rot2)
-                        .blendMode(.plusLighter)
-                    
-                    // Core Glint
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    Color.white.opacity(isSpeaking ? 0.95 : 0.8),
-                                    Color(red: 0.4, green: 0.8, blue: 1.0).opacity(0.5),
-                                    Color.clear
-                                ],
-                                center: .center,
-                                startRadius: 0,
-                                endRadius: 4
-                            )
-                        )
-                        .frame(width: 6, height: 6)
-                        .blendMode(.plusLighter)
-                    
-                    // Specular Highlight
-                    Ellipse()
-                        .fill(Color.white.opacity(0.6))
-                        .frame(width: 5, height: 2.5)
-                        .offset(x: -2.5, y: -3)
-                    
-                    // Glass Rim
-                    Circle()
-                        .strokeBorder(Color.white.opacity(0.6), lineWidth: 0.75)
+            HStack(alignment: .center, spacing: 0) {
+                if isSpeaking {
+                    // 3 Elegant, dancing equalizer bars (macOS Sound / Apple Music style)
+                    HStack(alignment: .center, spacing: 2.2) {
+                        ForEach(0..<3) { i in
+                            let phase = now * 5.2 + Double(i) * 1.4
+                            let wave = (sin(phase) + 1.0) * 0.5 // 0.0 ... 1.0
+                            let dynamicH = 4.0 + CGFloat(wave) * 3.5 + (level * 6.5)
+                            let clampedH = max(3.5, min(14.0, dynamicH))
+                            
+                            RoundedRectangle(cornerRadius: 1.2)
+                                .fill(Color.primary)
+                                .frame(width: 2.4, height: clampedH)
+                        }
+                    }
+                    .frame(width: 18, height: 16)
+                } else {
+                    // Clean, crisp native outline icon
+                    if let img = AppDelegate.shared?.idleIcon {
+                        Image(nsImage: img)
+                            .renderingMode(.template)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 17, height: 17)
+                            .foregroundColor(.primary)
+                    } else {
+                        // Minimal ready soundwave glyph
+                        HStack(spacing: 2.0) {
+                            RoundedRectangle(cornerRadius: 1.0).fill(Color.primary.opacity(0.65)).frame(width: 2.2, height: 5)
+                            RoundedRectangle(cornerRadius: 1.0).fill(Color.primary.opacity(0.95)).frame(width: 2.2, height: 11)
+                            RoundedRectangle(cornerRadius: 1.0).fill(Color.primary.opacity(0.65)).frame(width: 2.2, height: 7)
+                        }
+                        .frame(width: 18, height: 16)
+                    }
                 }
-                .frame(width: 15, height: 15)
-                .clipShape(Circle())
-                .scaleEffect(pulse)
             }
             .frame(width: 22, height: 20)
             .allowsHitTesting(false)

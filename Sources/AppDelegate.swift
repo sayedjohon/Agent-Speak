@@ -8,7 +8,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var dashboardWindow: NSWindow?
     var trayHostingView: PassthroughHostingView<TrayGradientOrbView>?
     
-    private var idleIcon: NSImage?
+    public var idleIcon: NSImage?
     private var speakingIcon: NSImage?
     
     public var isTrayIconVisible: Bool {
