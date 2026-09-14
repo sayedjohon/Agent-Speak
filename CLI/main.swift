@@ -56,13 +56,52 @@ guard args.count > 1 else {
 
 let cmd = args[1].lowercased()
 
+func getActiveConfigInfo() -> (engine: String, voice: String) {
+    let home = FileManager.default.homeDirectoryForCurrentUser.path
+    let cfgURL = URL(fileURLWithPath: "\(home)/.agentspeak/config.json")
+    guard let data = try? Data(contentsOf: cfgURL),
+          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let audio = json["audio"] as? [String: Any] else {
+        return ("macos_default", "System Voice")
+    }
+    let engine = audio["engine"] as? String ?? "macos_default"
+    var voice = "System Default"
+    if engine == "pocket_tts",
+       let ptts = audio["pocket_tts"] as? [String: Any],
+       let v = ptts["voice"] as? String {
+        voice = v
+    }
+    return (engine, voice)
+}
+
+func ensureAppRunningAndSend(_ message: String) -> Bool {
+    if sendSocketMessage(message) { return true }
+    
+    print("Agent Speak is starting up...")
+    let home = FileManager.default.homeDirectoryForCurrentUser.path
+    let appURL = URL(fileURLWithPath: "\(home)/Applications/Agent Speak.app")
+    if FileManager.default.fileExists(atPath: appURL.path) {
+        NSWorkspace.shared.open(appURL)
+        // Poll for socket for up to 3 seconds
+        for _ in 0..<30 {
+            usleep(100_000)
+            if sendSocketMessage(message) {
+                return true
+            }
+        }
+    }
+    return false
+}
+
 switch cmd {
 case "status":
     let isRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: "com.agentspeak.app").isEmpty
     let socketExists = FileManager.default.fileExists(atPath: socketPath)
+    let info = getActiveConfigInfo()
     if isRunning || socketExists {
         print("Agent Speak Status: 🟢 RUNNING (100% Native Swift)")
-        print("Voice Engine:       Default System Voice (Natural macOS)")
+        print("Voice Engine:       \(info.engine == "pocket_tts" ? "Pocket-TTS Neural Extension" : "Default System Voice (macOS)")")
+        print("Active Voice:       \(info.voice)")
         print("IPC Socket:         \(socketPath)")
     } else {
         print("Agent Speak Status: 🔴 NOT RUNNING")
@@ -75,46 +114,24 @@ case "say":
         print("Error: Please provide text to speak. Example: agentspeak say 'Hello world'")
         exit(1)
     }
-    if sendSocketMessage(text) {
+    if ensureAppRunningAndSend(text) {
         print("[Agent Speak] Sent to speech queue via Swift IPC.")
     } else {
-        print("Error: Agent Speak is not running. Launching app...")
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let appURL = URL(fileURLWithPath: "\(home)/Applications/Agent Speak.app")
-        if FileManager.default.fileExists(atPath: appURL.path) {
-            NSWorkspace.shared.open(appURL)
-            // Wait briefly for socket to come online
-            usleep(800_000)
-            _ = sendSocketMessage(text)
-        }
+        print("Error: Could not connect to Agent Speak socket.")
     }
 
 case "dashboard":
-    if sendSocketMessage("__CMD_SHOW_DASHBOARD__") {
+    if ensureAppRunningAndSend("__CMD_SHOW_DASHBOARD__") {
         print("[Agent Speak] Showing Agent Speak Dashboard...")
     } else {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let appURL = URL(fileURLWithPath: "\(home)/Applications/Agent Speak.app")
-        if FileManager.default.fileExists(atPath: appURL.path) {
-            NSWorkspace.shared.open(appURL)
-            print("[Agent Speak] Launching Agent Speak App...")
-        } else {
-            print("Error: 'Agent Speak.app' not found in ~/Applications/")
-        }
+        print("Error: Could not launch Agent Speak Dashboard.")
     }
 
 case "test-jarvis":
-    if sendSocketMessage("__CMD_TEST_JARVIS__") {
+    if ensureAppRunningAndSend("__CMD_TEST_JARVIS__") {
         print("[Agent Speak] Presenting Jarvis voice sample in the Notch Player...")
     } else {
-        print("Error: Agent Speak is not running. Launching app first...")
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let appURL = URL(fileURLWithPath: "\(home)/Applications/Agent Speak.app")
-        if FileManager.default.fileExists(atPath: appURL.path) {
-            NSWorkspace.shared.open(appURL)
-            usleep(800_000)
-            _ = sendSocketMessage("__CMD_TEST_JARVIS__")
-        }
+        print("Error: Could not trigger Jarvis test sample.")
     }
 
 case "stop":
