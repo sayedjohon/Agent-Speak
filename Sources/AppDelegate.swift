@@ -8,8 +8,8 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var dashboardWindow: NSWindow?
     var trayHostingView: PassthroughHostingView<TrayGradientOrbView>?
     
-    public var idleIcon: NSImage?
-    private var speakingIcon: NSImage?
+    var idleIcon: NSImage?
+    var speakingIcon: NSImage?
     
     public var isTrayIconVisible: Bool {
         return statusItem?.isVisible ?? false

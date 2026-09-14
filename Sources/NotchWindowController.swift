@@ -348,13 +348,12 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         if p.isMeteringEnabled {
             p.updateMeters()
             let power = p.averagePower(forChannel: 0)
-            let peak = p.peakPower(forChannel: 0)
-            let normAvg = max(0.0, min(1.0, Double(power + 48.0) / 48.0))
-            let normPeak = max(0.0, min(1.0, Double(peak + 42.0) / 42.0))
-            let targetLevel = Float(normAvg * 0.65 + normPeak * 0.35)
+            let norm = max(0.0, min(1.0, Double(power + 44.0) / 44.0))
+            let targetLevel = Float(norm)
             DispatchQueue.main.async {
                 let prev = SpeechQueueManager.shared.audioLevel
-                SpeechQueueManager.shared.audioLevel = prev * 0.3 + targetLevel * 0.7
+                let factor: Float = targetLevel > prev ? 0.22 : 0.08
+                SpeechQueueManager.shared.audioLevel = prev * (1.0 - factor) + targetLevel * factor
             }
         }
     }
