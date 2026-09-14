@@ -45,7 +45,7 @@ func printHelp() {
       pb          Speak copied clipboard text (alias: clipboard)
       settings    Open the Agent Speak Settings window (alias: dashboard)
       tray        Toggle or set menu bar tray icon (tray on | off | toggle)
-      voice       Manage voices and extensions (status | list | set | install | clone)
+      voice       Manage voices and volume (status | list | set | vol <1-200> | install | clone)
       bgm         Manage Iron Man background soundtrack (on | off | vol | test | open | status)
       test-jarvis Test playback of the Jarvis voice sample in the Notch Player
       stop        Stop current speech and dismiss the notch player
@@ -203,6 +203,20 @@ case "voice":
         print("Active Engine:      \(info.engine == "pocket_tts" ? "Pocket-TTS Neural Extension" : "Default macOS System Voice")")
         print("Active Voice:       \(info.voice)")
         print("Neural Extension:   \(isExtInstalled ? "🟢 INSTALLED (\(extDir))" : "🟡 NOT INSTALLED (On-Demand)")")
+        
+        var voiceVol = 100
+        let cfgURL = URL(fileURLWithPath: "\(home)/.agentspeak/config.json")
+        if let data = try? Data(contentsOf: cfgURL),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let audio = json["audio"] as? [String: Any] {
+            if let d = audio["volume"] as? Double {
+                voiceVol = d <= 2.0 ? Int(round(d * 100.0)) : Int(d)
+            } else if let i = audio["volume"] as? Int {
+                voiceVol = i <= 2 ? i * 100 : i
+            }
+        }
+        let boostText = voiceVol > 100 ? String(format: " (⚡ +%.1f dB Force Boost Active)", 20.0 * log10(Double(voiceVol) / 100.0)) : (voiceVol == 100 ? " (Standard Full)" : " (Soft)")
+        print("Voice Volume:       \(voiceVol)%\(boostText)")
     } else if sub == "list" {
         print("─── Available System Voices (macOS) ───")
         print("• Default System Voice (macOS Auto)")
@@ -279,9 +293,30 @@ case "voice":
                 print("[Agent Speak] Configuration updated: Engine = \(targetEngine), Voice = \(targetVoice)")
             }
         }
+    } else if sub == "vol" || sub == "volume" {
+        guard args.count >= 4, let intVal = Int(args[3]), intVal >= 1 && intVal <= 200 else {
+            print("Usage: aspk voice vol <1-200>")
+            print("Example: aspk voice vol 100   (Standard 100% Full Volume)")
+            print("Example: aspk voice vol 150   (+3.5 dB Decibel Force Boost)")
+            print("Example: aspk voice vol 200   (+6.0 dB Max Force Decibel Boost)")
+            exit(1)
+        }
+        _ = sendSocketMessage("__CMD_VOICE_VOL_\(intVal)__")
+        let cfgURL = URL(fileURLWithPath: "\(home)/.agentspeak/config.json")
+        if let data = try? Data(contentsOf: cfgURL),
+           var json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           var audio = json["audio"] as? [String: Any] {
+            audio["volume"] = intVal
+            json["audio"] = audio
+            if let updated = try? JSONSerialization.data(withJSONObject: json, options: .prettyPrinted) {
+                try? updated.write(to: cfgURL)
+            }
+        }
+        let dbStr = intVal > 100 ? String(format: " (+%.1f dB Force Boost)", 20.0 * log10(Double(intVal) / 100.0)) : (intVal == 100 ? " (Standard Full)" : String(format: " (%.1f dB)", 20.0 * log10(Double(intVal) / 100.0)))
+        print("[Agent Speak] Voice volume set to \(intVal)%\(dbStr).")
     } else {
         print("Unknown voice subcommand: \(sub)")
-        print("Available subcommands: status, list, set, install, clone")
+        print("Available subcommands: status, list, set, vol <1-200>, install, clone")
     }
 
 case "bgm":

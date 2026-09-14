@@ -111,20 +111,27 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         
         self.totalChunksCount = 1
         var chunk = AudioChunk(index: 0, text: "", filePath: audioFilePath)
-        if FileManager.default.fileExists(atPath: audioFilePath),
-           let p = try? AVAudioPlayer(contentsOf: URL(fileURLWithPath: audioFilePath)) {
-            p.delegate = self
-            p.isMeteringEnabled = true
-            p.prepareToPlay()
-            chunk.player = p
-            chunk.duration = p.duration
-            chunk.isReady = true
-            self.chunks = [chunk]
-            self.globalTotalDuration = max(1.0, p.duration)
-            p.play()
-            self.isPlaying = true
-            self.currentChunkIndex = 0
-            self.startTimer()
+        if FileManager.default.fileExists(atPath: audioFilePath) {
+            VoiceVolumeManager.shared.applyGainIfNeeded(filePath: audioFilePath)
+            if let p = try? AVAudioPlayer(contentsOf: URL(fileURLWithPath: audioFilePath)) {
+                p.volume = VoiceVolumeManager.shared.playerVolume
+                p.delegate = self
+                p.isMeteringEnabled = true
+                p.prepareToPlay()
+                chunk.player = p
+                chunk.duration = p.duration
+                chunk.isReady = true
+                self.chunks = [chunk]
+                self.globalTotalDuration = max(1.0, p.duration)
+                p.play()
+                self.isPlaying = true
+                self.currentChunkIndex = 0
+                self.startTimer()
+            } else {
+                DispatchQueue.main.async { [weak self] in
+                    self?.close()
+                }
+            }
         } else {
             DispatchQueue.main.async { [weak self] in
                 self?.close()
@@ -210,9 +217,13 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         
         // 3. Initialize player safely on main thread with retry for filesystem write flush
         if !isCancelled && FileManager.default.fileExists(atPath: c.filePath) {
+            // Apply analog soft-saturation decibel gain if volume > 100%
+            VoiceVolumeManager.shared.applyGainIfNeeded(filePath: c.filePath)
+            
             var playerCandidate: AVAudioPlayer?
             for _ in 0..<3 {
                 if let p = try? AVAudioPlayer(contentsOf: URL(fileURLWithPath: c.filePath)) {
+                    p.volume = VoiceVolumeManager.shared.playerVolume
                     playerCandidate = p
                     break
                 }
@@ -331,6 +342,7 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         if chunks[index].isReady {
             if let p = chunks[index].player {
                 p.currentTime = 0
+                p.volume = VoiceVolumeManager.shared.playerVolume
                 if p.play() {
                     isPlaying = true
                     return
@@ -413,6 +425,13 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 }
                 break
             }
+        }
+    }
+    
+    func updateVolume() {
+        let vol = VoiceVolumeManager.shared.playerVolume
+        for i in 0..<chunks.count {
+            chunks[i].player?.volume = vol
         }
     }
     
@@ -648,6 +667,12 @@ public class NotchWindowController {
         
         window?.orderOut(nil)
         window = nil
+    }
+    
+    public func updateVolume() {
+        DispatchQueue.main.async { [weak self] in
+            self?.audioManager?.updateVolume()
+        }
     }
     
     public func setupEscapeKeyTap() {

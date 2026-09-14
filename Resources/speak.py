@@ -8,10 +8,38 @@ os.environ["NO_PROXY"] = "*"
 os.environ["no_proxy"] = "*"
 
 import argparse
+import json
 import subprocess
 from pathlib import Path
 import scipy.io.wavfile
 import numpy as np
+
+def get_configured_volume() -> int:
+    config_file = Path.home() / ".agentspeak" / "config.json"
+    if config_file.exists():
+        try:
+            with open(config_file, "r") as f:
+                data = json.load(f)
+                vol = data.get("audio", {}).get("volume", 100)
+                if isinstance(vol, float) and vol <= 2.0:
+                    return max(1, min(200, int(round(vol * 100))))
+                return max(1, min(200, int(vol)))
+        except Exception:
+            pass
+    return 100
+
+def apply_soft_knee_gain(arr: np.ndarray, volume_pct: int) -> np.ndarray:
+    if volume_pct <= 100:
+        return arr
+    gain = volume_pct / 100.0
+    boosted = arr * gain
+    threshold = 0.85
+    headroom = 1.0 - threshold
+    mask_high = boosted > threshold
+    mask_low = boosted < -threshold
+    boosted[mask_high] = threshold + headroom * np.tanh((boosted[mask_high] - threshold) / headroom)
+    boosted[mask_low] = -threshold + (-headroom) * np.tanh((boosted[mask_low] - -threshold) / (-headroom))
+    return boosted
 
 BASE_DIR = Path(__file__).resolve().parent
 VOICES_DIR = BASE_DIR / "pocket_tts_lab" / "voices"
@@ -120,9 +148,23 @@ def main():
                 tmp_aiff.unlink()
         elif tmp_aiff != out_file:
             tmp_aiff.rename(out_file)
+        vol = get_configured_volume()
+        if vol > 100 and out_file.exists() and out_file.suffix.lower() == ".wav":
+            try:
+                rate, data = scipy.io.wavfile.read(str(out_file))
+                float_data = data.astype(np.float32) / 32767.0
+                float_data = apply_soft_knee_gain(float_data, vol)
+                int_data = np.clip(float_data * 32767.0, -32767, 32767).astype(np.int16)
+                scipy.io.wavfile.write(str(out_file), rate, int_data)
+            except Exception:
+                pass
         if args.play:
             subprocess.run(["killall", "afplay"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            subprocess.Popen(["afplay", str(out_file)])
+            afplay_cmd = ["afplay"]
+            if vol < 100:
+                afplay_cmd.extend(["-v", str(max(0.01, vol / 100.0))])
+            afplay_cmd.append(str(out_file))
+            subprocess.Popen(afplay_cmd)
         print(f"[PocketTTS Native Fallback] Spoken via {native_voice} -> {out_file}")
         sys.exit(0)
 
@@ -207,6 +249,10 @@ def main():
     # Trim trailing silence/dead air
     arr = trim_trailing_silence(arr, model.sample_rate)
     
+    # Apply configured volume & force gain boost
+    vol = get_configured_volume()
+    arr = apply_soft_knee_gain(arr, vol)
+    
     out_file = Path(args.output) if args.output else (OUTPUTS_DIR / "last_spoken.wav")
     scipy.io.wavfile.write(str(out_file), model.sample_rate, arr)
     
@@ -215,7 +261,11 @@ def main():
         subprocess.run(["killall", "afplay"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(["killall", "say"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         # Play the newly generated speech
-        subprocess.Popen(["afplay", str(out_file)])
+        afplay_cmd = ["afplay"]
+        if vol < 100:
+            afplay_cmd.extend(["-v", str(max(0.01, vol / 100.0))])
+        afplay_cmd.append(str(out_file))
+        subprocess.Popen(afplay_cmd)
 
     print(f"[PocketTTS] Synthesized {len(arr)/model.sample_rate:.2f}s -> {out_file}")
 

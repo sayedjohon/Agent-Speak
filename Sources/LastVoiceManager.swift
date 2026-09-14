@@ -183,11 +183,18 @@ public class LastVoiceManager: NSObject, ObservableObject, AVAudioPlayerDelegate
         guard FileManager.default.fileExists(atPath: lastVoiceFile.path) else { return }
         if let p = try? AVAudioPlayer(contentsOf: lastVoiceFile) {
             p.delegate = self
+            p.volume = VoiceVolumeManager.shared.playerVolume
             p.prepareToPlay()
             self.audioPlayer = p
             if totalDuration <= 0.1 {
                 self.totalDuration = p.duration
             }
+        }
+    }
+    
+    public func updateVolume() {
+        DispatchQueue.main.async { [weak self] in
+            self?.audioPlayer?.volume = VoiceVolumeManager.shared.playerVolume
         }
     }
     
@@ -205,6 +212,7 @@ public class LastVoiceManager: NSObject, ObservableObject, AVAudioPlayerDelegate
             setupPlayer()
         }
         guard let p = audioPlayer else { return }
+        p.volume = VoiceVolumeManager.shared.playerVolume
         
         if currentTime >= totalDuration - 0.05 {
             currentTime = 0.0

@@ -549,6 +549,13 @@ public class TranscriptWatcher {
                                 BackgroundMusicManager.shared.setVolume(vol)
                             }
                         }
+                    } else if raw.hasPrefix("__CMD_VOICE_VOL_") && raw.hasSuffix("__") {
+                        let inner = raw.replacingOccurrences(of: "__CMD_VOICE_VOL_", with: "").replacingOccurrences(of: "__", with: "")
+                        if let intVal = Int(inner) {
+                            DispatchQueue.main.async {
+                                VoiceVolumeManager.shared.setVolume(intVal)
+                            }
+                        }
                     } else {
                         let clean = TextSanitizer.sanitizeForSpeech(raw)
                         if !clean.isEmpty {

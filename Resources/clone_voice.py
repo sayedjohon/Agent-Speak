@@ -202,6 +202,27 @@ def main():
             arr = audio.numpy()
             arr = trim_trailing_silence(arr, model.sample_rate)
             
+            # Apply configured volume & gain boost
+            vol = 100
+            if CONFIG_PATH.exists():
+                try:
+                    with open(CONFIG_PATH, "r") as f:
+                        cdata = json.load(f)
+                        cv = cdata.get("audio", {}).get("volume", 100)
+                        vol = max(1, min(200, int(round(cv * 100)) if isinstance(cv, float) and cv <= 2.0 else int(cv)))
+                except Exception:
+                    pass
+            if vol > 100:
+                gain = vol / 100.0
+                boosted = arr * gain
+                threshold = 0.85
+                headroom = 1.0 - threshold
+                mask_high = boosted > threshold
+                mask_low = boosted < -threshold
+                boosted[mask_high] = threshold + headroom * np.tanh((boosted[mask_high] - threshold) / headroom)
+                boosted[mask_low] = -threshold + (-headroom) * np.tanh((boosted[mask_low] - -threshold) / (-headroom))
+                arr = boosted
+
             preview_out = Path("/tmp/audition_preview.wav")
             scipy.io.wavfile.write(str(preview_out), model.sample_rate, arr)
             
@@ -209,7 +230,11 @@ def main():
             
             if args.play:
                 subprocess.run(["killall", "afplay"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                subprocess.Popen(["afplay", str(preview_out)])
+                afplay_cmd = ["afplay"]
+                if vol < 100:
+                    afplay_cmd.extend(["-v", str(max(0.01, vol / 100.0))])
+                afplay_cmd.append(str(preview_out))
+                subprocess.Popen(afplay_cmd)
 
             print(json.dumps({
                 "status": "success",

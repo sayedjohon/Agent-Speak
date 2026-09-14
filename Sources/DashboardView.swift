@@ -574,6 +574,9 @@ public struct DashboardView: View {
             .cornerRadius(8)
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(red: 0.18, green: 0.19, blue: 0.24), lineWidth: 1))
             
+            // Voice Playback Volume & Force Decibel Gain Card
+            VoiceVolumeCardView()
+            
             // Interactive Voice & Multilingual Test Card
             VStack(alignment: .leading, spacing: 8) {
                 Text("TEST VOICE & MULTILINGUAL SPEECH")
