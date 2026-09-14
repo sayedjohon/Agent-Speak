@@ -192,8 +192,15 @@ public class HologramManager: ObservableObject {
                 hosting.frame = NSRect(x: 0, y: 0, width: screenFrame.width, height: screenFrame.height)
                 hosting.wantsLayer = true
                 panel.contentView = hosting
+                panel.alphaValue = 0.0
                 panel.orderFront(nil)
                 self.hologramPanel = panel
+                
+                NSAnimationContext.runAnimationGroup { ctx in
+                    ctx.duration = 0.20
+                    ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                    panel.animator().alphaValue = 1.0
+                }
             }
         }
     }
@@ -220,10 +227,20 @@ public class HologramManager: ObservableObject {
                 return
             }
             
-            // If no music is playing, smoothly dissolve after brief 0.35s tail
+            // Smoothly dissolve using hardware-accelerated CoreAnimation window alpha
             self.dismissTimer?.invalidate()
-            self.dismissTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: false) { [weak self] _ in
-                self?.dismissHologramImmediately()
+            self.dismissTimer = nil
+            
+            if let panel = self.hologramPanel {
+                NSAnimationContext.runAnimationGroup({ ctx in
+                    ctx.duration = 0.22
+                    ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                    panel.animator().alphaValue = 0.0
+                }, completionHandler: { [weak self] in
+                    self?.dismissHologramImmediately()
+                })
+            } else {
+                self.dismissHologramImmediately()
             }
         }
     }

@@ -60,16 +60,16 @@ public struct PocketTTSExtensionCardView: View {
                     }
                     .padding(.top, 2)
                     
-                    // CPU & Battery Warning Callout
+                    // On-Device Performance & Battery Reassurance
                     HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
+                        Image(systemName: "bolt.badge.clock.fill")
                             .font(.system(size: 11))
-                            .foregroundColor(.orange)
+                            .foregroundColor(.blue)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("CPU Usage & Performance Notice")
+                            Text("On-Device Neural Voice")
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.orange)
-                            Text("Pocket-TTS runs local neural AI on your Apple Silicon CPU, which uses slightly more CPU power during speech generation. If you prefer near-zero CPU usage and maximum battery life, use the MacBook Built-in Voice.")
+                                .foregroundColor(.white)
+                            Text("Synthesizes neural voices entirely on your Mac's Apple Silicon CPU. For maximum battery efficiency or near-zero CPU usage, you can switch back to the MacBook Built-in Voice at any time.")
                                 .font(.system(size: 9.5))
                                 .foregroundColor(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -77,9 +77,9 @@ public struct PocketTTSExtensionCardView: View {
                         Spacer()
                     }
                     .padding(8)
-                    .background(Color.orange.opacity(0.08))
+                    .background(Color.white.opacity(0.04))
                     .cornerRadius(6)
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.orange.opacity(0.25), lineWidth: 1))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.08), lineWidth: 1))
                     
                     // Multilingual Auto-Fallback Notice
                     HStack(alignment: .top, spacing: 8) {
@@ -245,19 +245,19 @@ public struct PocketTTSExtensionCardView: View {
                     
                     Divider().background(Color.white.opacity(0.06))
                     
-                    // Active Neural Engine CPU Notice
+                    // Active Neural Engine Note
                     HStack(spacing: 6) {
-                        Image(systemName: "cpu")
+                        Image(systemName: "sparkle")
                             .font(.system(size: 9))
-                            .foregroundColor(.orange)
-                        Text("Neural AI speech uses moderate CPU while generating audio. Switch to MacBook Built-in Voice anytime for near-zero CPU.")
+                            .foregroundColor(.purple)
+                        Text("On-device neural AI. Switch to MacBook Built-in Voice anytime for instant zero-CPU playback.")
                             .font(.system(size: 9.5))
                             .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
                         Spacer()
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.orange.opacity(0.06))
+                    .background(Color.purple.opacity(0.05))
                     .cornerRadius(5)
                     
                     HStack(spacing: 10) {
@@ -299,28 +299,29 @@ public struct PocketTTSExtensionCardView: View {
                             .buttonStyle(PlainButtonStyle())
                         }
                         
-                        // Clone Custom Voice Button
+                        // Clone Custom Voice Button (Presents spacious Apple Modal Sheet)
                         Button(action: {
                             let hasSeen = UserDefaults.standard.bool(forKey: "hasSeenCloningGuide")
-                            if !showingCloneSheet && !hasSeen {
+                            if !hasSeen {
                                 showingGuideSheet = true
+                            } else {
+                                showingCloneSheet = true
                             }
-                            showingCloneSheet.toggle()
                         }) {
                             HStack(spacing: 6) {
-                                Image(systemName: showingCloneSheet ? "xmark" : "plus")
+                                Image(systemName: "plus")
                                     .font(.system(size: 10, weight: .bold))
-                                Text(showingCloneSheet ? "Close Cloner" : "Clone New Voice...")
+                                Text("Clone New Voice...")
                                     .font(.system(size: 11.5, weight: .semibold))
                             }
                             .foregroundColor(.white)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(showingCloneSheet ? Color(red: 0.22, green: 0.24, blue: 0.30) : Color(red: 0.05, green: 0.48, blue: 0.95))
+                            .background(Color(red: 0.05, green: 0.48, blue: 0.95))
                             .cornerRadius(6)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color(red: 0.25, green: 0.55, blue: 1.0).opacity(showingCloneSheet ? 0.3 : 0.8), lineWidth: 1)
+                                    .stroke(Color(red: 0.25, green: 0.55, blue: 1.0).opacity(0.8), lineWidth: 1)
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -342,17 +343,6 @@ public struct PocketTTSExtensionCardView: View {
                         .buttonStyle(PlainButtonStyle())
                         .help("Refresh Voice Library")
                     }
-                    
-                    // MARK: - Reimagined High-Craft Voice Cloner Studio
-                    if showingCloneSheet {
-                        VoiceCloningStudioView(
-                            isPresented: $showingCloneSheet,
-                            onVoiceSaved: { newVoiceTag in
-                                pocketVoice = newVoiceTag
-                                onSave()
-                            }
-                        )
-                    }
                 }
                 .padding(14)
                 .background(Color(red: 0.11, green: 0.12, blue: 0.15))
@@ -365,6 +355,15 @@ public struct PocketTTSExtensionCardView: View {
                 isPresented: $showingGuideSheet,
                 onUnlockHuggingFace: {
                     manager.unlockZeroShotCloning()
+                }
+            )
+        }
+        .sheet(isPresented: $showingCloneSheet) {
+            VoiceCloningStudioSheet(
+                isPresented: $showingCloneSheet,
+                onVoiceSaved: { newVoiceTag in
+                    pocketVoice = newVoiceTag
+                    onSave()
                 }
             )
         }
@@ -397,7 +396,7 @@ public struct PocketTTSExtensionCardView: View {
         DispatchQueue.global(qos: .userInitiated).async {
             let proc = Process()
             proc.executableURL = URL(fileURLWithPath: py)
-            let testPhrase = "This is a viral and proven voice  currently used by hundreds successful of youtube channels. so Do you like this voice? "
+            let testPhrase = "Hello! I am your cloned neural voice. Everything you build with Agent Speak is running completely private and offline on your Mac."
             proc.arguments = [script, testPhrase, "--voice", self.pocketVoice, "--play"]
             
             DispatchQueue.main.async {

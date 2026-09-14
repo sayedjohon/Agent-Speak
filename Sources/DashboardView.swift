@@ -49,7 +49,7 @@ public struct DashboardView: View {
     @State private var skipSeconds: Int = 5
     @State private var showTrayIcon: Bool = true
     @State private var availableSystemVoices: [SystemVoiceItem] = []
-    @State private var customTestText: String = "This is a viral and proven voice  currently used by hundreds successful of youtube channels. so Do you like this voice? "
+    @State private var customTestText: String = "Hello! This is a real-time preview of your active voice persona. Pacing, tone, and inflection are synthesized on-device with zero cloud latency."
     
     // Workspace States
     @State private var watchAntigravity: Bool = true
@@ -526,7 +526,7 @@ public struct DashboardView: View {
                                 if queueManager.isSpeaking {
                                     queueManager.stopCurrent()
                                 } else {
-                                    let sampleText = "This is a viral and proven voice currently used by hundreds of successful YouTube channels. So do you like this voice?"
+                                    let sampleText = "Hello! This is a real-time preview of your active system voice running natively on Apple Silicon."
                                     queueManager.enqueue(source: selectedVoiceDisplayName, text: sampleText, immediate: true)
                                 }
                             }) {
@@ -603,76 +603,26 @@ public struct DashboardView: View {
             // Voice Playback Volume & Force Decibel Gain Card
             VoiceVolumeCardView()
             
-            // Interactive Voice & Multilingual Test Card
-            VStack(alignment: .leading, spacing: 8) {
-                Text("TEST VOICE & MULTILINGUAL SPEECH")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.secondary)
-                
-                HStack(spacing: 8) {
-                    TextField("Enter text to speak (e.g. English, বাংলা, हिंदी, Español)...", text: $customTestText)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 11.5))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(Color.white.opacity(0.06))
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                        )
-                    
-                    if queueManager.isSpeaking {
-                        Button(action: {
-                            SpeechQueueManager.shared.stopCurrent()
-                        }) {
-                            HStack(spacing: 5) {
-                                Image(systemName: "stop.fill")
-                                    .font(.system(size: 9))
-                                Text("Stop")
-                                    .font(.system(size: 11, weight: .bold))
-                            }
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(Color.red)
-                            .foregroundColor(.white)
-                            .cornerRadius(8)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    
-                    Button(action: {
-                        let textToSpeak = customTestText.trimmingCharacters(in: .whitespacesAndNewlines)
-                        let prompt = textToSpeak.isEmpty ? "This is a viral and proven voice  currently used by hundreds successful of youtube channels. so Do you like this voice? " : textToSpeak
-                        LastVoiceManager.shared.prepareForNewVoice(text: prompt)
-                        SpeechQueueManager.shared.enqueue(
-                            source: "Voice Test",
-                            text: prompt
-                        )
-                    }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 10))
-                            Text("Test Voice")
-                                .font(.system(size: 11, weight: .semibold))
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                    }
-                    .buttonStyle(.plain)
+            // Studio Script Editor (Apple HIG Multi-Line Prompter & Presets)
+            StudioScriptEditorView(
+                text: $customTestText,
+                isSpeaking: queueManager.isSpeaking,
+                onTest: {
+                    let textToSpeak = customTestText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let prompt = textToSpeak.isEmpty ? "Hello! This is a real-time preview of your active voice persona. Pacing, tone, and inflection are synthesized on-device with zero cloud latency." : textToSpeak
+                    LastVoiceManager.shared.prepareForNewVoice(text: prompt)
+                    SpeechQueueManager.shared.enqueue(
+                        source: "Voice Test",
+                        text: prompt
+                    )
+                },
+                onStop: {
+                    SpeechQueueManager.shared.stopCurrent()
                 }
-                
-                // Downward: Last Voice Player, Scrubber & Download
-                LastVoiceCardView()
-                    .padding(.top, 4)
-            }
-            .padding(11)
-            .background(Color.white.opacity(0.04))
-            .cornerRadius(10)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
+            )
+            
+            // Downward: Last Voice Player, Scrubber & Download
+            LastVoiceCardView()
         }
     }
     

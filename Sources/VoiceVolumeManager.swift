@@ -140,11 +140,18 @@ public class VoiceVolumeManager: ObservableObject {
             // Write to temporary sibling file first for atomic replacement
             let tempUrl = fileUrl.deletingLastPathComponent()
                 .appendingPathComponent("gain_\(UUID().uuidString).\(fileUrl.pathExtension)")
+            
+            defer {
+                if FileManager.default.fileExists(atPath: tempUrl.path) {
+                    try? FileManager.default.removeItem(at: tempUrl)
+                }
+            }
+            
             let outFile = try AVAudioFile(forWriting: tempUrl, settings: file.fileFormat.settings)
             try outFile.write(from: buffer)
             
-            _ = try? FileManager.default.removeItem(at: fileUrl)
-            try FileManager.default.moveItem(at: tempUrl, to: fileUrl)
+            // Safe atomic replacement preserving original on any failure
+            _ = try FileManager.default.replaceItemAt(fileUrl, withItemAt: tempUrl)
             return true
         } catch {
             NSLog("[VoiceVolumeManager] Gain processing error for %@: %@", filePath, error.localizedDescription)

@@ -1,0 +1,169 @@
+import SwiftUI
+import AppKit
+
+// MARK: - Apple HIG Studio Script Editor View
+public struct StudioScriptEditorView: View {
+    @Binding var text: String
+    var isSpeaking: Bool
+    var onTest: () -> Void
+    var onStop: () -> Void
+    
+    private let presetChips: [(title: String, icon: String, text: String)] = [
+        ("Tech Explainer", "sparkles", "Here is what happened: instead of querying the disk every cycle, we cached the response in memory. Speed improved instantly."),
+        ("Friendly Assistant", "person.bubble.fill", "I've finished analyzing your project. Everything looks clean, all tests are passing, and we're ready to ship."),
+        ("Casual Banter", "cup.and.saucer.fill", "Quick heads up—the build finished in under five seconds. Want to run the integration suite, or call it a day?"),
+        ("Code Review", "checkmark.shield.fill", "The race condition occurred because the worker thread mutated state before acquiring the database lock.")
+    ]
+    
+    public init(
+        text: Binding<String>,
+        isSpeaking: Bool,
+        onTest: @escaping () -> Void,
+        onStop: @escaping () -> Void
+    ) {
+        self._text = text
+        self.isSpeaking = isSpeaking
+        self.onTest = onTest
+        self.onStop = onStop
+    }
+    
+    private var wordCount: Int {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return 0 }
+        return trimmed.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.count
+    }
+    
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Header: Section Title & Character/Word Count
+            HStack {
+                Text("VOICE TEST SCRIPT")
+                    .font(.system(size: 10.5, weight: .bold))
+                    .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                
+                Spacer()
+                
+                HStack(spacing: 6) {
+                    Text("\(text.count) characters")
+                    Text("•")
+                    Text("\(wordCount) words")
+                }
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(Color(red: 0.50, green: 0.52, blue: 0.58))
+            }
+            
+            // Preset Scenario Chips (Apple HIG Pill Bar)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(presetChips, id: \.title) { chip in
+                        Button(action: {
+                            text = chip.text
+                        }) {
+                            HStack(spacing: 5) {
+                                Image(systemName: chip.icon)
+                                    .font(.system(size: 9.5))
+                                Text(chip.title)
+                                    .font(.system(size: 10.5, weight: .medium))
+                            }
+                            .foregroundColor(Color(red: 0.80, green: 0.82, blue: 0.88))
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 4.5)
+                            .background(Color.white.opacity(0.06))
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .help("Insert '\(chip.title)' sample script")
+                    }
+                }
+            }
+            
+            // Multi-Line Text Editor Container
+            ZStack(alignment: .topLeading) {
+                if text.isEmpty {
+                    Text("Type or paste any test sentence in any language (English, বাংলা, Español, etc.)...")
+                        .font(.system(size: 12))
+                        .foregroundColor(Color.white.opacity(0.28))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 9)
+                        .allowsHitTesting(false)
+                }
+                
+                TextEditor(text: $text)
+                    .font(.system(size: 12, weight: .regular))
+                    .lineSpacing(3)
+                    .padding(6)
+                    .frame(height: 72)
+                    .scrollContentBackground(.hidden)
+                    .background(Color.clear)
+            }
+            .background(Color.white.opacity(0.04))
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            )
+            
+            // Bottom Action Bar
+            HStack(alignment: .center) {
+                HStack(spacing: 4) {
+                    Image(systemName: "command")
+                        .font(.system(size: 9.5, weight: .semibold))
+                    Text("Return to test")
+                        .font(.system(size: 10))
+                }
+                .foregroundColor(Color(red: 0.45, green: 0.47, blue: 0.52))
+                
+                Spacer()
+                
+                if isSpeaking {
+                    Button(action: onStop) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "stop.fill")
+                                .font(.system(size: 9))
+                            Text("Stop")
+                                .font(.system(size: 11, weight: .bold))
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6.5)
+                        .background(Color.red)
+                        .foregroundColor(.white)
+                        .cornerRadius(7)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+                
+                Button(action: onTest) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 9.5))
+                        Text("Test Voice")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .padding(.horizontal, 15)
+                    .padding(.vertical, 6.5)
+                    .background(Color(red: 0.05, green: 0.48, blue: 0.95))
+                    .foregroundColor(.white)
+                    .cornerRadius(7)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 7)
+                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+                .keyboardShortcut(.return, modifiers: [.command])
+                .help("Test voice with current script (⌘ Return)")
+            }
+        }
+        .padding(12)
+        .background(Color(red: 0.11, green: 0.12, blue: 0.15))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(red: 0.18, green: 0.19, blue: 0.24), lineWidth: 1)
+        )
+    }
+}

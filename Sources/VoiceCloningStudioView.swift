@@ -3,8 +3,8 @@ import AppKit
 import AVFoundation
 import CoreMedia
 
-// MARK: - Raycast-grade Voice Cloning Studio
-public struct VoiceCloningStudioView: View {
+// MARK: - Dedicated Apple Pro Voice Cloning Studio Sheet
+public struct VoiceCloningStudioSheet: View {
     @ObservedObject var manager = PocketTTSManager.shared
     @Binding var isPresented: Bool
     var onVoiceSaved: (String) -> Void
@@ -12,11 +12,11 @@ public struct VoiceCloningStudioView: View {
     @State private var showingGuideSheet = false
     @State private var newVoiceName = ""
     @State private var selectedAudioPath = ""
-    @State private var testSentence = "This is a viral and proven voice  currently used by hundreds successful of youtube channels. so Do you like this voice? "
+    @State private var testSentence = "Here is a quick demo of your new cloned voice. Pacing, tone, and inflection are synthesized on-device with zero cloud latency."
     @State private var hasAuditioned = false
     @State private var auditionDuration: Double = 0.0
     
-    // Audio Trimming State (Pocket TTS Waveform & Cut)
+    // Audio Trimming State
     @StateObject private var trimmerPlayer = AudioTrimmerPlayer()
     @State private var audioDuration: Double = 0.0
     @State private var trimStartTime: Double = 0.0
@@ -24,46 +24,58 @@ public struct VoiceCloningStudioView: View {
     @State private var isCutActive: Bool = true
     @State private var isHoveringDropzone: Bool = false
     
+    private let promptPresets: [(title: String, prompt: String)] = [
+        ("Tech Explainer", "Here is what happened: instead of querying the disk every cycle, we cached the response in memory. Speed improved instantly."),
+        ("Friendly Assistant", "I've finished analyzing your project. Everything looks clean, all tests are passing, and we're ready to ship."),
+        ("Casual Banter", "Quick heads up—the build finished in under five seconds. Want to run the integration suite, or call it a day?"),
+        ("Code Review", "The race condition occurred because the worker thread mutated state before acquiring the database lock.")
+    ]
+    
     public init(isPresented: Binding<Bool>, onVoiceSaved: @escaping (String) -> Void) {
         self._isPresented = isPresented
         self.onVoiceSaved = onVoiceSaved
     }
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(spacing: 0) {
             // Header Bar
-            headerBar
+            modalHeaderBar
             
-            // Helpful Guide Banner
-            guideBanner
+            Divider().background(Color(nsColor: .separatorColor))
             
-            // 1. Voice Persona Name Input
-            voiceNameInputSection
-            
-            // 2. Reference Audio File Card / Dropzone
-            audioFileSection
-            
-            // 3. Speech Trimming & Segment Selector (Active when file loaded)
-            if !selectedAudioPath.isEmpty {
-                segmentTrimmingSection
+            // Scrollable Studio Workspace
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Step 1: Voice Persona Name
+                    voiceNameSection
+                    
+                    // Step 2: Reference Audio File Card
+                    audioFileSection
+                    
+                    // Step 3: Waveform Trimmer (only if file loaded)
+                    if !selectedAudioPath.isEmpty {
+                        segmentTrimmingSection
+                    }
+                    
+                    // Step 4: Multi-Line Audition Prompter
+                    auditionScriptSection
+                    
+                    // Status Feedback Bar
+                    statusFeedbackView
+                }
+                .padding(20)
             }
             
-            // 4. Test Verification Script
-            testScriptSection
+            Divider().background(Color(nsColor: .separatorColor))
             
-            // 5. Action Buttons Bar
-            actionButtonsBar
-            
-            // Status Feedback
-            statusFeedbackView
+            // Modal Action Footer
+            modalFooterBar
         }
-        .padding(14)
-        .background(Color(red: 0.11, green: 0.12, blue: 0.15))
-        .cornerRadius(8)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color(red: 0.18, green: 0.19, blue: 0.24), lineWidth: 1)
-        )
+        .frame(width: 640, height: 600)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .onDisappear {
+            trimmerPlayer.stop()
+        }
         .sheet(isPresented: $showingGuideSheet) {
             CloningGuideModalView(
                 isPresented: $showingGuideSheet,
@@ -74,187 +86,187 @@ public struct VoiceCloningStudioView: View {
         }
     }
     
-    // MARK: - Header Bar
-    private var headerBar: some View {
-        HStack(spacing: 8) {
-            HStack(spacing: 6) {
+    // MARK: - Modal Header Bar
+    private var modalHeaderBar: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.purple.opacity(0.15))
+                    .frame(width: 32, height: 32)
                 Image(systemName: "waveform.badge.mic")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(.white)
-                Text("VOICE CLONING & AUDITION STUDIO")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.purple)
             }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Voice Studio & Zero-Shot Cloner")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(Color(nsColor: .labelColor))
+                Text("Clone any custom voice from a clean 10–30 second audio sample")
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(nsColor: .secondaryLabelColor))
+            }
+            
+            Spacer()
             
             Button(action: { showingGuideSheet = true }) {
                 HStack(spacing: 4) {
-                    Image(systemName: "questionmark.circle.fill")
-                        .font(.system(size: 9.5))
+                    Image(systemName: "questionmark.circle")
+                        .font(.system(size: 11))
                     Text("Guide")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 11, weight: .medium))
                 }
-                .foregroundColor(.white)
                 .padding(.horizontal, 8)
-                .padding(.vertical, 3.5)
-                .background(Color(red: 0.16, green: 0.17, blue: 0.22))
-                .cornerRadius(5)
-                .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color(red: 0.24, green: 0.26, blue: 0.33), lineWidth: 1))
+                .padding(.vertical, 4)
+                .background(Color(nsColor: .controlBackgroundColor))
+                .cornerRadius(6)
             }
-            .buttonStyle(PlainButtonStyle())
+            .buttonStyle(.plain)
             
-            Spacer()
-            
-            Button(action: { manager.unlockZeroShotCloning() }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.up.right.square")
-                        .font(.system(size: 9.5))
-                    Text("HuggingFace License")
-                        .font(.system(size: 9.5, weight: .semibold))
-                }
-                .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+            Button(action: {
+                trimmerPlayer.stop()
+                isPresented = false
+            }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(Color(nsColor: .tertiaryLabelColor))
             }
-            .buttonStyle(PlainButtonStyle())
+            .buttonStyle(.plain)
+            .keyboardShortcut(.escape, modifiers: [])
         }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.6))
     }
     
-    // MARK: - Guide Banner
-    private var guideBanner: some View {
-        HStack(spacing: 7) {
-            Image(systemName: "scissors")
-                .font(.system(size: 10))
-                .foregroundColor(Color(red: 0.05, green: 0.55, blue: 1.0))
-            Text("Pocket TTS manual trimmer: drag handles on the track to crop your voice window. Only the selected area will play & clone.")
-                .font(.system(size: 10))
-                .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
-            Spacer()
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(Color(red: 0.14, green: 0.15, blue: 0.19))
-        .cornerRadius(6)
-        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(red: 0.20, green: 0.22, blue: 0.28), lineWidth: 1))
-    }
-    
-    // MARK: - 1. Voice Persona Name Input
-    private var voiceNameInputSection: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text("Voice Persona Name")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.white)
+    // MARK: - Step 1: Voice Persona Name
+    private var voiceNameSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("1. Persona Name")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(Color(nsColor: .secondaryLabelColor))
+                Spacer()
+                Text("Alphanumeric & underscores")
+                    .font(.system(size: 10))
+                    .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+            }
             
             HStack(spacing: 8) {
                 Image(systemName: "person.crop.circle")
-                    .font(.system(size: 12))
-                    .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                    .font(.system(size: 13))
+                    .foregroundColor(Color(nsColor: .secondaryLabelColor))
                 
-                TextField("e.g. Jarvis, Samantha, Morgan", text: $newVoiceName)
-                    .textFieldStyle(PlainTextFieldStyle())
-                    .font(.system(size: 11.5))
-                    .foregroundColor(.white)
+                TextField("e.g. Jarvis_Pro, Samantha_Studio, Tech_Host", text: $newVoiceName)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12))
                 
                 if !newVoiceName.isEmpty {
                     Button(action: { newVoiceName = "" }) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                            .font(.system(size: 12))
+                            .foregroundColor(Color(nsColor: .tertiaryLabelColor))
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(Color(red: 0.09, green: 0.10, blue: 0.13))
-            .cornerRadius(6)
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(red: 0.18, green: 0.19, blue: 0.24), lineWidth: 1))
+            .padding(.vertical, 8)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+            )
         }
     }
     
-    // MARK: - 2. Reference Audio File Card
+    // MARK: - Step 2: Reference Audio File
     private var audioFileSection: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text("Reference Speech Audio")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.white)
+        VStack(alignment: .leading, spacing: 6) {
+            Text("2. Reference Audio Sample")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(Color(nsColor: .secondaryLabelColor))
             
             if selectedAudioPath.isEmpty {
-                // Empty State Dropzone
+                // Dropzone
                 Button(action: pickAudioFile) {
                     HStack(spacing: 12) {
                         ZStack {
                             Circle()
-                                .fill(Color(red: 0.16, green: 0.18, blue: 0.24))
-                                .frame(width: 34, height: 34)
+                                .fill(Color.accentColor.opacity(0.12))
+                                .frame(width: 36, height: 36)
                             Image(systemName: "arrow.up.doc.fill")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(Color(red: 0.65, green: 0.67, blue: 0.74))
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(Color.accentColor)
                         }
                         
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Select Reference Audio (.wav or .mp3)")
-                                .font(.system(size: 11.5, weight: .bold))
-                                .foregroundColor(.white)
-                            Text("Click to choose a clean audio recording • 10–30 seconds optimal")
-                                .font(.system(size: 9.5))
-                                .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                            Text("Select Clean Voice Recording (.wav or .mp3)")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(Color(nsColor: .labelColor))
+                            Text("Click to browse or drag & drop • 10–30 seconds recommended")
+                                .font(.system(size: 10.5))
+                                .foregroundColor(Color(nsColor: .secondaryLabelColor))
                         }
                         
                         Spacer()
                         
                         Text("Browse...")
-                            .font(.system(size: 10.5, weight: .semibold))
-                            .foregroundColor(.white)
+                            .font(.system(size: 11, weight: .medium))
                             .padding(.horizontal, 12)
                             .padding(.vertical, 5)
-                            .background(Color(red: 0.16, green: 0.17, blue: 0.22))
-                            .cornerRadius(5)
-                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color(red: 0.24, green: 0.26, blue: 0.33), lineWidth: 1))
+                            .background(Color(nsColor: .controlBackgroundColor))
+                            .cornerRadius(6)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                            )
                     }
-                    .padding(10)
-                    .background(isHoveringDropzone ? Color(red: 0.14, green: 0.16, blue: 0.22) : Color(red: 0.09, green: 0.10, blue: 0.13))
+                    .padding(12)
+                    .background(isHoveringDropzone ? Color.accentColor.opacity(0.08) : Color(nsColor: .controlBackgroundColor).opacity(0.7))
                     .cornerRadius(8)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .strokeBorder(isHoveringDropzone ? Color(red: 0.05, green: 0.48, blue: 0.95) : Color(red: 0.18, green: 0.19, blue: 0.24), style: StrokeStyle(lineWidth: 1, dash: isHoveringDropzone ? [] : [5]))
+                            .strokeBorder(isHoveringDropzone ? Color.accentColor : Color(nsColor: .separatorColor), style: StrokeStyle(lineWidth: 1, dash: isHoveringDropzone ? [] : [4]))
                     )
                 }
-                .buttonStyle(PlainButtonStyle())
+                .buttonStyle(.plain)
                 .onDrop(of: ["public.file-url"], isTargeted: $isHoveringDropzone) { providers in
                     handleDrop(providers: providers)
                 }
             } else {
-                // Loaded State Card
+                // Loaded File Card
                 HStack(spacing: 10) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(Color(red: 0.16, green: 0.18, blue: 0.24))
+                            .fill(Color.accentColor.opacity(0.15))
                             .frame(width: 34, height: 34)
                         Image(systemName: "waveform")
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(Color(red: 0.05, green: 0.48, blue: 0.95))
+                            .foregroundColor(Color.accentColor)
                     }
                     
                     VStack(alignment: .leading, spacing: 3) {
                         Text((selectedAudioPath as NSString).lastPathComponent)
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            .foregroundColor(.white)
+                            .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
+                            .foregroundColor(Color(nsColor: .labelColor))
                             .lineLimit(1)
                             .truncationMode(.middle)
                         
                         HStack(spacing: 6) {
                             if audioDuration > 0 {
                                 Text(formatDuration(audioDuration))
-                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                    .foregroundColor(.white)
+                                    .font(.system(size: 9.5, weight: .bold, design: .monospaced))
                                     .padding(.horizontal, 5)
                                     .padding(.vertical, 1.5)
-                                    .background(Color(red: 0.16, green: 0.17, blue: 0.22))
+                                    .background(Color.white.opacity(0.08))
                                     .cornerRadius(3)
                             }
-                            
                             let ext = (selectedAudioPath as NSString).pathExtension.uppercased()
                             Text(ext.isEmpty ? "AUDIO" : ext)
                                 .font(.system(size: 8.5, weight: .bold))
-                                .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                                .foregroundColor(Color(nsColor: .secondaryLabelColor))
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 1.5)
                                 .background(Color.white.opacity(0.06))
@@ -266,15 +278,14 @@ public struct VoiceCloningStudioView: View {
                     
                     Button(action: pickAudioFile) {
                         Text("Change")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(.white)
+                            .font(.system(size: 10.5, weight: .medium))
                             .padding(.horizontal, 9)
                             .padding(.vertical, 4)
-                            .background(Color(red: 0.16, green: 0.17, blue: 0.22))
+                            .background(Color(nsColor: .controlBackgroundColor))
                             .cornerRadius(5)
-                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color(red: 0.24, green: 0.26, blue: 0.33), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color(nsColor: .separatorColor), lineWidth: 0.5))
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .buttonStyle(.plain)
                     
                     Button(action: {
                         trimmerPlayer.stop()
@@ -285,35 +296,33 @@ public struct VoiceCloningStudioView: View {
                         hasAuditioned = false
                     }) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 13))
-                            .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                            .font(.system(size: 14))
+                            .foregroundColor(Color(nsColor: .tertiaryLabelColor))
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .help("Remove audio file")
+                    .buttonStyle(.plain)
                 }
-                .padding(9)
-                .background(Color(red: 0.09, green: 0.10, blue: 0.13))
+                .padding(10)
+                .background(Color(nsColor: .controlBackgroundColor))
                 .cornerRadius(8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(red: 0.18, green: 0.19, blue: 0.24), lineWidth: 1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                )
             }
         }
     }
     
-    // MARK: - 3. Speech Trimming & Cut Selector (Pocket TTS Style)
+    // MARK: - Step 3: Waveform Trimmer
     private var segmentTrimmingSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("SPEECH REFERENCE & POCKET TTS CUT TOOL")
-                    .font(.system(size: 9.5, weight: .bold))
-                    .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
-                
+                Text("3. Speech Trimmer & Window Crop")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(Color(nsColor: .secondaryLabelColor))
                 Spacer()
-                
-                if audioDuration > 0 {
-                    Text("Total: \(formatDuration(audioDuration))")
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                        .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
-                }
+                Text("Select cleanest 10–20s segment")
+                    .font(.system(size: 10))
+                    .foregroundColor(Color(nsColor: .tertiaryLabelColor))
             }
             
             AudioWaveformTrimmerView(
@@ -326,28 +335,88 @@ public struct VoiceCloningStudioView: View {
         }
     }
     
-    // MARK: - 4. Test Verification Script
-    private var testScriptSection: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text("Test Script to Verify Voice Quality")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.white)
+    // MARK: - Step 4: Multi-Line Audition Prompter
+    private var auditionScriptSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("4. Audition Test Script")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(Color(nsColor: .secondaryLabelColor))
+                Spacer()
+                Text("\(testSentence.count) / 280 chars")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundColor(testSentence.count > 260 ? .orange : Color(nsColor: .secondaryLabelColor))
+            }
             
-            TextField("Enter test sentence to audition...", text: $testSentence)
-                .textFieldStyle(PlainTextFieldStyle())
-                .font(.system(size: 11.5))
-                .foregroundColor(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(Color(red: 0.09, green: 0.10, blue: 0.13))
-                .cornerRadius(6)
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(red: 0.18, green: 0.19, blue: 0.24), lineWidth: 1))
+            // Preset Prompt Chips
+            HStack(spacing: 6) {
+                ForEach(promptPresets, id: \.title) { item in
+                    Button(action: { testSentence = item.prompt }) {
+                        Text(item.title)
+                            .font(.system(size: 10.5, weight: .medium))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3.5)
+                            .background(Color(nsColor: .controlBackgroundColor))
+                            .cornerRadius(5)
+                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color(nsColor: .separatorColor), lineWidth: 0.5))
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer()
+            }
+            
+            // Multi-Line Editor Box
+            ZStack(alignment: .topLeading) {
+                if testSentence.isEmpty {
+                    Text("Type a sentence to test voice quality, natural cadence, and pronunciation...")
+                        .font(.system(size: 12))
+                        .foregroundColor(Color(nsColor: .placeholderTextColor))
+                        .padding(8)
+                }
+                
+                TextEditor(text: $testSentence)
+                    .font(.system(size: 12))
+                    .lineSpacing(3)
+                    .scrollContentBackground(.hidden)
+                    .padding(4)
+                    .frame(minHeight: 55, maxHeight: 85)
+            }
+            .background(Color(nsColor: .controlBackgroundColor))
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+            )
         }
     }
     
-    // MARK: - 5. Action Buttons Bar
-    private var actionButtonsBar: some View {
-        HStack(spacing: 10) {
+    // MARK: - Status Feedback
+    @ViewBuilder
+    private var statusFeedbackView: some View {
+        if manager.isCloning {
+            HStack(spacing: 8) {
+                ProgressView().scaleEffect(0.7)
+                Text(manager.cloneMessage)
+                    .font(.system(size: 11))
+                    .foregroundColor(.yellow)
+            }
+            .padding(.vertical, 2)
+        } else if !manager.cloneMessage.isEmpty {
+            HStack(spacing: 6) {
+                Image(systemName: hasAuditioned ? "checkmark.circle.fill" : "info.circle.fill")
+                    .font(.system(size: 11))
+                    .foregroundColor(hasAuditioned ? .green : .accentColor)
+                Text(manager.cloneMessage)
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(nsColor: .labelColor))
+            }
+            .padding(.vertical, 2)
+        }
+    }
+    
+    // MARK: - Modal Footer Bar
+    private var modalFooterBar: some View {
+        HStack(spacing: 12) {
             // Audition Preview Button
             Button(action: auditionVoiceSample) {
                 HStack(spacing: 6) {
@@ -357,118 +426,81 @@ public struct VoiceCloningStudioView: View {
                         Image(systemName: "play.circle.fill")
                             .font(.system(size: 11))
                     }
-                    Text(manager.isCloning ? "Synthesizing Preview..." : "Audition Preview")
+                    Text(manager.isCloning ? "Synthesizing..." : "Audition Preview")
+                        .font(.system(size: 12, weight: .semibold))
                 }
-                .font(.system(size: 11.5, weight: .medium))
                 .foregroundColor(.white)
                 .padding(.horizontal, 14)
-                .frame(height: 30)
-                .background(Color(red: 0.16, green: 0.17, blue: 0.22))
+                .padding(.vertical, 7)
+                .background(Color.accentColor)
                 .cornerRadius(6)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color(red: 0.25, green: 0.27, blue: 0.35), lineWidth: 1)
-                )
             }
-            .buttonStyle(PlainButtonStyle())
+            .buttonStyle(.plain)
             .disabled(selectedAudioPath.isEmpty || manager.isCloning)
             
-            if manager.isCloning || SpeechQueueManager.shared.isSpeaking || trimmerPlayer.isPlaying {
+            if trimmerPlayer.isPlaying || SpeechQueueManager.shared.isSpeaking {
                 Button(action: {
                     trimmerPlayer.stop()
                     SpeechQueueManager.shared.stopCurrent()
-                    let killProc = Process()
-                    killProc.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
-                    killProc.arguments = ["afplay"]
-                    try? killProc.run()
                 }) {
-                    HStack(spacing: 5) {
+                    HStack(spacing: 4) {
                         Image(systemName: "stop.fill")
-                            .font(.system(size: 9))
-                        Text("Stop")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(.system(size: 10))
+                        Text("Stop Audio")
+                            .font(.system(size: 11, weight: .semibold))
                     }
                     .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .frame(height: 30)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
                     .background(Color.red)
                     .cornerRadius(6)
                 }
-                .buttonStyle(PlainButtonStyle())
+                .buttonStyle(.plain)
             }
-            
-            // Save & Activate Button (Only after auditioning)
-            if hasAuditioned {
-                Button(action: saveAuditionedVoice) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 11))
-                        Text("Save & Activate Voice")
-                    }
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 14)
-                    .frame(height: 30)
-                    .background(Color(red: 0.05, green: 0.48, blue: 0.95))
-                    .cornerRadius(6)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color(red: 0.25, green: 0.55, blue: 1.0).opacity(0.8), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-                .disabled(newVoiceName.isEmpty || manager.isCloning)
-            }
-            
-            // Cancel Button
-            Button(action: {
-                trimmerPlayer.stop()
-                isPresented = false
-                hasAuditioned = false
-            }) {
-                Text("Cancel")
-                    .font(.system(size: 11))
-                    .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
-                    .padding(.horizontal, 10)
-                    .frame(height: 30)
-            }
-            .buttonStyle(PlainButtonStyle())
             
             Spacer()
-        }
-    }
-    
-    // MARK: - Status Feedback
-    @ViewBuilder
-    private var statusFeedbackView: some View {
-        if manager.isCloning {
-            HStack(spacing: 6) {
-                ProgressView().scaleEffect(0.6)
-                Text(manager.cloneMessage)
-                    .font(.system(size: 10))
-                    .foregroundColor(.yellow)
+            
+            Button("Cancel") {
+                trimmerPlayer.stop()
+                isPresented = false
             }
-        } else if !manager.cloneMessage.isEmpty {
-            Text(manager.cloneMessage)
-                .font(.system(size: 10))
-                .foregroundColor(hasAuditioned ? Color(red: 0.05, green: 0.50, blue: 1.0) : .green)
+            .font(.system(size: 11.5))
+            .buttonStyle(.plain)
+            
+            // Save & Activate Button
+            Button(action: saveAuditionedVoice) {
+                HStack(spacing: 5) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 11))
+                    Text("Save Persona to Library")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background((hasAuditioned && !cleanName.isEmpty) ? Color.green : Color.gray.opacity(0.4))
+                .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+            .disabled(!hasAuditioned || cleanName.isEmpty || manager.isCloning)
         }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.6))
     }
     
-    // MARK: - Helper Methods
+    // MARK: - Helpers & Actions
+    private var cleanName: String {
+        newVoiceName.trimmingCharacters(in: CharacterSet(charactersIn: "-_ "))
+            .components(separatedBy: CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_")).inverted)
+            .joined(separator: "_")
+    }
+    
     private func formatDuration(_ seconds: Double) -> String {
         let m = Int(seconds) / 60
         let s = Int(seconds) % 60
-        if m > 0 {
-            return "\(m)m \(s)s"
-        }
+        if m > 0 { return "\(m)m \(s)s" }
         return String(format: "%.1fs", seconds)
-    }
-    
-    private func formatSeconds(_ seconds: Double) -> String {
-        let m = Int(seconds) / 60
-        let s = Int(seconds) % 60
-        return String(format: "%02d:%02d", m, s)
     }
     
     private func loadFile(url: URL) {
@@ -525,7 +557,7 @@ public struct VoiceCloningStudioView: View {
     private func auditionVoiceSample() {
         guard !selectedAudioPath.isEmpty else { return }
         trimmerPlayer.stop()
-        let textToTest = testSentence.isEmpty ? "This is a viral and proven voice  currently used by hundreds successful of youtube channels. so Do you like this voice? " : testSentence
+        let textToTest = testSentence.isEmpty ? "Hello! This is a test of your cloned voice." : testSentence
         let actualStart = isCutActive ? trimStartTime : 0.0
         let actualDur = isCutActive ? max(1.0, trimEndTime - trimStartTime) : max(1.0, audioDuration)
         
@@ -544,22 +576,22 @@ public struct VoiceCloningStudioView: View {
     }
     
     private func saveAuditionedVoice() {
-        guard !newVoiceName.isEmpty, !selectedAudioPath.isEmpty else { return }
+        let finalName = cleanName
+        guard !finalName.isEmpty, !selectedAudioPath.isEmpty else { return }
         trimmerPlayer.stop()
-        let targetName = newVoiceName
         let actualStart = isCutActive ? trimStartTime : 0.0
         let actualDur = isCutActive ? max(1.0, trimEndTime - trimStartTime) : max(1.0, audioDuration)
         
         manager.cloneVoice(
-            name: targetName,
+            name: finalName,
             audioPath: selectedAudioPath,
             startTime: actualStart,
             duration: actualDur,
             autoTrim: false
         ) { success, _ in
             if success {
-                self.onVoiceSaved(targetName)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                self.onVoiceSaved(finalName)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                     self.isPresented = false
                     self.hasAuditioned = false
                     self.newVoiceName = ""
@@ -569,3 +601,6 @@ public struct VoiceCloningStudioView: View {
         }
     }
 }
+
+// Backward-compatibility bridge
+public typealias VoiceCloningStudioView = VoiceCloningStudioSheet

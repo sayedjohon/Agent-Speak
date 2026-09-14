@@ -106,7 +106,7 @@ public class SpeechQueueManager: ObservableObject {
             self.currentSpeakerSource = ""
             BackgroundMusicManager.shared.stopWithFadeAndReverb()
         }
-        cleanupTmpAudio()
+        cleanupTmpAudioAsync()
     }
     
     private func processNext() {
@@ -117,35 +117,35 @@ public class SpeechQueueManager: ObservableObject {
         }
         
         let item = queue.removeFirst()
-        self.isSpeaking = true
-        self.queueCount = self.queue.count
-        self.currentSpeakerSource = item.source
+        let count = self.queue.count
         queueLock.unlock()
         
-        DispatchQueue.main.async {
-            BackgroundMusicManager.shared.start()
-        }
-        
         DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.isSpeaking = true
+            self.queueCount = count
+            self.currentSpeakerSource = item.source
+            BackgroundMusicManager.shared.start()
+            
             var finishedOnce = false
             let finishHandler: () -> Void = {
                 guard !finishedOnce else { return }
                 finishedOnce = true
                 
-                self?.queueLock.lock()
-                self?.isSpeaking = false
-                let remaining = self?.queue.count ?? 0
-                self?.queueLock.unlock()
+                self.queueLock.lock()
+                self.isSpeaking = false
+                let remaining = self.queue.count
+                self.queueLock.unlock()
                 
                 DispatchQueue.main.async {
                     if remaining == 0 {
                         BackgroundMusicManager.shared.stopWithFadeAndReverb()
                     }
-                    self?.currentSpeakerSource = ""
-                    self?.audioLevel = 0.0
-                    self?.queueCount = remaining
-                    self?.cleanupTmpAudio()
-                    self?.processNext()
+                    self.currentSpeakerSource = ""
+                    self.audioLevel = 0.0
+                    self.queueCount = remaining
+                    self.cleanupTmpAudioAsync()
+                    self.processNext()
                 }
             }
             
@@ -166,14 +166,25 @@ public class SpeechQueueManager: ObservableObject {
         }
     }
     
-    private func cleanupTmpAudio() {
-        let fileManager = FileManager.default
-        let tmp = URL(fileURLWithPath: "/tmp")
-        let now = Date()
-        if let files = try? fileManager.contentsOfDirectory(at: tmp, includingPropertiesForKeys: [.contentModificationDateKey]) {
+    private func cleanupTmpAudioAsync() {
+        DispatchQueue.global(qos: .utility).async {
+            let fileManager = FileManager.default
+            let tmp = URL(fileURLWithPath: "/tmp")
+            let now = Date()
+            guard let files = try? fileManager.contentsOfDirectory(at: tmp, includingPropertiesForKeys: [.contentModificationDateKey]) else { return }
+            
+            let targetPrefixes = [
+                "speech_chunk_",
+                "speech_bar_",
+                "test_speech",
+                "audition_preview",
+                "temp_voice_",
+                "gain_"
+            ]
+            
             for f in files {
                 let name = f.lastPathComponent
-                if name.hasPrefix("speech_chunk_") || name.hasPrefix("speech_bar_") || name.hasPrefix("test_speech") {
+                if targetPrefixes.contains(where: { name.hasPrefix($0) }) {
                     if let res = try? f.resourceValues(forKeys: [.contentModificationDateKey]),
                        let modDate = res.contentModificationDate,
                        now.timeIntervalSince(modDate) > 120 {

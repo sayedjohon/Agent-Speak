@@ -13,23 +13,36 @@ public class AudioTrimmerPlayer: NSObject, ObservableObject, AVAudioPlayerDelega
     private var playbackTimer: Timer?
     private var activeStartTime: Double = 0.0
     private var activeEndTime: Double = 0.0
+    private var loadGeneration: Int = 0
     
     public override init() {
         super.init()
     }
     
+    deinit {
+        stop()
+    }
+    
     public func loadAudio(url: URL) {
         stop()
+        loadGeneration += 1
+        let currentGen = loadGeneration
+        
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            self.duration = 0.0
+            self.waveformSamples = generateFallbackWaveform(sampleCount: 64)
+            return
+        }
+        
         do {
             let p = try AVAudioPlayer(contentsOf: url)
             p.delegate = self
             p.prepareToPlay()
             self.player = p
-            self.duration = p.duration
+            self.duration = max(0.0, p.duration)
             self.currentTime = 0.0
-            self.extractWaveform(url: url)
+            self.extractWaveform(url: url, generation: currentGen)
         } catch {
-            print("AudioTrimmerPlayer error: \(error.localizedDescription)")
             self.duration = 0.0
             self.waveformSamples = generateFallbackWaveform(sampleCount: 64)
         }
@@ -88,46 +101,64 @@ public class AudioTrimmerPlayer: NSObject, ObservableObject, AVAudioPlayerDelega
     }
     
     // MARK: - Waveform Extraction
-    private func extractWaveform(url: URL, sampleCount: Int = 64) {
+    private func extractWaveform(url: URL, sampleCount: Int = 64, generation: Int) {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
-            guard let file = try? AVAudioFile(forReading: url) else {
+            guard let file = try? AVAudioFile(forReading: url), file.length > 0 else {
                 let fallback = self.generateFallbackWaveform(sampleCount: sampleCount)
-                DispatchQueue.main.async { self.waveformSamples = fallback }
+                DispatchQueue.main.async {
+                    if self.loadGeneration == generation {
+                        self.waveformSamples = fallback
+                    }
+                }
                 return
             }
             
             let format = file.processingFormat
-            let frameCount = AVAudioFrameCount(min(file.length, 44100 * 300))
-            guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else {
+            guard format.channelCount > 0 else { return }
+            let maxFrames = min(file.length, 44100 * 60)
+            guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(maxFrames)) else {
                 let fallback = self.generateFallbackWaveform(sampleCount: sampleCount)
-                DispatchQueue.main.async { self.waveformSamples = fallback }
+                DispatchQueue.main.async {
+                    if self.loadGeneration == generation {
+                        self.waveformSamples = fallback
+                    }
+                }
                 return
             }
             
             do {
-                try file.read(into: buffer)
+                try file.read(into: buffer, frameCount: AVAudioFrameCount(maxFrames))
                 guard let floatData = buffer.floatChannelData?[0] else {
                     let fallback = self.generateFallbackWaveform(sampleCount: sampleCount)
-                    DispatchQueue.main.async { self.waveformSamples = fallback }
+                    DispatchQueue.main.async {
+                        if self.loadGeneration == generation {
+                            self.waveformSamples = fallback
+                        }
+                    }
                     return
                 }
                 
                 let totalFrames = Int(buffer.frameLength)
                 guard totalFrames > sampleCount else {
                     let fallback = self.generateFallbackWaveform(sampleCount: sampleCount)
-                    DispatchQueue.main.async { self.waveformSamples = fallback }
+                    DispatchQueue.main.async {
+                        if self.loadGeneration == generation {
+                            self.waveformSamples = fallback
+                        }
+                    }
                     return
                 }
                 
                 let step = max(1, totalFrames / sampleCount)
                 var bars: [CGFloat] = []
+                bars.reserveCapacity(sampleCount)
                 
                 for i in 0..<sampleCount {
                     let startFrame = i * step
                     let endFrame = min(startFrame + step, totalFrames)
                     var peak: Float = 0.0
-                    let strideStep = max(1, step / 15)
+                    let strideStep = max(1, step / 16)
                     for f in stride(from: startFrame, to: endFrame, by: strideStep) {
                         let val = abs(floatData[f])
                         if val > peak { peak = val }
@@ -137,11 +168,17 @@ public class AudioTrimmerPlayer: NSObject, ObservableObject, AVAudioPlayerDelega
                 }
                 
                 DispatchQueue.main.async {
-                    self.waveformSamples = bars
+                    if self.loadGeneration == generation {
+                        self.waveformSamples = bars
+                    }
                 }
             } catch {
                 let fallback = self.generateFallbackWaveform(sampleCount: sampleCount)
-                DispatchQueue.main.async { self.waveformSamples = fallback }
+                DispatchQueue.main.async {
+                    if self.loadGeneration == generation {
+                        self.waveformSamples = fallback
+                    }
+                }
             }
         }
     }
@@ -198,6 +235,9 @@ public struct AudioWaveformTrimmerView: View {
         .background(Color(red: 0.09, green: 0.10, blue: 0.13))
         .cornerRadius(7)
         .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color(red: 0.18, green: 0.19, blue: 0.24), lineWidth: 1))
+        .onDisappear {
+            player.stop()
+        }
     }
     
     // MARK: - Header Bar (Play/Pause & Cut Button)

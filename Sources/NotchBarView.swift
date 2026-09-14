@@ -135,12 +135,12 @@ struct FloatingJarvisHologramOverlayView: View {
                     
                     // Smooth opacity: fades out in lockstep with background music fade
                     let dynamicOpacity: Double = {
-                        if !isAnyActive { return 0.0 }
                         if isSpeechActive { return 1.0 }
                         if bgm.isFadingOut {
                             return max(0.0, min(1.0, 1.0 - bgm.fadeProgress))
                         }
-                        return 0.88
+                        if isMusicActive { return 0.88 }
+                        return 0.85
                     }()
                     
                     let theme = hologram.currentTheme
@@ -174,7 +174,7 @@ struct FloatingJarvisHologramOverlayView: View {
                                             )
                                         )
                                         .frame(width: waveRadius * 2, height: waveRadius * 2)
-                                        .blur(radius: 70)
+                                        .blur(radius: 28)
                                         .blendMode(.plusLighter)
                                     
                                     // Outward propagating harmonic ripple wave ring
