@@ -70,7 +70,8 @@ public class BackgroundMusicManager: ObservableObject {
         
         let candidateSources = [
             Bundle.main.resourceURL?.appendingPathComponent("bgm/Iron_Man.mp3"),
-            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/DEV_AREA/ssh linux/agent-speak/Resources/bgm/Iron_Man.mp3")
+            Bundle.main.resourceURL?.appendingPathComponent("Iron_Man.mp3"),
+            URL(fileURLWithPath: FileManager.default.currentDirectoryPath + "/Resources/bgm/Iron_Man.mp3")
         ]
         
         for candidate in candidateSources {

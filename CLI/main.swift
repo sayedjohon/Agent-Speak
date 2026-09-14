@@ -238,7 +238,14 @@ case "voice":
         }
     } else if sub == "install" || sub == "install-extension" {
         print("[Agent Speak] Starting Pocket-TTS Neural Extension setup on your Mac...")
-        let script = FileManager.default.fileExists(atPath: "\(extDir)/install.sh") ? "\(extDir)/install.sh" : "\(home)/Documents/DEV_AREA/ssh linux/agent-speak/config/install_pocket_tts.sh"
+        let scriptCandidates = [
+            "\(extDir)/install.sh",
+            "\(home)/Applications/Agent Speak.app/Contents/Resources/install_pocket_tts.sh",
+            "/Applications/Agent Speak.app/Contents/Resources/install_pocket_tts.sh",
+            "\(FileManager.default.currentDirectoryPath)/Resources/install_pocket_tts.sh",
+            "\(FileManager.default.currentDirectoryPath)/config/install_pocket_tts.sh"
+        ]
+        let script = scriptCandidates.first(where: { FileManager.default.fileExists(atPath: $0) }) ?? "\(extDir)/install.sh"
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/bash")
         p.arguments = [script]
@@ -252,8 +259,14 @@ case "voice":
         }
         let vName = args[3]
         let aPath = (args[4] as NSString).expandingTildeInPath
-        let cloneScript = FileManager.default.fileExists(atPath: "\(extDir)/clone_voice.py") ? "\(extDir)/clone_voice.py" : "\(home)/Documents/DEV_AREA/ssh linux/pocket-tts/clone_voice.py"
-        let py = isExtInstalled ? extPython : "\(home)/Documents/DEV_AREA/ssh linux/pocket-tts/venv/bin/python"
+        let cloneCandidates = [
+            "\(extDir)/clone_voice.py",
+            "\(home)/Applications/Agent Speak.app/Contents/Resources/clone_voice.py",
+            "/Applications/Agent Speak.app/Contents/Resources/clone_voice.py",
+            "\(FileManager.default.currentDirectoryPath)/Resources/clone_voice.py"
+        ]
+        let cloneScript = cloneCandidates.first(where: { FileManager.default.fileExists(atPath: $0) }) ?? "\(extDir)/clone_voice.py"
+        let py = extPython
         
         guard FileManager.default.fileExists(atPath: py) else {
             print("Error: Pocket-TTS runtime not found. Run 'aspk voice install' first.")

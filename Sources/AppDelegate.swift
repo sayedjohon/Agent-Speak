@@ -74,7 +74,6 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         let svgPaths = [
             bundle.path(forResource: "agent-speak-macos-outline-fixed", ofType: "svg"),
             "\(resPath)/agent-speak-macos-outline-fixed.svg",
-            "/Users/sayedjohon/Downloads/agent-speak-macos-outline-fixed.svg",
             bundle.path(forResource: "agent-speak-icon-tray", ofType: "svg"),
             "\(resPath)/agent-speak-icon-tray.svg"
         ]

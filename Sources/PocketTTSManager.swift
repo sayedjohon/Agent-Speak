@@ -45,6 +45,9 @@ public class PocketTTSManager: ObservableObject {
     public var activeScriptPath: String? {
         let extScript = extensionDir + "/speak.py"
         if FileManager.default.fileExists(atPath: extScript) { return extScript }
+        if let bundleScript = Bundle.main.resourcePath.map({ $0 + "/speak.py" }), FileManager.default.fileExists(atPath: bundleScript) {
+            return bundleScript
+        }
         let devScript = devDir + "/speak.py"
         if FileManager.default.fileExists(atPath: devScript) { return devScript }
         return nil
@@ -53,6 +56,9 @@ public class PocketTTSManager: ObservableObject {
     public var activeCloneScriptPath: String? {
         let extClone = extensionDir + "/clone_voice.py"
         if FileManager.default.fileExists(atPath: extClone) { return extClone }
+        if let bundleClone = Bundle.main.resourcePath.map({ $0 + "/clone_voice.py" }), FileManager.default.fileExists(atPath: bundleClone) {
+            return bundleClone
+        }
         let devClone = devDir + "/clone_voice.py"
         if FileManager.default.fileExists(atPath: devClone) { return devClone }
         return nil
@@ -109,9 +115,9 @@ public class PocketTTSManager: ObservableObject {
         if let bundleVoices = Bundle.main.resourcePath.map({ $0 + "/voices" }) {
             searchDirs.append(bundleVoices)
         }
-        let localRepoVoices = FileManager.default.homeDirectoryForCurrentUser.path + "/Documents/DEV_AREA/ssh linux/agent-speak/Resources/voices"
-        if FileManager.default.fileExists(atPath: localRepoVoices) {
-            searchDirs.append(localRepoVoices)
+        let cwdVoices = FileManager.default.currentDirectoryPath + "/Resources/voices"
+        if FileManager.default.fileExists(atPath: cwdVoices) {
+            searchDirs.append(cwdVoices)
         }
         
         for dir in searchDirs {
@@ -148,7 +154,8 @@ public class PocketTTSManager: ObservableObject {
             let possibleScripts = [
                 self.extensionDir + "/install.sh",
                 Bundle.main.resourcePath.map { $0 + "/install_pocket_tts.sh" } ?? "",
-                FileManager.default.homeDirectoryForCurrentUser.path + "/Documents/DEV_AREA/ssh linux/agent-speak/config/install_pocket_tts.sh"
+                FileManager.default.currentDirectoryPath + "/Resources/install_pocket_tts.sh",
+                FileManager.default.currentDirectoryPath + "/config/install_pocket_tts.sh"
             ]
             
             var scriptToRun: String?
