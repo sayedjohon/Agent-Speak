@@ -15,6 +15,10 @@ public class GestureHUDState: ObservableObject {
     private init() {}
     
     public func showGesture(_ gesture: RecognizedGestureType, label: String) {
+        guard gesture != .none && gesture != .hoverPointer && gesture != .clutch else {
+            return
+        }
+        
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
@@ -54,7 +58,7 @@ public struct GestureHUDView: View {
     
     public var body: some View {
         Group {
-            if state.isVisible && state.currentGesture != .hoverPointer && state.currentGesture != .none {
+            if state.isVisible && state.currentGesture != .hoverPointer && state.currentGesture != .none && state.currentGesture != .clutch {
                 HStack(spacing: 10) {
                     Image(systemName: state.currentGesture.iconName)
                         .font(.system(size: 16, weight: .bold))

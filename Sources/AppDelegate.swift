@@ -314,9 +314,26 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         
         menu.addItem(NSMenuItem.separator())
         
-        // 4. Background Music Direct 1-Click Toggle (music icon, checkmark state)
+        // 4. Hands-Free Gestures Direct 1-Click Toggle (hand icon, checkmark state, ⌃G)
+        let gesturesRunning = CameraGestureManager.shared.isRunning
+        let gestureTitle = gesturesRunning ? "Hands-Free Gestures: Active" : "Hands-Free Gestures: Off"
+        let gestureItem = NSMenuItem(
+            title: gestureTitle,
+            action: #selector(toggleHandsFreeGestures),
+            keyEquivalent: "g"
+        )
+        gestureItem.keyEquivalentModifierMask = [.control]
+        gestureItem.state = gesturesRunning ? .on : .off
+        if let icon = NSImage(systemSymbolName: gesturesRunning ? "hand.raised.fill" : "hand.raised", accessibilityDescription: "Hands-Free Gestures") {
+            icon.isTemplate = true
+            gestureItem.image = icon
+        }
+        gestureItem.target = self
+        menu.addItem(gestureItem)
+        
+        // 5. Background Music Direct 1-Click Toggle (music icon, checkmark state)
         let bgmItem = NSMenuItem(
-            title: bgmEnabled ? "Background Music" : "Background Music",
+            title: bgmEnabled ? "Background Music: On" : "Background Music: Off",
             action: #selector(toggleBackgroundMusic),
             keyEquivalent: ""
         )
@@ -327,7 +344,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         }
         bgmItem.target = self
         menu.addItem(bgmItem)
-        
+
         menu.addItem(NSMenuItem.separator())
         
         // 5. Settings (gear icon, ⌃,)
@@ -613,6 +630,10 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
                 BackgroundMusicManager.shared.start()
             }
         }
+    }
+    
+    @objc func toggleHandsFreeGestures() {
+        CameraGestureManager.shared.toggle()
     }
     
     // MARK: - Global HotKeys (Carbon)

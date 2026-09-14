@@ -6,6 +6,7 @@ import Vision
 public struct HandSkeletonData: Identifiable {
     public var id = UUID()
     public var isRightHand: Bool
+    public var isIntentional: Bool = true
     public var confidence: Float
     
     public var wrist: CGPoint
@@ -84,6 +85,7 @@ public class GestureClassifier {
     public var pinchThreshold: CGFloat = 0.055
     public var scrollSensitivity: CGFloat = 1.0
     public var trackingAnchor: String = "wrist" // "wrist", "indexMCP", "indexTip"
+    public var wristElevationThreshold: CGFloat = 0.26 // Rejects bottom 26% of frame (keyboard/desk)
     
     // Right hand tracking state
     private var isRightPinched: Bool = false
@@ -113,13 +115,45 @@ public class GestureClassifier {
             MouseCursorController.shared.endDrag()
             isDraggingActive = false
         }
+        if isRightPinched {
+            isRightPinched = false
+            MouseCursorController.shared.unlockCursor()
+        }
         if isLeftFistHolding {
-            KeyboardShortcutController.shared.setWhisperModifierHold(active: false)
+            if GroqWhisperManager.shared.engineMode == .modifierHold {
+                KeyboardShortcutController.shared.setWhisperModifierHold(active: false)
+            } else {
+                GroqWhisperManager.shared.stopRecordingAndTranscribe()
+            }
             isLeftFistHolding = false
         }
-        isRightPinched = false
         lastScrollPoint = nil
         leftWristHistory.removeAll()
+        MouseCursorController.shared.resetSmoothing()
+    }
+    
+    // MARK: - Hand Intentionality & Typing Gating
+    public func isIntentionalHand(_ hand: HandSkeletonData) -> Bool {
+        // 1. Overall confidence check: Ignore low-confidence camera noise
+        guard hand.confidence >= 0.35 else { return false }
+        
+        // 2. Wrist Elevation Gate:
+        // In Vision coordinate space, 0.0 is bottom and 1.0 is top.
+        // Hands resting on or hovering slightly above keyboard/desk lie in the bottom ~26% of frame.
+        guard hand.wrist.y >= wristElevationThreshold else { return false }
+        
+        // 3. Upright Hand Posture Gate:
+        // When intentionally gesturing or navigating, the hand faces the camera with fingers pointing upward,
+        // so the knuckles (MCP joints) are physically higher in the frame than the wrist joint.
+        // When typing on a physical keyboard, hands angle downward towards the desk and keys.
+        let highestKnuckleY = max(hand.indexMCP.y, hand.middleMCP.y)
+        guard highestKnuckleY >= (hand.wrist.y + 0.02) else { return false }
+        
+        // 4. Hand Span / Perspective Sanity:
+        let handSpan = distance(hand.wrist, hand.middleMCP)
+        guard handSpan >= 0.05 && handSpan <= 0.60 else { return false }
+        
+        return true
     }
     
     // MARK: - Euclidean Geometry Helpers
@@ -144,9 +178,17 @@ public class GestureClassifier {
     ) {
         let now = Date().timeIntervalSince1970
         
-        // Find right and left hands
-        let rightHand = hands.first(where: { $0.isRightHand })
-        let leftHand = hands.first(where: { !$0.isRightHand })
+        // Strict Gating: Reject hands resting on the keyboard or in downward typing postures
+        let activeHands = hands.filter { isIntentionalHand($0) }
+        
+        // If no intentional hands are in view, immediately dismiss any floating HUD
+        if activeHands.isEmpty {
+            GestureHUDState.shared.hide()
+        }
+        
+        // Find right and left active hands
+        let rightHand = activeHands.first(where: { $0.isRightHand })
+        let leftHand = activeHands.first(where: { !$0.isRightHand })
         
         // 1. Process Right Hand (Mouse & Pointer Operations)
         if let right = rightHand {
@@ -156,8 +198,12 @@ public class GestureClassifier {
                 MouseCursorController.shared.endDrag()
                 isDraggingActive = false
             }
-            isRightPinched = false
+            if isRightPinched {
+                isRightPinched = false
+                MouseCursorController.shared.unlockCursor()
+            }
             lastScrollPoint = nil
+            MouseCursorController.shared.resetSmoothing()
         }
         
         // 2. Process Left Hand (Shortcuts, Modifiers & Dictation Flow)
@@ -165,10 +211,16 @@ public class GestureClassifier {
             processLeftHand(left, now: now, onGestureDetected: onGestureDetected)
         } else {
             if isLeftFistHolding {
-                KeyboardShortcutController.shared.setWhisperModifierHold(active: false)
+                if GroqWhisperManager.shared.engineMode == .modifierHold {
+                    KeyboardShortcutController.shared.setWhisperModifierHold(active: false)
+                    onGestureDetected?(.whisperFlowHold, "Whisper Command Released")
+                } else {
+                    GroqWhisperManager.shared.stopRecordingAndTranscribe()
+                    onGestureDetected?(.whisperFlowHold, "Transcribing speech...")
+                }
                 isLeftFistHolding = false
-                onGestureDetected?(.whisperFlowHold, "Whisper Command Released")
             }
+            leftWristHistory.removeAll()
         }
     }
     
@@ -187,9 +239,8 @@ public class GestureClassifier {
         let indexThumbDist = distance(hand.thumbTip, hand.indexTip)
         let middleThumbDist = distance(hand.thumbTip, hand.middleTip)
         
-        // Safety Clutch: If thumb is tightly tucked inside a closed fist, pause tracking
+        // Safety Clutch: If thumb is tightly tucked inside a closed fist, pause tracking silently
         if !indexExt && !middleExt && !ringExt && !littleExt && !thumbExt {
-            onGestureDetected?(.clutch, "Right Hand Standby")
             return
         }
         

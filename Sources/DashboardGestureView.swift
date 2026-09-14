@@ -8,9 +8,21 @@ struct HandSkeletonCanvasView: View {
     
     var body: some View {
         Canvas { context, size in
+            // Draw keyboard typing boundary line (hands below this elevation threshold are ignored)
+            let thresholdY = (1.0 - GestureClassifier.shared.wristElevationThreshold) * size.height
+            var linePath = Path()
+            linePath.move(to: CGPoint(x: 10, y: thresholdY))
+            linePath.addLine(to: CGPoint(x: size.width - 10, y: thresholdY))
+            context.stroke(
+                linePath,
+                with: .color(Color.yellow.opacity(0.4)),
+                style: StrokeStyle(lineWidth: 1.2, dash: [5, 4])
+            )
+            
             for hand in hands {
-                let color: Color = hand.isRightHand ? .cyan : .orange
-                let glowColor: Color = hand.isRightHand ? Color.cyan.opacity(0.4) : Color.orange.opacity(0.4)
+                let isIntentional = hand.isIntentional
+                let color: Color = isIntentional ? (hand.isRightHand ? .cyan : .orange) : Color.gray.opacity(0.35)
+                let glowColor: Color = isIntentional ? (hand.isRightHand ? Color.cyan.opacity(0.4) : Color.orange.opacity(0.4)) : Color.clear
                 
                 // Helper to transform normalized (0...1) camera coords to canvas coords
                 func screenPt(_ pt: CGPoint) -> CGPoint {
@@ -51,20 +63,22 @@ struct HandSkeletonCanvasView: View {
                 for bone in bones {
                     var path = Path()
                     path.addLines(bone)
-                    context.stroke(path, with: .color(glowColor), lineWidth: 5)
-                    context.stroke(path, with: .color(color), lineWidth: 2)
+                    if isIntentional {
+                        context.stroke(path, with: .color(glowColor), lineWidth: 5)
+                    }
+                    context.stroke(path, with: .color(color), lineWidth: isIntentional ? 2 : 1)
                 }
                 
                 // Draw joint nodes
                 let allTips = [w, tTip, iTip, mTip, rTip, lTip, tIP, iPIP, mPIP, rPIP, lPIP, tMP, iMCP, mMCP, rMCP, lMCP]
                 for node in allTips {
-                    let rect = CGRect(x: node.x - 4, y: node.y - 4, width: 8, height: 8)
-                    context.fill(Path(ellipseIn: rect), with: .color(.white))
-                    context.stroke(Path(ellipseIn: rect), with: .color(color), lineWidth: 1.5)
+                    let rect = CGRect(x: node.x - 3.5, y: node.y - 3.5, width: 7, height: 7)
+                    context.fill(Path(ellipseIn: rect), with: .color(isIntentional ? .white : Color(white: 0.3)))
+                    context.stroke(Path(ellipseIn: rect), with: .color(color), lineWidth: 1.2)
                 }
                 
-                // Highlight active tracking anchor on Right Hand with a prominent pulse ring
-                if hand.isRightHand {
+                // Highlight active tracking anchor on Right Hand with a prominent pulse ring ONLY if intentional
+                if hand.isRightHand && isIntentional {
                     let activeAnchorPt: CGPoint
                     switch anchorType {
                     case "indexTip": activeAnchorPt = iTip
@@ -88,6 +102,7 @@ public struct DashboardGestureView: View {
     @State private var cursorSpeed: Double = 1.2
     @State private var smoothing: Double = 0.85
     @State private var pinchDist: Double = 0.055
+    @State private var elevationThreshold: Double = 0.26
     @State private var trackingAnchor: String = "wrist"
     @State private var isHudActive: Bool = true
     @State private var isApiKeyVisible: Bool = false
@@ -334,6 +349,21 @@ public struct DashboardGestureView: View {
                             saveGesturePreferences()
                         }
                     Text(String(format: "%.3f", pinchDist))
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.white)
+                        .frame(width: 45, alignment: .trailing)
+                }
+                
+                GridRow {
+                    Text("Elevation Gate")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.gray)
+                    Slider(value: $elevationThreshold, in: 0.15...0.40, step: 0.01)
+                        .onChange(of: elevationThreshold) { _, val in
+                            GestureClassifier.shared.wristElevationThreshold = CGFloat(val)
+                            saveGesturePreferences()
+                        }
+                    Text(String(format: "%d%%", Int(elevationThreshold * 100)))
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundColor(.white)
                         .frame(width: 45, alignment: .trailing)
@@ -723,6 +753,10 @@ public struct DashboardGestureView: View {
         if let speed = gestures["cursor_speed"] as? Double { cursorSpeed = speed }
         if let sm = gestures["smoothing_factor"] as? Double { smoothing = sm }
         if let p = gestures["pinch_threshold"] as? Double { pinchDist = p }
+        if let elev = gestures["elevation_threshold"] as? Double {
+            elevationThreshold = elev
+            GestureClassifier.shared.wristElevationThreshold = CGFloat(elev)
+        }
         if let h = gestures["hud_enabled"] as? Bool { isHudActive = h }
         if let anchor = gestures["tracking_anchor"] as? String { trackingAnchor = anchor }
         if let cam = gestures["camera_device_id"] as? String { manager.selectedCameraId = cam }
@@ -747,6 +781,7 @@ public struct DashboardGestureView: View {
         gestures["cursor_speed"] = cursorSpeed
         gestures["smoothing_factor"] = smoothing
         gestures["pinch_threshold"] = pinchDist
+        gestures["elevation_threshold"] = elevationThreshold
         gestures["tracking_anchor"] = trackingAnchor
         gestures["hud_enabled"] = isHudActive
         gestures["camera_device_id"] = manager.selectedCameraId

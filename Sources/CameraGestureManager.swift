@@ -97,9 +97,13 @@ public class CameraGestureManager: NSObject, ObservableObject, AVCaptureVideoDat
     }
     
     // MARK: - Start & Stop Tracking
-    public func start() {
+    public func start(persist: Bool = true) {
         guard !isRunning else { return }
         checkCameraAuthorization()
+        
+        if persist {
+            saveStatePreference(enabled: true)
+        }
         
         captureQueue.async { [weak self] in
             guard let self = self else { return }
@@ -116,8 +120,12 @@ public class CameraGestureManager: NSObject, ObservableObject, AVCaptureVideoDat
         }
     }
     
-    public func stop() {
+    public func stop(persist: Bool = true) {
         guard isRunning else { return }
+        
+        if persist {
+            saveStatePreference(enabled: false)
+        }
         
         captureQueue.async { [weak self] in
             guard let self = self else { return }
@@ -146,6 +154,23 @@ public class CameraGestureManager: NSObject, ObservableObject, AVCaptureVideoDat
             stop()
         } else {
             start()
+        }
+    }
+    
+    private func saveStatePreference(enabled: Bool) {
+        let configPath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".agentspeak/config.json")
+        var json: [String: Any] = [:]
+        if let data = try? Data(contentsOf: configPath),
+           let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            json = existing
+        }
+        
+        var gestures: [String: Any] = json["gestures"] as? [String: Any] ?? [:]
+        gestures["enabled"] = enabled
+        json["gestures"] = gestures
+        
+        if let outData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted]) {
+            try? outData.write(to: configPath)
         }
     }
     
@@ -213,7 +238,8 @@ public class CameraGestureManager: NSObject, ObservableObject, AVCaptureVideoDat
             
             var skeletons: [HandSkeletonData] = []
             for obs in observations {
-                if let skeleton = parseHandObservation(obs) {
+                if var skeleton = parseHandObservation(obs) {
+                    skeleton.isIntentional = GestureClassifier.shared.isIntentionalHand(skeleton)
                     skeletons.append(skeleton)
                 }
             }

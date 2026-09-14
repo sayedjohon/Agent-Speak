@@ -507,6 +507,7 @@ case "gesture", "gestures":
         var speed = 1.2
         var smoothing = 0.85
         var anchor = "wrist"
+        var elevGate = 0.26
         var dictMode = "Groq Whisper v3 (Cloud)"
         var dictModel = "whisper-large-v3"
         if let data = try? Data(contentsOf: cfgURL),
@@ -516,6 +517,7 @@ case "gesture", "gestures":
                 speed = g["cursor_speed"] as? Double ?? 1.2
                 smoothing = g["smoothing_factor"] as? Double ?? 0.85
                 anchor = g["tracking_anchor"] as? String ?? "wrist"
+                elevGate = g["elevation_threshold"] as? Double ?? 0.26
             }
             if let d = json["dictation"] as? [String: Any] {
                 dictMode = d["mode"] as? String ?? "Groq Whisper v3 (Cloud)"
@@ -524,6 +526,7 @@ case "gesture", "gestures":
         }
         print("Vision Hand Gestures: \(isEnabled ? "🟢 ACTIVE" : "⚪ STANDBY (Off)")")
         print("Tracking Anchor:     \(anchor.capitalized) Joint (Rock-Solid)")
+        print("Elevation Cutoff:    \(Int(elevGate * 100))% (Typing / Desk Filter)")
         print("Cursor Speed:        \(String(format: "%.1fx", speed))")
         print("Jitter Smoothing:    \(Int(smoothing * 100))%")
         print("Dictation Engine:    \(dictMode)")
