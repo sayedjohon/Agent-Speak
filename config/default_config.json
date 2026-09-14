@@ -75,5 +75,14 @@
       "enabled": true,
       "socket_path": "/tmp/agentspeak.sock"
     }
+  },
+  "gestures": {
+    "enabled": false,
+    "camera_device_id": "default",
+    "cursor_speed": 1.2,
+    "smoothing_factor": 0.85,
+    "pinch_threshold": 0.05,
+    "whisper_modifier": "command",
+    "hud_enabled": true
   }
 }

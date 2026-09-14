@@ -26,5 +26,7 @@
     <true/>
     <key>CADisableMinimumFrameDuration</key>
     <true/>
+    <key>NSCameraUsageDescription</key>
+    <string>Agent Speak uses your camera for real-time hand gesture tracking, precision mouse navigation, and hands-free keyboard shortcuts.</string>
 </dict>
 </plist>

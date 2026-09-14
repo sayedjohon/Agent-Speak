@@ -20,6 +20,7 @@ enum DashboardTab: String, CaseIterable, Identifiable {
     case bgm = "Background Music"
     case workspaces = "Connected AI"
     case hardware = "Hologram & HUD"
+    case gestures = "Vision & Gestures"
     case shortcuts = "Shortcuts & CLI"
     
     var id: String { rawValue }
@@ -30,6 +31,7 @@ enum DashboardTab: String, CaseIterable, Identifiable {
         case .bgm: return "music.note"
         case .workspaces: return "circle.hexagongrid.fill"
         case .hardware: return "atom"
+        case .gestures: return "hand.raised.fingers.spread.fill"
         case .shortcuts: return "command"
         }
     }
@@ -40,6 +42,7 @@ enum DashboardTab: String, CaseIterable, Identifiable {
         case .bgm: return [Color.pink, Color.purple]
         case .workspaces: return [Color.indigo, Color.purple]
         case .hardware: return [Color.teal, Color.blue]
+        case .gestures: return [Color.cyan, Color.teal]
         case .shortcuts: return [Color.orange, Color.red]
         }
     }
@@ -355,6 +358,8 @@ public struct DashboardView: View {
                         workspacesTab
                     case .hardware:
                         hardwareTab
+                    case .gestures:
+                        DashboardGestureView()
                     case .shortcuts:
                         shortcutsTab
                     }
@@ -370,6 +375,7 @@ public struct DashboardView: View {
         case .bgm: return "Play soundtrack audio behind speech with shuffle, random offset, and reverb decay."
         case .workspaces: return "Monitors text output from local AI assistants. Never accesses microphone."
         case .hardware: return "Customize dynamic camera notch HUD and menu bar status icon."
+        case .gestures: return "Dual-hand camera gesture tracking, cursor navigation, and hands-free shortcuts."
         case .shortcuts: return "Global keyboard shortcuts and terminal command cheat sheet."
         }
     }

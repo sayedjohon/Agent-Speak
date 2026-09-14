@@ -710,6 +710,28 @@ public class TranscriptWatcher {
                         DispatchQueue.main.async {
                             HologramManager.shared.setTheme(id: colorId)
                         }
+                    } else if raw == "__CMD_GESTURE_ON__" {
+                        DispatchQueue.main.async {
+                            CameraGestureManager.shared.start()
+                        }
+                    } else if raw == "__CMD_GESTURE_OFF__" {
+                        DispatchQueue.main.async {
+                            CameraGestureManager.shared.stop()
+                        }
+                    } else if raw == "__CMD_GESTURE_TOGGLE__" {
+                        DispatchQueue.main.async {
+                            CameraGestureManager.shared.toggle()
+                        }
+                    } else if raw == "__CMD_GESTURE_HUD_ON__" {
+                        DispatchQueue.main.async {
+                            CameraGestureManager.shared.isHUDEnabled = true
+                            GestureHUDController.shared.show()
+                        }
+                    } else if raw == "__CMD_GESTURE_HUD_OFF__" {
+                        DispatchQueue.main.async {
+                            CameraGestureManager.shared.isHUDEnabled = false
+                            GestureHUDController.shared.hide()
+                        }
                     } else {
                         let clean = TextSanitizer.sanitizeForSpeech(raw)
                         if !clean.isEmpty {

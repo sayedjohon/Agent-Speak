@@ -48,6 +48,7 @@ func printHelp() {
       hologram    Manage holographic reactor overlay (on | off | color <name> | preview | status)
       voice       Manage voices and volume (status | list | set | vol <1-200> | install | clone)
       bgm         Manage Iron Man background soundtrack (on | off | vol | test | open | status)
+      gesture     Control camera hand tracking (status | on | off | toggle | hud on/off | list)
       greet       Speak active persona's signature greeting (alias: intro)
       test-jarvis Test playback of the Jarvis voice sample in the Notch Player
       stop        Stop current speech and dismiss the notch player
@@ -475,6 +476,79 @@ case "hologram", "holo":
     } else {
         print("Unknown hologram subcommand: \(sub)")
         print("Available subcommands: on, off, toggle, color <name>, preview, status")
+    }
+
+case "gesture", "gestures":
+    let sub = args.count > 2 ? args[2].lowercased() : "status"
+    if sub == "on" {
+        _ = ensureAppRunningAndSend("__CMD_GESTURE_ON__")
+        print("[Agent Speak] Camera gesture tracking engine started.")
+    } else if sub == "off" {
+        _ = ensureAppRunningAndSend("__CMD_GESTURE_OFF__")
+        print("[Agent Speak] Camera gesture tracking stopped.")
+    } else if sub == "toggle" {
+        _ = ensureAppRunningAndSend("__CMD_GESTURE_TOGGLE__")
+        print("[Agent Speak] Toggled camera gesture tracking.")
+    } else if sub == "hud" {
+        let hudSub = args.count > 3 ? args[3].lowercased() : "toggle"
+        if hudSub == "on" {
+            _ = ensureAppRunningAndSend("__CMD_GESTURE_HUD_ON__")
+            print("[Agent Speak] Floating gesture HUD enabled.")
+        } else if hudSub == "off" {
+            _ = ensureAppRunningAndSend("__CMD_GESTURE_HUD_OFF__")
+            print("[Agent Speak] Floating gesture HUD disabled.")
+        } else {
+            print("Usage: agentspeak gesture hud on | off")
+        }
+    } else if sub == "status" {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let cfgURL = URL(fileURLWithPath: "\(home)/.agentspeak/config.json")
+        var isEnabled = false
+        var speed = 1.2
+        var smoothing = 0.85
+        var whisperMod = "command"
+        if let data = try? Data(contentsOf: cfgURL),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let g = json["gestures"] as? [String: Any] {
+            isEnabled = g["enabled"] as? Bool ?? false
+            speed = g["cursor_speed"] as? Double ?? 1.2
+            smoothing = g["smoothing_factor"] as? Double ?? 0.85
+            whisperMod = g["whisper_modifier"] as? String ?? "command"
+        }
+        print("Vision Hand Gestures: \(isEnabled ? "🟢 ACTIVE" : "⚪ STANDBY (Off)")")
+        print("Cursor Speed:        \(String(format: "%.1fx", speed))")
+        print("Jitter Smoothing:    \(Int(smoothing * 100))%")
+        print("Whisper Flow Key:    \(whisperMod.capitalized) (Held by Left Fist)")
+        print("Toggle Hotkey:       Control + G")
+    } else if sub == "list" {
+        print("""
+        Agent Speak — Two-Handed 10-Finger Gesture Map
+        
+        RIGHT HAND (Mouse & Pointer):
+          • Index Finger Pointing     -> Move cursor smoothly across screen
+          • Index + Thumb Pinch       -> Left click / focus text field
+          • Pinch & Hold (> 200ms)    -> Click and drag windows, files, or text
+          • Middle + Thumb Pinch      -> Right click context menu
+          • Double Pinch              -> Double click
+          • 2 Fingers Extended (Up/Dn)-> Smooth vertical and horizontal scroll
+        
+        LEFT HAND (Shortcuts, Modifiers & Dictation):
+          • Closed Fist (Hold)        -> Holds Command key (Whisper Flow dictation)
+          • Open Fist (Release)       -> Releases Command key (transcription pastes)
+          • Index Tap / Pinch         -> Return / Enter (submits chat query / prompt)
+          • "V" Pose (Peace Sign)     -> Paste (Cmd + V)
+          • "C" Hand Pose             -> Copy (Cmd + C)
+          • Open Palm (Stop Sign)     -> Escape / Dismiss active popup
+          • Swipe Left / Right        -> Undo (Cmd + Z) / Redo (Cmd + Shift + Z)
+          • 4-Finger Swipe Up         -> Mission Control
+        
+        SAFETY CLUTCH:
+          • Tuck Thumb / Lower Hands  -> Pauses cursor tracking instantly
+          • Control + G Hotkey        -> Toggle tracking engine on/off
+        """)
+    } else {
+        print("Unknown gesture subcommand: \(sub)")
+        print("Usage: agentspeak gesture <on | off | toggle | hud | status | list>")
     }
 
 case "greet", "welcome", "intro":

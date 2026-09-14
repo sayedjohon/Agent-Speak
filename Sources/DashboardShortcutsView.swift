@@ -20,6 +20,8 @@ public struct DashboardShortcutsView: View {
                     Divider()
                     shortcutRow(keys: "⌃ ,", title: "Open Settings", desc: "Open this Agent Speak configuration dashboard")
                     Divider()
+                    shortcutRow(keys: "⌃ G", title: "Toggle Gestures", desc: "Instantly turn camera vision gesture tracking on or off")
+                    Divider()
                     shortcutRow(keys: "⌃ X", title: "Stop Speech & Fade Music", desc: "Instantly stops speech and triggers 2.5s cinematic reverb fade-out")
                     Divider()
                     shortcutRow(keys: "Esc", title: "Quick Dismiss", desc: "Silences voice and dismisses notch HUD with spatial reverb decay")
@@ -40,6 +42,10 @@ public struct DashboardShortcutsView: View {
                     .tracking(0.5)
                 
                 VStack(spacing: 8) {
+                    cliRow(cmd: "aspk gesture on | off | status", desc: "Control real-time camera gesture tracking engine")
+                    Divider()
+                    cliRow(cmd: "aspk gesture list", desc: "Print cheat sheet of all 10-finger hand poses and mappings")
+                    Divider()
                     cliRow(cmd: "aspk pb", desc: "Speak text currently copied to clipboard")
                     Divider()
                     cliRow(cmd: "aspk say <text>", desc: "Speak any custom message through notch player")

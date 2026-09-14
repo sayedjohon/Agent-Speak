@@ -69,9 +69,17 @@
 - **Auto-Speech Detection**: Automatically locates the cleanest speech window or lets you scrub custom timestamps.
 - **Instant Auditioning**: Test synthesized clone previews directly before activating across your workflows.
 
+### 🖐️ Dual-Hand 10-Finger Camera Gesture Control
+- **100% On-Device Vision Tracking**: Driven by Apple Vision framework (`VNDetectHumanHandPoseRequest`) running on Apple Silicon Neural Engine at 60-120 FPS.
+- **Precision Mouse & Drag**: Jitter-free cursor movement with adaptive One-Euro filtering, index-thumb pinch for left clicks, pinch-and-hold for dragging windows/text, and middle-thumb pinch for right clicks.
+- **Whisper Flow Dictation Workflow**: Close left fist to hold `Command` while speaking; open fist to release and paste; quick index tap sends `Return` to submit prompts.
+- **Hands-Free Productivity**: Built-in gestures for Copy (`Cmd+C`), Paste (`Cmd+V`), Cut, Undo/Redo, Select All, Escape, and Mission Control.
+- **Interactive Skeleton Dashboard & HUD**: Live skeletal hand rendering and floating feedback pill.
+
 ### ⌨️ Global Productivity Hotkeys
 - `Control + S`: Read highlighted text aloud from any application (Safari, Chrome, Xcode, VS Code, Slack, PDF viewer).
 - `Control + P`: Read current clipboard contents aloud.
+- `Control + G`: Instantly toggle camera gesture tracking on or off.
 - `Escape`: Low-level macOS event tap that instantly silences playback in zero milliseconds without switching focus.
 
 ### 🤖 Automatic Multi-Agent Watching

@@ -75,6 +75,15 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         let trusted = AXIsProcessTrustedWithOptions(options)
         NSLog("[AgentSpeak] Accessibility permission on launch: \(trusted ? "TRUSTED" : "NOT TRUSTED")")
         
+        // Initialize Camera Gesture engine if enabled in config
+        let configPath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".agentspeak/config.json")
+        if let data = try? Data(contentsOf: configPath),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let gestures = json["gestures"] as? [String: Any],
+           let enabled = gestures["enabled"] as? Bool, enabled {
+            CameraGestureManager.shared.start()
+        }
+        
         // Announce persona signature greeting once at application startup
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             let greeting = PersonaGreetingManager.shared.resolveGreeting()
@@ -628,6 +637,8 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
                     appDelegate.showDashboard()
                 case 4: // Ctrl + X: Stop Speech
                     appDelegate.stopSpeech()
+                case 5: // Ctrl + G: Toggle Camera Gestures
+                    CameraGestureManager.shared.toggle()
                 default:
                     break
                 }
@@ -658,6 +669,12 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         // 4. Ctrl + X (Stop Speech)
         var ref4: EventHotKeyRef?
         if RegisterEventHotKey(UInt32(kVK_ANSI_X), UInt32(controlKey), EventHotKeyID(signature: sig, id: 4), target, 0, &ref4) == noErr, let r = ref4 {
+            hotKeyRefs.append(r)
+        }
+        
+        // 5. Ctrl + G (Toggle Camera Gestures)
+        var ref5: EventHotKeyRef?
+        if RegisterEventHotKey(UInt32(kVK_ANSI_G), UInt32(controlKey), EventHotKeyID(signature: sig, id: 5), target, 0, &ref5) == noErr, let r = ref5 {
             hotKeyRefs.append(r)
         }
     }
