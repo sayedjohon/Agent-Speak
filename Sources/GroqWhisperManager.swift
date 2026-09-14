@@ -40,15 +40,17 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
     public override init() {
         super.init()
         loadConfig()
-        setupAppleSpeechRecognizer()
     }
     
     // MARK: - Apple Speech Setup (100% Offline)
-    private func setupAppleSpeechRecognizer() {
+    public func setupAppleSpeechRecognizer() {
+        guard engineMode == .appleOnDevice else { return }
         let locale = languageCode.isEmpty ? Locale.current : Locale(identifier: languageCode)
         speechRecognizer = SFSpeechRecognizer(locale: locale)
-        SFSpeechRecognizer.requestAuthorization { status in
-            NSLog("[GroqWhisper] Apple Speech authorization: %ld", status.rawValue)
+        if SFSpeechRecognizer.authorizationStatus() == .notDetermined {
+            SFSpeechRecognizer.requestAuthorization { status in
+                NSLog("[GroqWhisper] Apple Speech authorization: %ld", status.rawValue)
+            }
         }
     }
     
@@ -56,9 +58,9 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
     public func startRecording() {
         guard !isRecording else { return }
         
-        // Ensure microphone permission
+        // Ensure microphone permission cleanly
         if #available(macOS 14.0, *) {
-            AVCaptureDevice.requestAccess(for: .audio) { _ in }
+            AVAudioApplication.requestRecordPermission { _ in }
         }
         
         let settings: [String: Any] = [

@@ -28,5 +28,9 @@
     <true/>
     <key>NSCameraUsageDescription</key>
     <string>Agent Speak uses your camera for real-time hand gesture tracking, precision mouse navigation, and hands-free keyboard shortcuts.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Agent Speak uses your microphone for voice dictation, Whisper speech-to-text, and audio transcription.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Agent Speak uses on-device speech recognition for private offline voice dictation.</string>
 </dict>
 </plist>
