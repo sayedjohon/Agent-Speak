@@ -34,7 +34,43 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         guard let button = statusItem?.button else { return }
         
-        button.image = NSImage(systemSymbolName: "waveform.circle.fill", accessibilityDescription: "Agent Speak")
+        var trayImage: NSImage?
+        
+        // 1. Vector SVG from bundle resources
+        if let svgPath = Bundle.main.path(forResource: "agent-speak-icon-tray", ofType: "svg"),
+           let img = NSImage(contentsOfFile: svgPath) {
+            img.size = NSSize(width: 18, height: 18)
+            trayImage = img
+        }
+        
+        // 2. Named TrayIcon asset from bundle
+        if trayImage == nil, let img = NSImage(named: "TrayIcon") {
+            img.size = NSSize(width: 18, height: 18)
+            trayImage = img
+        }
+        
+        // 3. Direct path fallback in Resources
+        if trayImage == nil {
+            let directPaths = [
+                Bundle.main.bundlePath + "/Contents/Resources/agent-speak-icon-tray.svg",
+                Bundle.main.bundlePath + "/Contents/Resources/TrayIcon@2x.png",
+                Bundle.main.bundlePath + "/Contents/Resources/TrayIcon.png"
+            ]
+            for path in directPaths {
+                if FileManager.default.fileExists(atPath: path), let img = NSImage(contentsOfFile: path) {
+                    img.size = NSSize(width: 18, height: 18)
+                    trayImage = img
+                    break
+                }
+            }
+        }
+        
+        if let icon = trayImage {
+            button.image = icon
+        } else {
+            button.image = NSImage(systemSymbolName: "waveform.circle.fill", accessibilityDescription: "Agent Speak")
+        }
+        
         button.action = #selector(menuBarButtonClicked(_:))
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         button.target = self

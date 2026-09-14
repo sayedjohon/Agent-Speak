@@ -41,6 +41,13 @@ swiftc -O "$SCRIPT_DIR"/Sources/*.swift -o "$APPS_DIR/Agent Speak.app/Contents/M
 cp "$SCRIPT_DIR/dashboard/Info.plist" "$APPS_DIR/Agent Speak.app/Contents/Info.plist"
 chmod +x "$APPS_DIR/Agent Speak.app/Contents/MacOS/AgentSpeak"
 
+# Copy Resources (AppIcon, Tray Icons, Brand Assets)
+if [[ -d "$SCRIPT_DIR/Resources" ]]; then
+    echo -e "${CYAN}→ Installing custom brand assets & icons...${NC}"
+    cp -R "$SCRIPT_DIR/Resources/"* "$APPS_DIR/Agent Speak.app/Contents/Resources/"
+fi
+touch "$APPS_DIR/Agent Speak.app"
+
 # Also keep a copy in bin/
 mkdir -p "$SCRIPT_DIR/bin"
 cp "$APPS_DIR/Agent Speak.app/Contents/MacOS/AgentSpeak" "$SCRIPT_DIR/bin/AgentSpeak"

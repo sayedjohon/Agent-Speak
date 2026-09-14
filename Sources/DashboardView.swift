@@ -74,6 +74,20 @@ public struct DashboardView: View {
     
     public init() {}
     
+    private var brandLogoImage: NSImage? {
+        let paths = [
+            Bundle.main.path(forResource: "Agent-Speak-logo", ofType: "png"),
+            Bundle.main.bundlePath + "/Contents/Resources/Agent-Speak-logo.png",
+            Bundle.main.bundlePath + "/Contents/Resources/AppIcon.icns"
+        ]
+        for p in paths {
+            if let p = p, FileManager.default.fileExists(atPath: p), let img = NSImage(contentsOfFile: p) {
+                return img
+            }
+        }
+        return NSImage(named: "AppIcon")
+    }
+    
     public var body: some View {
         ZStack {
             // Liquid Glass Dark Obsidian Background
@@ -84,9 +98,17 @@ public struct DashboardView: View {
                 // Header Bar
                 HStack {
                     HStack(spacing: 8) {
-                        Image(systemName: "waveform.circle.fill")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(.blue)
+                        if let logo = brandLogoImage {
+                            Image(nsImage: logo)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 22, height: 22)
+                                .cornerRadius(5)
+                        } else {
+                            Image(systemName: "waveform.circle.fill")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.blue)
+                        }
                         Text("AGENT SPEAK")
                             .font(.system(size: 13, weight: .bold, design: .rounded))
                             .tracking(1.4)
