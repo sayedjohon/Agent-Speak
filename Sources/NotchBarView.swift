@@ -112,7 +112,7 @@ struct FloatingJarvisHologramOverlayView: View {
     @ObservedObject var state: StreamingAudioManager
     @ObservedObject var meter = JarvisAudioLevelMeter.shared
     
-    let reactorSize: CGFloat = 480.0
+    let reactorSize: CGFloat = 820.0
     
     init(state: StreamingAudioManager) {
         self.state = state
@@ -128,71 +128,57 @@ struct FloatingJarvisHologramOverlayView: View {
                 // Invisible click-through container
                 Color.clear
                 
-                // 1. Ambient Scene Wave Glow (Radiates across the room/screen when speaking)
+                // 1. Ambient Scene Wave Glow (Warm golden-amber ripples across the screen when speaking)
                 if state.isPlaying {
                     TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
                         let now = timeline.date.timeIntervalSinceReferenceDate
-                        let pulse = sin(now * 2.6) * 0.5 + 0.5
-                        let waveRadius: CGFloat = 460.0 + CGFloat(pulse) * 45.0 + CGFloat(energy) * 80.0
-                        let rippleProgress = CGFloat((now.truncatingRemainder(dividingBy: 2.2)) / 2.2)
+                        let pulse = sin(now * 2.4) * 0.5 + 0.5
+                        let waveRadius: CGFloat = 520.0 + CGFloat(pulse) * 50.0 + CGFloat(energy) * 80.0
+                        let rippleProgress = CGFloat((now.truncatingRemainder(dividingBy: 2.5)) / 2.5)
                         
                         ZStack {
-                            // Soft atmospheric warm amber room illumination
+                            // Soft atmospheric warm amber room illumination (pure warm glow, no white wash)
                             Circle()
                                 .fill(
                                     RadialGradient(
                                         colors: [
-                                            Color(red: 1.0, green: 0.60, blue: 0.12).opacity(0.18 + Double(energy) * 0.20),
-                                            Color(red: 0.95, green: 0.30, blue: 0.02).opacity(0.08 + Double(energy) * 0.10),
+                                            Color(red: 1.0, green: 0.52, blue: 0.04).opacity(0.13 + Double(energy) * 0.12),
+                                            Color(red: 0.90, green: 0.26, blue: 0.02).opacity(0.05 + Double(energy) * 0.05),
                                             Color.clear
                                         ],
                                         center: .center,
-                                        startRadius: 30,
+                                        startRadius: 40,
                                         endRadius: waveRadius
                                     )
                                 )
                                 .frame(width: waveRadius * 2, height: waveRadius * 2)
-                                .blur(radius: 60)
+                                .blur(radius: 70)
                                 .blendMode(.plusLighter)
                             
                             // Outward propagating harmonic ripple wave ring
                             Circle()
                                 .stroke(
-                                    Color(red: 1.0, green: 0.72, blue: 0.25).opacity((1.0 - Double(rippleProgress)) * (0.28 + Double(energy) * 0.30)),
-                                    lineWidth: 1.8
+                                    Color(red: 1.0, green: 0.65, blue: 0.15).opacity((1.0 - Double(rippleProgress)) * (0.22 + Double(energy) * 0.20)),
+                                    lineWidth: 2.0
                                 )
-                                .frame(width: 240 + rippleProgress * 440, height: 240 + rippleProgress * 440)
-                                .blur(radius: 2.5)
+                                .frame(width: 300 + rippleProgress * 500, height: 300 + rippleProgress * 500)
+                                .blur(radius: 3)
                                 .blendMode(.plusLighter)
                         }
-                        // Center ambient glow precisely behind the reactor
-                        .position(x: w / 2.0, y: h * 0.36)
+                        // Center ambient glow in the perfect middle of the screen
+                        .position(x: w / 2.0, y: h / 2.0)
                     }
                 }
                 
-                // 2. Large Tony Stark Holographic Arc Reactor (100% Opacity + Dual Bloom Glow)
-                ZStack {
-                    // Layer A: Intense Bloom Glow Pass
-                    JarvisOrbVisualizerView(
-                        isSpeaking: state.isPlaying,
-                        isPlayingMusic: BackgroundMusicManager.shared.isPlaying,
-                        size: reactorSize
-                    )
-                    .blur(radius: 16)
-                    .opacity(state.isPlaying ? 0.95 : 0.40)
-                    .blendMode(.plusLighter)
-                    
-                    // Layer B: Crisp 100% Opacity Hologram Pass
-                    JarvisOrbVisualizerView(
-                        isSpeaking: state.isPlaying,
-                        isPlayingMusic: BackgroundMusicManager.shared.isPlaying,
-                        size: reactorSize
-                    )
-                    .blendMode(.plusLighter)
-                }
+                // 2. Large Tony Stark Holographic Arc Reactor (Double size, crisp 100% opacity, pure golden amber)
+                JarvisOrbVisualizerView(
+                    isSpeaking: state.isPlaying,
+                    isPlayingMusic: BackgroundMusicManager.shared.isPlaying,
+                    size: reactorSize
+                )
                 .frame(width: reactorSize, height: reactorSize)
-                // Position in the upper-middle of the screen, floating right below notch
-                .position(x: w / 2.0, y: h * 0.36)
+                // Position in the PERFECT MIDDLE of the screen
+                .position(x: w / 2.0, y: h / 2.0)
             }
             .frame(width: w, height: h)
             .allowsHitTesting(false)
@@ -201,5 +187,6 @@ struct FloatingJarvisHologramOverlayView: View {
         .ignoresSafeArea()
     }
 }
+
 
 

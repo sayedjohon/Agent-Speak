@@ -119,46 +119,30 @@ public struct JarvisOrbVisualizerView: View {
 
     private func drawGlassVolume(_ context: inout GraphicsContext, center: CGPoint, radius: CGFloat, energy: CGFloat, time: TimeInterval) {
         let sphere = CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
-        let warmGlow = Path(ellipseIn: sphere.insetBy(dx: -radius * 0.12, dy: -radius * 0.12))
+        let warmGlow = Path(ellipseIn: sphere.insetBy(dx: -radius * 0.08, dy: -radius * 0.08))
 
-        // Outer intense atmospheric bloom
+        // Outer soft warm amber bloom
         var blurred = context
-        blurred.addFilter(.blur(radius: radius * (0.24 + energy * 0.12)))
+        blurred.addFilter(.blur(radius: radius * (0.20 + energy * 0.10)))
         blurred.fill(warmGlow, with: .radialGradient(
             Gradient(colors: [
-                Self.hotWhite.opacity(0.50 + energy * 0.40),
-                Self.amber.opacity(0.55 + energy * 0.35),
-                Self.deepAmber.opacity(0.20),
+                Self.amber.opacity(0.30 + energy * 0.20),
+                Self.deepAmber.opacity(0.14 + energy * 0.10),
                 .clear
             ]),
             center: center,
-            startRadius: radius * 0.04,
-            endRadius: radius * 1.25
-        ))
-
-        // Secondary rich core bloom
-        var coreBloom = context
-        coreBloom.addFilter(.blur(radius: radius * 0.14))
-        coreBloom.fill(Path(ellipseIn: sphere.insetBy(dx: radius * 0.10, dy: radius * 0.10)), with: .radialGradient(
-            Gradient(colors: [
-                Self.hotWhite.opacity(0.65 + energy * 0.30),
-                Self.amber.opacity(0.50 + energy * 0.30),
-                .clear
-            ]),
-            center: center,
-            startRadius: 0,
-            endRadius: radius * 0.90
+            startRadius: radius * 0.06,
+            endRadius: radius * 1.15
         ))
 
         context.fill(Path(ellipseIn: sphere), with: .radialGradient(
             Gradient(colors: [
-                Self.hotWhite.opacity(0.08 + energy * 0.06),
-                Self.amber.opacity(0.12 + energy * 0.08),
-                Self.deepAmber.opacity(0.05),
+                Self.amber.opacity(0.06 + energy * 0.04),
+                Self.deepAmber.opacity(0.04),
                 .clear
             ]),
             center: center,
-            startRadius: radius * 0.08,
+            startRadius: radius * 0.10,
             endRadius: radius
         ))
 
@@ -169,7 +153,7 @@ public struct JarvisOrbVisualizerView: View {
             width: radius * 1.46,
             height: radius * 1.84
         )
-        context.stroke(Path(ellipseIn: lens), with: .color(Self.lensAmber.opacity(0.13 + energy * 0.08)), lineWidth: max(0.45, radius * 0.006))
+        context.stroke(Path(ellipseIn: lens), with: .color(Self.lensAmber.opacity(0.14 + energy * 0.08)), lineWidth: max(0.45, radius * 0.006))
     }
 
     private func drawBrokenReactorRings(
@@ -526,27 +510,26 @@ public struct JarvisOrbVisualizerView: View {
         time: TimeInterval,
         scale: CGFloat
     ) {
-        let coreRadius = radius * (0.095 + energy * 0.072 + breathing * 0.018)
+        let coreRadius = radius * (0.060 + energy * 0.030 + breathing * 0.008)
         let coreRect = CGRect(x: center.x - coreRadius, y: center.y - coreRadius, width: coreRadius * 2, height: coreRadius * 2)
 
         var coreGlow = context
-        coreGlow.addFilter(.blur(radius: max(1.4, scale * 3.5)))
+        coreGlow.addFilter(.blur(radius: max(1.2, scale * 2.0)))
         coreGlow.fill(Path(ellipseIn: coreRect.insetBy(dx: -coreRadius * 0.35, dy: -coreRadius * 0.35)), with: .radialGradient(
             Gradient(colors: [
-                Self.hotWhite.opacity(0.62 + energy * 0.28),
-                Self.amber.opacity(0.48 + energy * 0.34),
+                Self.goldGlint.opacity(0.40 + energy * 0.22),
+                Self.amber.opacity(0.30),
                 .clear
             ]),
             center: center,
             startRadius: 0,
-            endRadius: coreRadius * 1.6
+            endRadius: coreRadius * 1.5
         ))
 
         context.fill(Path(ellipseIn: coreRect), with: .radialGradient(
             Gradient(colors: [
-                .white.opacity(0.95),
-                Self.hotWhite.opacity(0.86),
-                Self.amber.opacity(0.56),
+                Self.goldGlint.opacity(0.65 + energy * 0.15),
+                Self.amber.opacity(0.40),
                 .clear
             ]),
             center: center,
@@ -577,11 +560,11 @@ public struct JarvisOrbVisualizerView: View {
                 }
             }
 
-            let alpha = 0.34 + energy * 0.45
+            let alpha = 0.34 + energy * 0.35
             var glow = context
-            glow.addFilter(.blur(radius: max(0.7, scale * 1.6)))
-            glow.stroke(filament, with: .color(Self.hotWhite.opacity(alpha * 0.48)), style: StrokeStyle(lineWidth: max(0.65, scale * 2.0), lineCap: .round, lineJoin: .round))
-            context.stroke(filament, with: .color(Self.hotWhite.opacity(alpha)), style: StrokeStyle(lineWidth: max(0.34, scale * 0.72), lineCap: .round, lineJoin: .round))
+            glow.addFilter(.blur(radius: max(0.7, scale * 1.4)))
+            glow.stroke(filament, with: .color(Self.amber.opacity(alpha * 0.50)), style: StrokeStyle(lineWidth: max(0.65, scale * 1.6), lineCap: .round, lineJoin: .round))
+            context.stroke(filament, with: .color(Self.goldGlint.opacity(alpha)), style: StrokeStyle(lineWidth: max(0.34, scale * 0.65), lineCap: .round, lineJoin: .round))
         }
     }
 
@@ -629,8 +612,9 @@ public struct JarvisOrbVisualizerView: View {
         return path
     }
 
-    private static let hotWhite = Color(red: 1.00, green: 0.88, blue: 0.48)
-    private static let amber = Color(red: 1.00, green: 0.54, blue: 0.08)
-    private static let deepAmber = Color(red: 0.95, green: 0.26, blue: 0.02)
-    private static let lensAmber = Color(red: 1.00, green: 0.71, blue: 0.25)
+    private static let goldGlint = Color(red: 1.00, green: 0.85, blue: 0.35)
+    private static let hotWhite = Color(red: 1.00, green: 0.72, blue: 0.16)
+    private static let amber = Color(red: 1.00, green: 0.52, blue: 0.04)
+    private static let deepAmber = Color(red: 0.90, green: 0.28, blue: 0.02)
+    private static let lensAmber = Color(red: 1.00, green: 0.65, blue: 0.15)
 }
