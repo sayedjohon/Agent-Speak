@@ -17,7 +17,7 @@ public struct LastVoiceCardView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.cyan)
                 
-                Text("LAST SYNTHESIZED VOICE")
+                Text("RECENT AUDIO EXPORT")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(.secondary)
                 
@@ -40,7 +40,7 @@ public struct LastVoiceCardView: View {
                     ProgressView()
                         .scaleEffect(0.7)
                         .frame(width: 16, height: 16)
-                    Text("Synthesizing voice audio...")
+                    Text("Preparing voice audio...")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
@@ -208,7 +208,7 @@ public struct LastVoiceCardView: View {
                     Image(systemName: "info.circle")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
-                    Text("Synthesized audio will appear here with an interactive scrubber and download button.")
+                    Text("Generated speech audio will appear here with an interactive player and download option.")
                         .font(.system(size: 10.5))
                         .foregroundColor(.secondary.opacity(0.8))
                 }

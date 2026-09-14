@@ -9,6 +9,7 @@ func sendSocketMessage(_ text: String) -> Bool {
     defer { close(fd) }
     
     var addr = sockaddr_un()
+    addr.sun_len = UInt8(MemoryLayout<sockaddr_un>.size)
     addr.sun_family = sa_family_t(AF_UNIX)
     let pathBytes = socketPath.utf8CString
     withUnsafeMutablePointer(to: &addr.sun_path.0) { ptr in
@@ -17,7 +18,7 @@ func sendSocketMessage(_ text: String) -> Bool {
         }
     }
     
-    let addrLen = socklen_t(MemoryLayout<sa_family_t>.size + socketPath.utf8.count + 1)
+    let addrLen = socklen_t(MemoryLayout<sockaddr_un>.size)
     let res = withUnsafePointer(to: &addr) { ptr in
         ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { saPtr in
             connect(fd, saPtr, addrLen)
@@ -44,6 +45,7 @@ func printHelp() {
       pb          Speak copied clipboard text (alias: clipboard)
       settings    Open the Agent Speak Settings window (alias: dashboard)
       tray        Toggle or set menu bar tray icon (tray on | off | toggle)
+      voice       Manage voices and extensions (status | list | set | install | clone)
       test-jarvis Test playback of the Jarvis voice sample in the Notch Player
       stop        Stop current speech and dismiss the notch player
       quit        Terminate the Agent Speak application
@@ -185,6 +187,100 @@ case "tray":
         } else {
             print("Error: Could not connect to Agent Speak socket.")
         }
+    }
+
+case "voice":
+    let sub = args.count > 2 ? args[2].lowercased() : "status"
+    let home = FileManager.default.homeDirectoryForCurrentUser.path
+    let extPython = "\(home)/.agentspeak/extensions/pocket-tts/venv/bin/python"
+    let extDir = "\(home)/.agentspeak/extensions/pocket-tts"
+    let isExtInstalled = FileManager.default.fileExists(atPath: extPython)
+    let info = getActiveConfigInfo()
+
+    if sub == "status" || sub == "info" {
+        print("─── Voice Engine Status ───")
+        print("Active Engine:      \(info.engine == "pocket_tts" ? "Pocket-TTS Neural Extension" : "Default macOS System Voice")")
+        print("Active Voice:       \(info.voice)")
+        print("Neural Extension:   \(isExtInstalled ? "🟢 INSTALLED (\(extDir))" : "🟡 NOT INSTALLED (On-Demand)")")
+    } else if sub == "list" {
+        print("─── Available System Voices (macOS) ───")
+        print("• Default System Voice (macOS Auto)")
+        print("• Daniel (British English)")
+        print("• Samantha (American English)")
+        print("• Rishi (Indian English)")
+        print("\n─── Pocket-TTS Neural Extension Personas ───")
+        if isExtInstalled {
+            let voicesDir = "\(extDir)/voices"
+            if let files = try? FileManager.default.contentsOfDirectory(atPath: voicesDir) {
+                for f in files.sorted() where f.hasSuffix(".safetensors") {
+                    let name = (f as NSString).deletingPathExtension
+                    print("• \(name)")
+                }
+            }
+        } else {
+            print("(Extension not installed. Run 'aspk voice install' to download on-demand)")
+        }
+    } else if sub == "install" || sub == "install-extension" {
+        print("[Agent Speak] Starting Pocket-TTS Neural Extension setup on your Mac...")
+        let script = FileManager.default.fileExists(atPath: "\(extDir)/install.sh") ? "\(extDir)/install.sh" : "\(home)/Documents/DEV_AREA/ssh linux/agent-speak/config/install_pocket_tts.sh"
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/bash")
+        p.arguments = [script]
+        try? p.run()
+        p.waitUntilExit()
+    } else if sub == "clone" {
+        guard args.count >= 5 else {
+            print("Usage: aspk voice clone <PersonaName> <path_to_audio>")
+            print("Example: aspk voice clone MyVoice ~/Downloads/sample.wav")
+            exit(1)
+        }
+        let vName = args[3]
+        let aPath = (args[4] as NSString).expandingTildeInPath
+        let cloneScript = FileManager.default.fileExists(atPath: "\(extDir)/clone_voice.py") ? "\(extDir)/clone_voice.py" : "\(home)/Documents/DEV_AREA/ssh linux/pocket-tts/clone_voice.py"
+        let py = isExtInstalled ? extPython : "\(home)/Documents/DEV_AREA/ssh linux/pocket-tts/venv/bin/python"
+        
+        guard FileManager.default.fileExists(atPath: py) else {
+            print("Error: Pocket-TTS runtime not found. Run 'aspk voice install' first.")
+            exit(1)
+        }
+        
+        print("[Agent Speak] Cloning voice persona '\(vName)' from \(aPath)...")
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: py)
+        p.arguments = [cloneScript, aPath, "--name", vName]
+        try? p.run()
+        p.waitUntilExit()
+    } else if sub == "set" {
+        guard args.count >= 4 else {
+            print("Usage: aspk voice set <macos|pocket> [voice_name]")
+            print("Example: aspk voice set pocket Sayed_Johon_Primary")
+            print("Example: aspk voice set macos Daniel")
+            exit(1)
+        }
+        let targetEngine = args[3].lowercased().contains("pocket") ? "pocket_tts" : "macos_default"
+        let targetVoice = args.count >= 5 ? args[4] : (targetEngine == "pocket_tts" ? "Sayed_Johon_Primary" : "default")
+        
+        let cfgURL = URL(fileURLWithPath: "\(home)/.agentspeak/config.json")
+        if let data = try? Data(contentsOf: cfgURL),
+           var json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           var audio = json["audio"] as? [String: Any] {
+            audio["engine"] = targetEngine
+            if targetEngine == "pocket_tts" {
+                var ptts = audio["pocket_tts"] as? [String: Any] ?? [:]
+                ptts["voice"] = targetVoice
+                audio["pocket_tts"] = ptts
+            } else {
+                audio["macos_voice"] = targetVoice
+            }
+            json["audio"] = audio
+            if let updatedData = try? JSONSerialization.data(withJSONObject: json, options: .prettyPrinted) {
+                try? updatedData.write(to: cfgURL)
+                print("[Agent Speak] Configuration updated: Engine = \(targetEngine), Voice = \(targetVoice)")
+            }
+        }
+    } else {
+        print("Unknown voice subcommand: \(sub)")
+        print("Available subcommands: status, list, set, install, clone")
     }
 
 case "stop":

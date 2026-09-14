@@ -30,14 +30,17 @@ mkdir -p "$APPS_DIR/Agent Speak.app/Contents/MacOS"
 mkdir -p "$APPS_DIR/Agent Speak.app/Contents/Resources"
 mkdir -p "$CONFIG_DIR"
 
-# 1. Stop any previous instances
+# 1. Stop any previous instances and unload launchd service
+PLIST_PATH="$HOME/Library/LaunchAgents/com.agentspeak.app.plist"
+launchctl unload "$PLIST_PATH" 2>/dev/null || true
 pkill -9 -f "AgentSpeak" 2>/dev/null || true
 pkill -9 -f "AntigravityJarvis" 2>/dev/null || true
 pkill -9 -f "speech-bar" 2>/dev/null || true
 
 # 2. Compile Unified Application (Sources/*.swift)
 echo -e "${CYAN}→ Compiling Agent Speak application (Swift)...${NC}"
-swiftc -O "$SCRIPT_DIR"/Sources/*.swift -o "$APPS_DIR/Agent Speak.app/Contents/MacOS/AgentSpeak"
+swiftc -O "$SCRIPT_DIR"/Sources/*.swift -o "/tmp/AgentSpeakBinary"
+mv "/tmp/AgentSpeakBinary" "$APPS_DIR/Agent Speak.app/Contents/MacOS/AgentSpeak"
 cp "$SCRIPT_DIR/dashboard/Info.plist" "$APPS_DIR/Agent Speak.app/Contents/Info.plist"
 chmod +x "$APPS_DIR/Agent Speak.app/Contents/MacOS/AgentSpeak"
 

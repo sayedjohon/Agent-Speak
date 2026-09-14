@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import AppKit
 import Combine
+import QuartzCore
 
 public class LastVoiceManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
     public static let shared = LastVoiceManager()
@@ -17,6 +18,7 @@ public class LastVoiceManager: NSObject, ObservableObject, AVAudioPlayerDelegate
     
     private var audioPlayer: AVAudioPlayer?
     private var playbackTimer: Timer?
+    private var displayLink: CADisplayLink?
     private let storageDir: URL
     private let lastVoiceFile: URL
     private let metaFile: URL
@@ -230,17 +232,31 @@ public class LastVoiceManager: NSObject, ObservableObject, AVAudioPlayerDelegate
     
     private func startTimer() {
         stopTimer()
-        let t = Timer(timeInterval: 0.03, repeats: true) { [weak self] _ in
-            guard let self = self, let p = self.audioPlayer else { return }
-            self.currentTime = p.currentTime
+        if #available(macOS 14.0, *), let screen = NSScreen.main {
+            let link = screen.displayLink(target: self, selector: #selector(onDisplayLinkTick))
+            link.preferredFrameRateRange = CAFrameRateRange(minimum: 80, maximum: 120, preferred: 120)
+            link.add(to: .main, forMode: .common)
+            self.displayLink = link
+        } else {
+            let t = Timer(timeInterval: 1.0 / 120.0, repeats: true) { [weak self] _ in
+                guard let self = self, let p = self.audioPlayer else { return }
+                self.currentTime = p.currentTime
+            }
+            RunLoop.main.add(t, forMode: .common)
+            self.playbackTimer = t
         }
-        RunLoop.main.add(t, forMode: .common)
-        self.playbackTimer = t
+    }
+    
+    @objc private func onDisplayLinkTick() {
+        guard let p = audioPlayer else { return }
+        currentTime = p.currentTime
     }
     
     private func stopTimer() {
         playbackTimer?.invalidate()
         playbackTimer = nil
+        displayLink?.invalidate()
+        displayLink = nil
     }
     
     public func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {

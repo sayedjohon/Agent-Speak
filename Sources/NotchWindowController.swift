@@ -3,85 +3,11 @@ import SwiftUI
 import AVFoundation
 import Carbon
 import NaturalLanguage
+import QuartzCore
 
-// MARK: - Multilingual Script Detector & Chunker
-enum ScriptType: Equatable {
-    case bengali, devanagari, arabic, cjk, latin, common
-}
-
-func scriptType(of char: Character) -> ScriptType {
-    for scalar in char.unicodeScalars {
-        let val = scalar.value
-        if (0x0980...0x09FF).contains(val) { return .bengali }
-        if (0x0900...0x097F).contains(val) { return .devanagari }
-        if (0x0600...0x06FF).contains(val) { return .arabic }
-        if (0x3040...0x30FF).contains(val) || (0x4E00...0x9FFF).contains(val) { return .cjk }
-        if (0x0041...0x005A).contains(val) || (0x0061...0x007A).contains(val) || (0x00C0...0x024F).contains(val) {
-            return .latin
-        }
-    }
-    return .common
-}
-
+// MARK: - Chunker Utility
 func splitTextIntoChunks(text: String) -> [String] {
-    let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    if clean.isEmpty { return [] }
-    
-    // 1. Sentence & phrase boundary split
-    var rawSentences: [String] = []
-    var cur = ""
-    for char in clean {
-        cur.append(char)
-        if char == "." || char == "!" || char == "?" || char == "\n" || char == ":" || char == ";" {
-            let s = cur.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !s.isEmpty && s.contains(where: { $0.isLetter || $0.isNumber }) {
-                rawSentences.append(s)
-            }
-            cur = ""
-        }
-    }
-    let rem = cur.trimmingCharacters(in: .whitespacesAndNewlines)
-    if !rem.isEmpty && rem.contains(where: { $0.isLetter || $0.isNumber }) {
-        rawSentences.append(rem)
-    }
-    if rawSentences.isEmpty {
-        rawSentences = clean.contains(where: { $0.isLetter || $0.isNumber }) ? [clean] : []
-    }
-    
-    // 2. Sub-segment mixed scripts (code-switching between Bengali, Hindi, English, etc.)
-    var chunks: [String] = []
-    for sentence in rawSentences {
-        var segments: [String] = []
-        var curScript: ScriptType = .common
-        var buf = ""
-        
-        for char in sentence {
-            let s = scriptType(of: char)
-            if s == .common {
-                buf.append(char)
-            } else if s == curScript {
-                buf.append(char)
-            } else {
-                if curScript != .common && !buf.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    segments.append(buf.trimmingCharacters(in: .whitespacesAndNewlines))
-                    buf = ""
-                }
-                curScript = s
-                buf.append(char)
-            }
-        }
-        if !buf.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            segments.append(buf.trimmingCharacters(in: .whitespacesAndNewlines))
-        }
-        
-        if segments.isEmpty {
-            chunks.append(sentence)
-        } else {
-            chunks.append(contentsOf: segments)
-        }
-    }
-    
-    return chunks
+    return SpeechLanguageDetector.splitTextIntoChunks(text: text)
 }
 
 // MARK: - Audio Chunk Model
@@ -107,11 +33,13 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
     
     var chunks: [AudioChunk] = []
     var timer: Timer?
+    var displayLink: CADisplayLink?
     var onClose: (() -> Void)?
     
     private var isCancelled = false
     private var activeRenderProcess: Process?
     private let renderQueue = DispatchQueue(label: "com.agentspeak.speech.render", qos: .userInitiated)
+    private var documentLanguage: String = "en"
     
     static func loadSkipSeconds() -> Int {
         let configPath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".agentspeak/config.json")
@@ -127,6 +55,11 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
     init(text: String, onClose: (() -> Void)?) {
         self.onClose = onClose
         self.skipSeconds = StreamingAudioManager.loadSkipSeconds()
+        
+        let docRec = NLLanguageRecognizer()
+        docRec.processString(text)
+        self.documentLanguage = docRec.dominantLanguage?.rawValue ?? "en"
+        
         super.init()
         
         let sessionId = UInt32.random(in: 1000...9999)
@@ -215,23 +148,12 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         
         var renderedSuccessfully = false
         
-        // 1. If Pocket-TTS extension is selected, attempt synthesis
-        if engine == "pocket_tts" {
-            let possibleScripts = [
-                FileManager.default.homeDirectoryForCurrentUser.path + "/Documents/DEV_AREA/ssh linux/pocket-tts/speak.py",
-                FileManager.default.homeDirectoryForCurrentUser.path + "/.agentspeak/extensions/pocket-tts/speak.py"
-            ]
-            let possiblePythons = [
-                FileManager.default.homeDirectoryForCurrentUser.path + "/Documents/DEV_AREA/ssh linux/pocket-tts/venv/bin/python",
-                FileManager.default.homeDirectoryForCurrentUser.path + "/.agentspeak/extensions/pocket-tts/venv/bin/python"
-            ]
-            
-            var scriptPath: String?
-            var pythonPath: String?
-            for s in possibleScripts { if FileManager.default.fileExists(atPath: s) { scriptPath = s; break } }
-            for p in possiblePythons { if FileManager.default.fileExists(atPath: p) { pythonPath = p; break } }
-            
-            if let script = scriptPath, let py = pythonPath {
+        // 1. If Pocket-TTS extension is selected, verify language compatibility
+        let pocketSupported = SpeechLanguageDetector.isPocketTTSSupported(text: c.text, documentLanguage: self.documentLanguage)
+        
+        if engine == "pocket_tts" && pocketSupported {
+            if let script = PocketTTSManager.shared.activeScriptPath,
+               let py = PocketTTSManager.shared.activePythonPath {
                 let proc = Process()
                 proc.executableURL = URL(fileURLWithPath: py)
                 proc.arguments = [script, c.text, "--voice", voice, "--output", c.filePath, "--no-play"]
@@ -248,27 +170,18 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
             }
         }
         
-        // 2. Native Apple Silicon voice (macos_default or fallback)
+        // 2. Native Apple Silicon voice (macos_default or automatic multilingual fallback)
         if !renderedSuccessfully {
             let proc = Process()
             proc.executableURL = URL(fileURLWithPath: "/usr/bin/say")
             
-            var sayVoice: String? = nil
-            if (voice == "Jarvis" || voice == "Daniel") && engine == "pocket_tts" {
-                sayVoice = "Daniel"
-            } else {
-                // Multilingual Auto-Detection: Detect language of incoming sentence
-                let recognizer = NLLanguageRecognizer()
-                recognizer.processString(c.text)
-                let lang = recognizer.dominantLanguage?.rawValue
-                
-                if let lang = lang, !lang.starts(with: "en"), lang != "und",
-                   let matchVoice = AVSpeechSynthesisVoice(language: lang) {
-                    sayVoice = matchVoice.name
-                } else if macosVoice != "default" && !macosVoice.isEmpty {
-                    sayVoice = macosVoice
-                }
-            }
+            let sayVoice = SpeechLanguageDetector.resolveNativeVoice(
+                for: c.text,
+                documentLanguage: self.documentLanguage,
+                macosVoice: macosVoice,
+                pocketVoice: voice,
+                engine: engine
+            )
             
             if let v = sayVoice {
                 proc.arguments = ["-v", v, "-o", c.filePath, c.text]
@@ -332,21 +245,39 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
     
     func startTimer() {
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { [weak self] _ in
-            self?.tick()
+        stopTimer()
+        if #available(macOS 14.0, *), let screen = NSScreen.main {
+            let l = screen.displayLink(target: self, selector: #selector(displayTick))
+            l.preferredFrameRateRange = CAFrameRateRange(minimum: 80, maximum: 120, preferred: 120)
+            l.add(to: .main, forMode: .common)
+            self.displayLink = l
+        } else {
+            let t = Timer.scheduledTimer(withTimeInterval: 1.0 / 120.0, repeats: true) { [weak self] _ in
+                self?.tick()
+            }
+            RunLoop.main.add(t, forMode: .common)
+            self.timer = t
         }
+    }
+    
+    func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+        displayLink?.invalidate()
+        displayLink = nil
+    }
+    
+    @objc private func displayTick() {
+        tick()
     }
     
     private func tick() {
         guard !isDragging else { return }
         guard currentChunkIndex < chunks.count, let p = chunks[currentChunkIndex].player, p.isPlaying else {
-            DispatchQueue.main.async {
-                if SpeechQueueManager.shared.audioLevel > 0.02 {
-                    SpeechQueueManager.shared.audioLevel *= 0.8
-                } else {
-                    SpeechQueueManager.shared.audioLevel = 0.0
-                }
+            if SpeechQueueManager.shared.audioLevel > 0.01 {
+                SpeechQueueManager.shared.audioLevel *= 0.88
+            } else {
+                SpeechQueueManager.shared.audioLevel = 0.0
             }
             return
         }
@@ -358,11 +289,9 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
             let power = p.averagePower(forChannel: 0)
             let norm = max(0.0, min(1.0, Double(power + 44.0) / 44.0))
             let targetLevel = Float(norm)
-            DispatchQueue.main.async {
-                let prev = SpeechQueueManager.shared.audioLevel
-                let factor: Float = targetLevel > prev ? 0.22 : 0.08
-                SpeechQueueManager.shared.audioLevel = prev * (1.0 - factor) + targetLevel * factor
-            }
+            let prev = SpeechQueueManager.shared.audioLevel
+            let factor: Float = targetLevel > prev ? 0.25 : 0.10
+            SpeechQueueManager.shared.audioLevel = prev * (1.0 - factor) + targetLevel * factor
         }
     }
     
@@ -374,8 +303,7 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
             playChunkWhenReady(index: nextIndex)
         } else {
             isPlaying = false
-            timer?.invalidate()
-            timer = nil
+            stopTimer()
             let cb = onClose
             onClose = nil
             cb?()
@@ -438,8 +366,7 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         for c in chunks {
             c.player?.stop()
         }
-        timer?.invalidate()
-        timer = nil
+        stopTimer()
         DispatchQueue.main.async {
             SpeechQueueManager.shared.audioLevel = 0.0
         }
@@ -549,6 +476,7 @@ public class NotchWindowController {
                 rootView: PointyTopNotchBarView(state: self.audioManager!, hasNotch: hasNotch)
             )
             hosting.frame = NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight)
+            hosting.wantsLayer = true
             panel.contentView = hosting
             panel.orderFront(nil)
             self.window = panel
@@ -631,6 +559,7 @@ public class NotchWindowController {
                 rootView: PointyTopNotchBarView(state: self.audioManager!, hasNotch: hasNotch)
             )
             hosting.frame = NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight)
+            hosting.wantsLayer = true
             panel.contentView = hosting
             panel.orderFront(nil)
             self.window = panel

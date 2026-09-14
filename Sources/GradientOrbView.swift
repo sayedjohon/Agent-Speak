@@ -272,15 +272,15 @@ public struct CompactVisualizerOrbView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(isSpeaking ? Color.green : Color.blue)
+                        .fill(isSpeaking ? Color.green : Color(red: 0.2, green: 0.85, blue: 0.5))
                         .frame(width: 8, height: 8)
                     
-                    Text(isSpeaking ? "ACTIVE PLAYBACK" : "INTELLIGENT AGENT READY")
+                    Text(isSpeaking ? "ACTIVE PLAYBACK" : "SPEECH ENGINE READY")
                         .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundColor(isSpeaking ? .green : .blue)
+                        .foregroundColor(isSpeaking ? .green : Color(red: 0.2, green: 0.85, blue: 0.5))
                 }
                 
-                Text(isSpeaking ? "Synthesizing voice response at the camera notch..." : "Monitoring active terminal and AI coding assistant transcripts...")
+                Text(isSpeaking ? "Vocalizing speech through the camera notch player..." : "Ready to speak assistant responses, clipboard text, and selection.")
                     .font(.system(size: 11, weight: .regular))
                     .foregroundColor(.secondary)
                     .lineLimit(2)

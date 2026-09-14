@@ -1,6 +1,7 @@
 import Cocoa
 import SwiftUI
 import Carbon
+import QuartzCore
 
 public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     public static var shared: AppDelegate!
@@ -175,7 +176,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Use live 3D gradient orb view in the menu bar
         button.image = nil
         let isSpeaking = SpeechQueueManager.shared.isSpeaking
-        button.toolTip = isSpeaking ? "Agent Speak: Speaking... (Click for options)" : "Agent Speak: Ready & Monitoring (Click for options)"
+        button.toolTip = isSpeaking ? "Agent Speak: Speaking... (Click for options)" : "Agent Speak: Ready (Click for options)"
         
         if trayHostingView == nil {
             let hosting = PassthroughHostingView(rootView: TrayGradientOrbView())
@@ -194,7 +195,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     public func updateTrayIcon(isSpeaking: Bool) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self, let button = self.statusItem?.button else { return }
-            button.toolTip = isSpeaking ? "Agent Speak: Speaking... (Click for options)" : "Agent Speak: Ready & Monitoring (Click for options)"
+            button.toolTip = isSpeaking ? "Agent Speak: Speaking... (Click for options)" : "Agent Speak: Ready (Click for options)"
         }
     }
     
@@ -245,7 +246,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         
         let isSpeaking = SpeechQueueManager.shared.isSpeaking
         
-        // 1. Settings (1 word, gear icon, ⌃,)
+        // 1. Settings (gear icon, ⌃,)
         let settingsItem = NSMenuItem(title: "Settings...", action: #selector(showDashboard), keyEquivalent: ",")
         settingsItem.keyEquivalentModifierMask = [.control]
         if let icon = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Settings") {
@@ -257,30 +258,30 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
-        // 2. Selected Play (2 words, text cursor icon, ⌃S)
-        let selectedItem = NSMenuItem(title: "Selected Play", action: #selector(speakSelected), keyEquivalent: "s")
+        // 2. Speak Selection (text viewfinder icon, ⌃S)
+        let selectedItem = NSMenuItem(title: "Speak Selection", action: #selector(speakSelected), keyEquivalent: "s")
         selectedItem.keyEquivalentModifierMask = [.control]
-        if let icon = NSImage(systemSymbolName: "text.cursor", accessibilityDescription: "Selected Play") {
+        if let icon = NSImage(systemSymbolName: "text.viewfinder", accessibilityDescription: "Speak Selection") {
             icon.isTemplate = true
             selectedItem.image = icon
         }
         selectedItem.target = self
         menu.addItem(selectedItem)
         
-        // 3. Clipboard Play (2 words, clipboard icon, ⌃P)
-        let clipboardItem = NSMenuItem(title: "Clipboard Play", action: #selector(speakClipboard), keyEquivalent: "p")
+        // 3. Speak Clipboard (clipboard icon, ⌃P)
+        let clipboardItem = NSMenuItem(title: "Speak Clipboard", action: #selector(speakClipboard), keyEquivalent: "p")
         clipboardItem.keyEquivalentModifierMask = [.control]
-        if let icon = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "Clipboard Play") {
+        if let icon = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "Speak Clipboard") {
             icon.isTemplate = true
             clipboardItem.image = icon
         }
         clipboardItem.target = self
         menu.addItem(clipboardItem)
         
-        // 4. Stop (1 word, stop icon, ⌃X)
-        let stopItem = NSMenuItem(title: "Stop", action: #selector(stopSpeech), keyEquivalent: "x")
+        // 4. Stop Speech (stop icon, ⌃X)
+        let stopItem = NSMenuItem(title: "Stop Speech", action: #selector(stopSpeech), keyEquivalent: "x")
         stopItem.keyEquivalentModifierMask = [.control]
-        if let icon = NSImage(systemSymbolName: "stop.circle", accessibilityDescription: "Stop") {
+        if let icon = NSImage(systemSymbolName: "stop.circle", accessibilityDescription: "Stop Speech") {
             icon.isTemplate = true
             stopItem.image = icon
         }
@@ -290,10 +291,10 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
-        // 5. Quit (1 word, power icon, ⌘Q)
-        let quitItem = NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q")
+        // 5. Quit Agent Speak (power icon, ⌘Q)
+        let quitItem = NSMenuItem(title: "Quit Agent Speak", action: #selector(quitApp), keyEquivalent: "q")
         quitItem.keyEquivalentModifierMask = [.command]
-        if let icon = NSImage(systemSymbolName: "power", accessibilityDescription: "Quit") {
+        if let icon = NSImage(systemSymbolName: "power", accessibilityDescription: "Quit Agent Speak") {
             icon.isTemplate = true
             quitItem.image = icon
         }
@@ -305,13 +306,13 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     
     func setupDashboardWindow() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 750, height: 570),
+            contentRect: NSRect(x: 0, y: 0, width: 750, height: 750),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        window.minSize = NSSize(width: 740, height: 490)
-        window.maxSize = NSSize(width: 900, height: 900)
+        window.minSize = NSSize(width: 740, height: 580)
+        window.maxSize = NSSize(width: 950, height: 950)
         window.center()
         window.isReleasedWhenClosed = false
         window.title = "Agent Speak"
@@ -323,6 +324,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         window.backgroundColor = NSColor(red: 0.07, green: 0.08, blue: 0.10, alpha: 1.0)
         
         let hostingView = NSHostingView(rootView: DashboardView())
+        hostingView.wantsLayer = true
         window.contentView = hostingView
         
         self.dashboardWindow = window
@@ -493,13 +495,13 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             DispatchQueue.main.async {
                 guard let appDelegate = NSApp.delegate as? AppDelegate else { return }
                 switch hotKeyID.id {
-                case 1: // Ctrl + S: Selected Play
+                case 1: // Ctrl + S: Speak Selection
                     appDelegate.captureAndSpeakSelectedText()
-                case 2: // Ctrl + P: Clipboard Play
+                case 2: // Ctrl + P: Speak Clipboard
                     appDelegate.speakClipboard()
                 case 3: // Ctrl + ,: Settings
                     appDelegate.showDashboard()
-                case 4: // Ctrl + X: Stop
+                case 4: // Ctrl + X: Stop Speech
                     appDelegate.stopSpeech()
                 default:
                     break
@@ -510,13 +512,13 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         
         let sig: OSType = 0x4153504B // "ASPK"
         
-        // 1. Ctrl + S (Selected Play)
+        // 1. Ctrl + S (Speak Selection)
         var ref1: EventHotKeyRef?
         if RegisterEventHotKey(UInt32(kVK_ANSI_S), UInt32(controlKey), EventHotKeyID(signature: sig, id: 1), target, 0, &ref1) == noErr, let r = ref1 {
             hotKeyRefs.append(r)
         }
         
-        // 2. Ctrl + P (Clipboard Play)
+        // 2. Ctrl + P (Speak Clipboard)
         var ref2: EventHotKeyRef?
         if RegisterEventHotKey(UInt32(kVK_ANSI_P), UInt32(controlKey), EventHotKeyID(signature: sig, id: 2), target, 0, &ref2) == noErr, let r = ref2 {
             hotKeyRefs.append(r)
@@ -528,7 +530,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             hotKeyRefs.append(r)
         }
         
-        // 4. Ctrl + X (Stop)
+        // 4. Ctrl + X (Stop Speech)
         var ref4: EventHotKeyRef?
         if RegisterEventHotKey(UInt32(kVK_ANSI_X), UInt32(controlKey), EventHotKeyID(signature: sig, id: 4), target, 0, &ref4) == noErr, let r = ref4 {
             hotKeyRefs.append(r)
