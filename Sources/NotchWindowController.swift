@@ -4,16 +4,35 @@ import AVFoundation
 import Carbon
 import NaturalLanguage
 
-// MARK: - Sentence Chunker
+// MARK: - Multilingual Script Detector & Chunker
+enum ScriptType: Equatable {
+    case bengali, devanagari, arabic, cjk, latin, common
+}
+
+func scriptType(of char: Character) -> ScriptType {
+    for scalar in char.unicodeScalars {
+        let val = scalar.value
+        if (0x0980...0x09FF).contains(val) { return .bengali }
+        if (0x0900...0x097F).contains(val) { return .devanagari }
+        if (0x0600...0x06FF).contains(val) { return .arabic }
+        if (0x3040...0x30FF).contains(val) || (0x4E00...0x9FFF).contains(val) { return .cjk }
+        if (0x0041...0x005A).contains(val) || (0x0061...0x007A).contains(val) || (0x00C0...0x024F).contains(val) {
+            return .latin
+        }
+    }
+    return .common
+}
+
 func splitTextIntoChunks(text: String) -> [String] {
     let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
     if clean.isEmpty { return [] }
     
+    // 1. Sentence & phrase boundary split
     var rawSentences: [String] = []
     var cur = ""
     for char in clean {
         cur.append(char)
-        if char == "." || char == "!" || char == "?" || char == "\n" {
+        if char == "." || char == "!" || char == "?" || char == "\n" || char == ":" || char == ";" {
             let s = cur.trimmingCharacters(in: .whitespacesAndNewlines)
             if !s.isEmpty && s.contains(where: { $0.isLetter || $0.isNumber }) {
                 rawSentences.append(s)
@@ -25,51 +44,43 @@ func splitTextIntoChunks(text: String) -> [String] {
     if !rem.isEmpty && rem.contains(where: { $0.isLetter || $0.isNumber }) {
         rawSentences.append(rem)
     }
-    
     if rawSentences.isEmpty {
-        return clean.contains(where: { $0.isLetter || $0.isNumber }) ? [clean] : []
+        rawSentences = clean.contains(where: { $0.isLetter || $0.isNumber }) ? [clean] : []
     }
-    if rawSentences.count == 1 { return rawSentences }
     
-    let minChunk0Words = 6
-    var chunk0Sentences: [String] = []
-    var chunk0WordCount = 0
-    var remainingSentences: [String] = []
-    var splitIndex = rawSentences.count
-    
-    for (idx, s) in rawSentences.enumerated() {
-        let wCount = s.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.count
-        chunk0Sentences.append(s)
-        chunk0WordCount += wCount
-        if chunk0WordCount >= minChunk0Words {
-            splitIndex = idx + 1
-            break
+    // 2. Sub-segment mixed scripts (code-switching between Bengali, Hindi, English, etc.)
+    var chunks: [String] = []
+    for sentence in rawSentences {
+        var segments: [String] = []
+        var curScript: ScriptType = .common
+        var buf = ""
+        
+        for char in sentence {
+            let s = scriptType(of: char)
+            if s == .common {
+                buf.append(char)
+            } else if s == curScript {
+                buf.append(char)
+            } else {
+                if curScript != .common && !buf.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    segments.append(buf.trimmingCharacters(in: .whitespacesAndNewlines))
+                    buf = ""
+                }
+                curScript = s
+                buf.append(char)
+            }
         }
-    }
-    
-    if splitIndex < rawSentences.count {
-        remainingSentences = Array(rawSentences[splitIndex...])
-    }
-    
-    var chunks: [String] = [chunk0Sentences.joined(separator: " ")]
-    var curChunk = ""
-    var curWords = 0
-    let targetWordsForSubsequent = 24
-    
-    for s in remainingSentences {
-        let wCount = s.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.count
-        if curWords > 0 && (curWords + wCount) > targetWordsForSubsequent {
-            chunks.append(curChunk.trimmingCharacters(in: .whitespacesAndNewlines))
-            curChunk = s
-            curWords = wCount
+        if !buf.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            segments.append(buf.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        
+        if segments.isEmpty {
+            chunks.append(sentence)
         } else {
-            if curChunk.isEmpty { curChunk = s } else { curChunk += " " + s }
-            curWords += wCount
+            chunks.append(contentsOf: segments)
         }
     }
-    if !curChunk.isEmpty {
-        chunks.append(curChunk.trimmingCharacters(in: .whitespacesAndNewlines))
-    }
+    
     return chunks
 }
 

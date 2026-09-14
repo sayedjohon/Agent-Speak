@@ -105,7 +105,7 @@ switch cmd {
 case "status":
     let apps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.agentspeak.app")
     let isRunning = !apps.isEmpty
-    let socketResponds = sendSocketMessage("")
+    let socketResponds = sendSocketMessage("__PING__")
     let info = getActiveConfigInfo()
     if isRunning {
         print("Agent Speak Status: 🟢 RUNNING (100% Native Swift)")
