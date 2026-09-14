@@ -71,26 +71,53 @@ public class PocketTTSManager: ObservableObject {
         var seenTags = Set<String>()
         
         // Standard curated personas
-        let builtins: [(tag: String, name: String, desc: String)] = [
+        let curated: [(tag: String, name: String, desc: String)] = [
+            ("Jarvis_Best", "Jarvis (Best)", "AI Butler (Authoritative British - Primary)"),
             ("Sayed_Johon_Primary", "Sayed Johon", "Creator Clone (Studio Clarity)"),
-            ("Jarvis", "Jarvis", "AI Butler (Authoritative British)"),
+            ("Jarvis", "Jarvis (Classic)", "AI Butler (Authoritative British)"),
+            ("Male_Peace", "Male Peace", "Calm & Meditative Voice"),
+            ("Male_News_Caster", "Male News Caster", "Deep Social Media News Anchor"),
+            ("Female_Soft_Intimate", "Female Soft & Intimate", "Gentle & Warm Conversationalist"),
+            ("Female_Podcast_Host", "Female Podcast Host", "Engaging Conversational Host"),
+            ("Male_American_Narrator", "Male American Narrator", "Casual Conversational Narrator"),
+            ("Male_Shorts_Creator", "Male Shorts Creator", "High-Energy YouTube Shorts Creator"),
+            ("Male_Viral_Actor", "Male Viral Actor", "Viral Dynamic Content Creator"),
+            ("Female_Confident_Sultry", "Female Confident & Sly", "Confident, Sly & Expressive"),
+            ("Male_Energetic_Creator", "Male Energetic Creator", "Upbeat Social Media Storyteller"),
+            ("Male_Social_Media", "Male Social Media", "Modern Social Media Presenter"),
+            ("Male_New", "Male New", "Crisp Modern Tone"),
+            ("Female_New", "Female New", "Fresh Modern Tone"),
+            ("Male_Old_Storyteller", "Male Old Storyteller", "Seasoned Warm Storyteller"),
+            ("Female_Aah", "Female Expressive", "Expressive & Soulful"),
+            ("Female_Pro_2", "Female Pro", "Polished Professional Narrator"),
+            ("Male_Adam_v2", "Male Adam v2", "Natural Studio Clarity"),
             ("alba", "Alba", "Storyteller (Natural Scottish/British)"),
             ("george", "George", "Narrator (Deep British Male)"),
             ("cosette", "Cosette", "Expressive (Warm & Engaging)"),
             ("marius", "Marius", "Conversational (Casual Male)")
         ]
         
-        for b in builtins {
-            items.append(PocketVoiceItem(tag: b.tag, displayName: b.name, subtitle: b.desc))
-            seenTags.insert(b.tag)
+        var curatedMap: [String: (name: String, desc: String)] = [:]
+        for c in curated {
+            items.append(PocketVoiceItem(tag: c.tag, displayName: c.name, subtitle: c.desc))
+            seenTags.insert(c.tag)
+            curatedMap[c.tag] = (c.name, c.desc)
+            curatedMap[c.tag.replacingOccurrences(of: "_", with: "-")] = (c.name, c.desc)
         }
         
-        // Search custom voice files in voices directory
-        let searchDirs = [
+        // Search custom voice files in voices directories
+        var searchDirs = [
             extensionDir + "/voices",
             devDir + "/pocket_tts_lab/voices",
             devDir + "/saved_voices"
         ]
+        if let bundleVoices = Bundle.main.resourcePath.map({ $0 + "/voices" }) {
+            searchDirs.append(bundleVoices)
+        }
+        let localRepoVoices = FileManager.default.homeDirectoryForCurrentUser.path + "/Documents/DEV_AREA/ssh linux/agent-speak/Resources/voices"
+        if FileManager.default.fileExists(atPath: localRepoVoices) {
+            searchDirs.append(localRepoVoices)
+        }
         
         for dir in searchDirs {
             if let files = try? FileManager.default.contentsOfDirectory(atPath: dir) {
@@ -99,8 +126,12 @@ public class PocketTTSManager: ObservableObject {
                         let stem = (file as NSString).deletingPathExtension
                         if !seenTags.contains(stem) && !stem.hasPrefix("test_") {
                             seenTags.insert(stem)
-                            let cleanLabel = stem.replacingOccurrences(of: "_", with: " ")
-                            items.append(PocketVoiceItem(tag: stem, displayName: cleanLabel, subtitle: "Custom Cloned Voice"))
+                            if let match = curatedMap[stem] {
+                                items.append(PocketVoiceItem(tag: stem, displayName: match.name, subtitle: match.desc))
+                            } else {
+                                let cleanLabel = stem.replacingOccurrences(of: "_", with: " ")
+                                items.append(PocketVoiceItem(tag: stem, displayName: cleanLabel, subtitle: "Custom Cloned Voice"))
+                            }
                         }
                     }
                 }

@@ -54,14 +54,23 @@ public class SpeechQueueManager: ObservableObject {
     
     private init() {}
     
-    public func enqueue(source: String, text: String) {
+    public func enqueue(source: String, text: String, immediate: Bool = false) {
         queueLock.lock()
+        if immediate {
+            queue.removeAll()
+        }
         queue.append((source, text))
         let count = queue.count
         queueLock.unlock()
         
+        NSLog("[SpeechQueue] Enqueued item from '%@' (immediate: %d, queueCount: %d, length: %d)", source, immediate ? 1 : 0, count, text.count)
+        
         DispatchQueue.main.async {
             self.queueCount = count
+            if immediate && self.isSpeaking {
+                NotchWindowController.shared.dismiss()
+                self.isSpeaking = false
+            }
             self.processNext()
         }
     }

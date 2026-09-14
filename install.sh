@@ -36,6 +36,7 @@ launchctl unload "$PLIST_PATH" 2>/dev/null || true
 pkill -9 -f "AgentSpeak" 2>/dev/null || true
 pkill -9 -f "AntigravityJarvis" 2>/dev/null || true
 pkill -9 -f "speech-bar" 2>/dev/null || true
+rm -f /tmp/agentspeak.sock 2>/dev/null || true
 
 # 2. Compile Unified Application (Sources/*.swift)
 echo -e "${CYAN}→ Compiling Agent Speak application (Swift)...${NC}"
@@ -95,6 +96,12 @@ if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
     cp "$SCRIPT_DIR/config/default_config.json" "$CONFIG_DIR/config.json"
 fi
 
+# Sync bundled neural personas to Pocket-TTS extension directory if present
+if [[ -d "$CONFIG_DIR/extensions/pocket-tts/voices" && -d "$SCRIPT_DIR/Resources/voices" ]]; then
+    cp "$SCRIPT_DIR/Resources/voices/"*.safetensors "$CONFIG_DIR/extensions/pocket-tts/voices/" 2>/dev/null || true
+    cp "$SCRIPT_DIR/Resources/voices/"*.wav "$CONFIG_DIR/extensions/pocket-tts/voices/" 2>/dev/null || true
+fi
+
 # 5. Clean Obsolete Legacy LaunchAgents & Register 24/7 Daemon
 echo -e "${CYAN}→ Registering Agent Speak as a permanent background service...${NC}"
 launchctl unload "$HOME/Library/LaunchAgents/com.sayedjohon.antigravity-voice-watcher.plist" 2>/dev/null || true
@@ -105,6 +112,8 @@ pkill -9 -f "antigravity_voice_watcher" 2>/dev/null || true
 
 PLIST_PATH="$HOME/Library/LaunchAgents/com.agentspeak.app.plist"
 launchctl unload "$PLIST_PATH" 2>/dev/null || true
+pkill -9 -f "AgentSpeak" 2>/dev/null || true
+rm -f /tmp/agentspeak.sock 2>/dev/null || true
 
 cat <<EOF > "$PLIST_PATH"
 <?xml version="1.0" encoding="UTF-8"?>

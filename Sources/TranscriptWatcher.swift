@@ -59,7 +59,7 @@ public class TranscriptWatcher {
         }
     }
     
-    private func readTailOfFile(at url: URL, maxBytes: Int = 131072) -> String? {
+    private func readTailOfFile(at url: URL, maxBytes: Int = 524288) -> String? {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
         
@@ -69,8 +69,9 @@ public class TranscriptWatcher {
         let offset = fileSize - readSize
         handle.seek(toFileOffset: offset)
         let data = handle.readData(ofLength: Int(readSize))
-        return String(data: data, encoding: .utf8)
+        return String(decoding: data, as: UTF8.self)
     }
+
     
     public func scan() {
         scanAntigravity()
@@ -429,6 +430,7 @@ public class TranscriptWatcher {
         guard fd >= 0 else { return }
         
         var addr = sockaddr_un()
+        addr.sun_len = UInt8(MemoryLayout<sockaddr_un>.size)
         addr.sun_family = sa_family_t(AF_UNIX)
         let pathBytes = socketPath.utf8CString
         withUnsafeMutablePointer(to: &addr.sun_path.0) { ptr in
@@ -437,14 +439,19 @@ public class TranscriptWatcher {
             }
         }
         
-        let addrLen = socklen_t(MemoryLayout<sa_family_t>.size + socketPath.utf8.count + 1)
+        let addrLen = socklen_t(MemoryLayout<sockaddr_un>.size)
         let bindRes = withUnsafePointer(to: &addr) { ptr in
             ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { saPtr in
                 bind(fd, saPtr, addrLen)
             }
         }
-        guard bindRes == 0 else { return }
-        listen(fd, 5)
+        NSLog("[AgentSpeak] Socket fd: %d, bindRes: %d, errno: %d", fd, bindRes, errno)
+        guard bindRes == 0 else {
+            close(fd)
+            return
+        }
+        let listenRes = listen(fd, 5)
+        NSLog("[AgentSpeak] Socket listenRes: %d", listenRes)
         
         let queue = DispatchQueue(label: "com.agentspeak.socket")
         let src = DispatchSource.makeReadSource(fileDescriptor: fd, queue: queue)

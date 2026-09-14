@@ -11,12 +11,31 @@
     "skip_seconds": 5,
     "pocket_tts": {
       "enabled": false,
-      "voice": "Jarvis",
+      "voice": "Jarvis_Best",
       "available_voices": [
-        "Jarvis",
+        "Jarvis_Best",
         "Sayed_Johon_Primary",
+        "Jarvis",
+        "Male_Peace",
+        "Male_News_Caster",
+        "Female_Soft_Intimate",
+        "Female_Podcast_Host",
+        "Male_American_Narrator",
+        "Male_Shorts_Creator",
+        "Male_Viral_Actor",
+        "Female_Confident_Sultry",
+        "Male_Energetic_Creator",
+        "Male_Social_Media",
+        "Male_New",
+        "Female_New",
+        "Male_Old_Storyteller",
+        "Female_Aah",
+        "Female_Pro_2",
+        "Male_Adam_v2",
         "alba",
-        "george"
+        "george",
+        "cosette",
+        "marius"
       ]
     },
     "volume": 1.0

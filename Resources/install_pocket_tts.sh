@@ -82,17 +82,55 @@ echo -e "${GREEN}✓ Neural engine dependencies installed successfully.${NC}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEV_POCKET_DIR="$(cd "$SCRIPT_DIR/../../pocket-tts" 2>/dev/null && pwd || echo "")"
 
-if [[ -f "$SCRIPT_DIR/../pocket-tts/speak.py" ]]; then
-    cp "$SCRIPT_DIR/../pocket-tts/speak.py" "$EXT_DIR/speak.py"
-    cp "$SCRIPT_DIR/../pocket-tts/clone_voice.py" "$EXT_DIR/clone_voice.py"
-elif [[ -n "$DEV_POCKET_DIR" && -f "$DEV_POCKET_DIR/speak.py" ]]; then
-    cp "$DEV_POCKET_DIR/speak.py" "$EXT_DIR/speak.py"
-    cp "$DEV_POCKET_DIR/clone_voice.py" "$EXT_DIR/clone_voice.py"
-fi
+CANDIDATE_SCRIPTS=(
+    "$SCRIPT_DIR/speak.py"
+    "$SCRIPT_DIR/../Resources/speak.py"
+    "/Applications/Agent Speak.app/Contents/Resources/speak.py"
+    "$HOME/Applications/Agent Speak.app/Contents/Resources/speak.py"
+    "$SCRIPT_DIR/../pocket-tts/speak.py"
+    "$DEV_POCKET_DIR/speak.py"
+)
+for sp in "${CANDIDATE_SCRIPTS[@]}"; do
+    if [[ -f "$sp" ]]; then
+        cp "$sp" "$EXT_DIR/speak.py"
+        break
+    fi
+done
+
+CANDIDATE_CLONES=(
+    "$SCRIPT_DIR/clone_voice.py"
+    "$SCRIPT_DIR/../Resources/clone_voice.py"
+    "/Applications/Agent Speak.app/Contents/Resources/clone_voice.py"
+    "$SCRIPT_DIR/../pocket-tts/clone_voice.py"
+    "$DEV_POCKET_DIR/clone_voice.py"
+)
+for cp_s in "${CANDIDATE_CLONES[@]}"; do
+    if [[ -f "$cp_s" ]]; then
+        cp "$cp_s" "$EXT_DIR/clone_voice.py"
+        break
+    fi
+done
 chmod +x "$EXT_DIR/speak.py" "$EXT_DIR/clone_voice.py" 2>/dev/null || true
 
-# 5. Pre-cache standard voices
-echo -e "${CYAN}→ [4/5] Pre-caching neural personas (Alba, George, Cosette, Marius, Sayed Johon)...${NC}"
+# 5. Pre-bundle curated personas and pre-cache standard voices
+echo -e "${CYAN}→ [4/5] Pre-bundling neural personas (Jarvis (Best), Sayed Johon, Studio Personas, Alba, George)...${NC}"
+
+# Copy pre-packaged voices from app bundle, Resources, or dev repo
+VOICE_SOURCES=(
+    "$SCRIPT_DIR/voices"
+    "$SCRIPT_DIR/../Resources/voices"
+    "$SCRIPT_DIR/../../Resources/voices"
+    "/Applications/Agent Speak.app/Contents/Resources/voices"
+    "$HOME/Applications/Agent Speak.app/Contents/Resources/voices"
+    "$DEV_POCKET_DIR/pocket_tts_lab/voices"
+)
+for vsrc in "${VOICE_SOURCES[@]}"; do
+    if [[ -d "$vsrc" ]]; then
+        cp "$vsrc"/*.safetensors "$VOICES_DIR/" 2>/dev/null || true
+        cp "$vsrc"/*.wav "$VOICES_DIR/" 2>/dev/null || true
+    fi
+done
+
 "$VENV_DIR/bin/python" -c "
 import os
 os.environ.pop('NO_PROXY', None)
@@ -122,14 +160,9 @@ if not jarvis_target.exists() and george_target.exists():
     shutil.copy(str(george_target), str(jarvis_target))
 "
 
-# Copy Sayed Johon Primary if exists in dev
-if [[ -n "$DEV_POCKET_DIR" && -f "$DEV_POCKET_DIR/pocket_tts_lab/voices/Sayed_Johon_Primary.safetensors" ]]; then
-    cp "$DEV_POCKET_DIR/pocket_tts_lab/voices/Sayed_Johon_Primary.safetensors" "$VOICES_DIR/"
-fi
-
 # 6. Verification and Config Update
-echo -e "${CYAN}→ [5/5] Testing neural synthesis and updating config...${NC}"
-"$VENV_DIR/bin/python" "$EXT_DIR/speak.py" "Pocket-TTS neural extension is ready." --voice alba --no-play
+echo -e "${CYAN}→ [5/5] Testing neural synthesis and setting Jarvis (Best) as default...${NC}"
+"$VENV_DIR/bin/python" "$EXT_DIR/speak.py" "Pocket-TTS neural extension is ready." --voice Jarvis_Best --no-play
 
 # Update config.json
 if [[ -f "$CONFIG_FILE" ]]; then
@@ -141,12 +174,22 @@ if p.exists():
     cfg = json.load(open(p))
     ptts = cfg.setdefault('audio', {}).setdefault('pocket_tts', {})
     ptts['enabled'] = True
+    ptts['voice'] = 'Jarvis_Best'
     vdir = Path('$VOICES_DIR')
-    voices = ['Sayed_Johon_Primary', 'Jarvis', 'alba', 'george', 'cosette', 'marius']
+    curated_priority = [
+        'Jarvis_Best', 'Sayed_Johon_Primary', 'Jarvis',
+        'Male_Peace', 'Male_News_Caster', 'Female_Soft_Intimate',
+        'Female_Podcast_Host', 'Male_American_Narrator', 'Male_Shorts_Creator',
+        'Male_Viral_Actor', 'Female_Confident_Sultry', 'Male_Energetic_Creator',
+        'Male_Social_Media', 'Male_New', 'Female_New', 'Male_Old_Storyteller',
+        'Female_Aah', 'Female_Pro_2', 'Male_Adam_v2',
+        'alba', 'george', 'cosette', 'marius'
+    ]
+    voices = list(curated_priority)
     for f in vdir.glob('*.safetensors'):
         if f.stem not in voices:
             voices.append(f.stem)
-    ptts['available_voices'] = sorted(list(set(voices)))
+    ptts['available_voices'] = voices
     json.dump(cfg, open(p, 'w'), indent=2)
 "
 fi
@@ -154,4 +197,5 @@ fi
 echo -e "\n${GREEN}${BOLD}✓ Pocket-TTS Neural Extension successfully installed!${NC}"
 echo -e "${BLUE}• Extension Location:${NC} $EXT_DIR"
 echo -e "${BLUE}• Status:${NC}             Ready & 100% Offline"
-echo -e "${BLUE}• Personas:${NC}           Sayed Johon, Jarvis, Alba, George, Cosette, Marius\n"
+echo -e "${BLUE}• Default Persona:${NC}    Jarvis (Best) [Jarvis_Best]"
+echo -e "${BLUE}• Curated Personas:${NC}   23 Studio & Builtin Voices Loaded\n"

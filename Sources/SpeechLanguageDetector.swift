@@ -118,15 +118,100 @@ public struct SpeechLanguageDetector {
                 segments.append(buf.trimmingCharacters(in: .whitespacesAndNewlines))
             }
             
-            if segments.isEmpty {
-                chunks.append(sentence)
-            } else {
-                chunks.append(contentsOf: segments)
+            let rawTargets = segments.isEmpty ? [sentence] : segments
+            for target in rawTargets {
+                let subSegments = subDivideOversizedSegment(target, maxWords: 18)
+                for sub in subSegments {
+                    var s = sub.trimmingCharacters(in: .whitespacesAndNewlines)
+                    // Clean leading punctuation that could confuse TTS models
+                    while let first = s.first, first == "," || first == ";" || first == ":" || first == "-" || first == "—" || first == "." {
+                        s.removeFirst()
+                        s = s.trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                    if !s.isEmpty && s.contains(where: { $0.isLetter || $0.isNumber }) {
+                        chunks.append(s)
+                    }
+                }
             }
         }
         
         return chunks
     }
+    
+    /// Sub-divides sentences exceeding maxWords into natural clauses or phrase boundaries.
+    /// Guarantees that Pocket-TTS never receives chunks over 40-50 tokens, eliminating word-skipping.
+    private static func subDivideOversizedSegment(_ text: String, maxWords: Int = 18) -> [String] {
+        let words = text.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+        if words.count <= maxWords {
+            return [text]
+        }
+        
+        // 1. Split on natural clause boundaries: commas, semicolons, em-dashes
+        var clauses: [String] = []
+        var cur = ""
+        for char in text {
+            cur.append(char)
+            if char == "," || char == ";" || char == "—" || char == "–" {
+                let s = cur.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !s.isEmpty {
+                    clauses.append(s)
+                }
+                cur = ""
+            }
+        }
+        let rem = cur.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !rem.isEmpty {
+            clauses.append(rem)
+        }
+        
+        var results: [String] = []
+        var currentChunkWords: [String] = []
+        
+        for clause in clauses {
+            let cWords = clause.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+            if currentChunkWords.count + cWords.count <= maxWords {
+                currentChunkWords.append(contentsOf: cWords)
+            } else {
+                if !currentChunkWords.isEmpty {
+                    results.append(currentChunkWords.joined(separator: " "))
+                    currentChunkWords = []
+                }
+                if cWords.count <= maxWords {
+                    currentChunkWords.append(contentsOf: cWords)
+                } else {
+                    // Clause itself exceeds maxWords: split on coordinating conjunctions or word count
+                    var sub = cWords
+                    let conjunctions: Set<String> = [
+                        "and", "but", "or", "so", "because", "although", "however",
+                        "which", "that", "with", "without", "when", "while", "where", "if"
+                    ]
+                    while sub.count > maxWords {
+                        var splitIdx = maxWords
+                        for i in stride(from: min(sub.count - 1, maxWords), through: 8, by: -1) {
+                            let w = sub[i].lowercased().trimmingCharacters(in: .punctuationCharacters)
+                            if conjunctions.contains(w) {
+                                splitIdx = i
+                                break
+                            }
+                        }
+                        let head = sub.prefix(splitIdx).joined(separator: " ")
+                        results.append(head)
+                        sub = Array(sub.dropFirst(splitIdx))
+                    }
+                    if !sub.isEmpty {
+                        currentChunkWords.append(contentsOf: sub)
+                    }
+                }
+            }
+        }
+        
+        if !currentChunkWords.isEmpty {
+            results.append(currentChunkWords.joined(separator: " "))
+        }
+        
+        return results.isEmpty ? [text] : results
+    }
+
     
     /// Determines whether Pocket-TTS can synthesize this text chunk.
     /// Pocket-TTS uses an English neural model. Any non-English or non-Latin script
@@ -293,7 +378,7 @@ public struct SpeechLanguageDetector {
         if macosVoice != "default" && !macosVoice.isEmpty {
             return macosVoice
         }
-        if engine == "pocket_tts" && (pocketVoice == "Jarvis" || pocketVoice == "Daniel") {
+        if engine == "pocket_tts" && (pocketVoice.contains("Jarvis") || pocketVoice == "Daniel") {
             return "Daniel"
         }
         

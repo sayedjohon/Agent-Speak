@@ -18,6 +18,7 @@ struct AudioChunk {
     var duration: Double = 0.0
     var startTime: Double = 0.0
     var isReady: Bool = false
+    var isFailed: Bool = false
     var player: AVAudioPlayer?
 }
 
@@ -137,7 +138,7 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         
         // Read audio engine preference from config
         var engine = "macos_default"
-        var voice = "Jarvis"
+        var voice = "Jarvis_Best"
         var macosVoice = "default"
         let configPath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".agentspeak/config.json")
         if let data = try? Data(contentsOf: configPath),
@@ -176,7 +177,7 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         }
         
         // 2. Native Apple Silicon voice (macos_default or automatic multilingual fallback)
-        if !renderedSuccessfully {
+        if !renderedSuccessfully && !isCancelled {
             let proc = Process()
             proc.executableURL = URL(fileURLWithPath: "/usr/bin/say")
             
@@ -199,26 +200,46 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
             try? proc.run()
             proc.waitUntilExit()
             self.activeRenderProcess = nil
+            
+            if FileManager.default.fileExists(atPath: c.filePath),
+               let attrs = try? FileManager.default.attributesOfItem(atPath: c.filePath),
+               (attrs[.size] as? Int64 ?? 0) > 400 {
+                renderedSuccessfully = true
+            }
         }
         
-        if FileManager.default.fileExists(atPath: c.filePath),
-           let p = try? AVAudioPlayer(contentsOf: URL(fileURLWithPath: c.filePath)) {
-            p.delegate = self
-            p.isMeteringEnabled = true
-            p.prepareToPlay()
-            if Thread.isMainThread {
-                self.chunks[index].player = p
-                self.chunks[index].duration = p.duration
-                self.chunks[index].isReady = true
-                self.updateTimelineDurations()
-            } else {
-                DispatchQueue.main.async {
+        // 3. Initialize player safely on main thread with retry for filesystem write flush
+        if !isCancelled && FileManager.default.fileExists(atPath: c.filePath) {
+            var playerCandidate: AVAudioPlayer?
+            for _ in 0..<3 {
+                if let p = try? AVAudioPlayer(contentsOf: URL(fileURLWithPath: c.filePath)) {
+                    playerCandidate = p
+                    break
+                }
+                usleep(25_000) // 25ms filesystem sync buffer
+            }
+            
+            if let p = playerCandidate {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self, !self.isCancelled else { return }
+                    p.delegate = self
+                    p.isMeteringEnabled = true
+                    p.prepareToPlay()
                     self.chunks[index].player = p
                     self.chunks[index].duration = p.duration
                     self.chunks[index].isReady = true
                     self.updateTimelineDurations()
                 }
+                return
             }
+        }
+        
+        // If synthesis failed completely, mark as failed on main thread so player can skip smoothly
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, !self.isCancelled else { return }
+            self.chunks[index].isFailed = true
+            self.chunks[index].isReady = true
+            NSLog("[AgentSpeak] Warning: Chunk %d failed to render audio file.", index)
         }
     }
     
@@ -294,31 +315,69 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
     
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        let finishedIndex = currentChunkIndex
-        let nextIndex = finishedIndex + 1
+        let actualIndex = chunks.firstIndex(where: { $0.player === player }) ?? currentChunkIndex
+        let nextIndex = actualIndex + 1
         if nextIndex < chunks.count {
             currentChunkIndex = nextIndex
             playChunkWhenReady(index: nextIndex)
         } else {
-            isPlaying = false
-            stopTimer()
-            let cb = onClose
-            onClose = nil
-            cb?()
+            finishPlayback()
         }
     }
     
-    private func playChunkWhenReady(index: Int) {
+    private func playChunkWhenReady(index: Int, attempts: Int = 0) {
         guard index < chunks.count, !isCancelled else { return }
-        if let p = chunks[index].player, chunks[index].isReady {
-            p.currentTime = 0
-            p.play()
-            isPlaying = true
-        } else {
+        
+        if chunks[index].isReady {
+            if let p = chunks[index].player {
+                p.currentTime = 0
+                if p.play() {
+                    isPlaying = true
+                    return
+                } else {
+                    p.prepareToPlay()
+                    if p.play() {
+                        isPlaying = true
+                        return
+                    }
+                }
+            }
+            
+            // If player is nil or chunk marked failed, advance to next chunk immediately
+            NSLog("[AgentSpeak] Chunk %d could not play or was empty, advancing.", index)
+            let nextIndex = index + 1
+            if nextIndex < chunks.count {
+                currentChunkIndex = nextIndex
+                playChunkWhenReady(index: nextIndex)
+            } else {
+                finishPlayback()
+            }
+            return
+        }
+        
+        // Wait for background chunk rendering with 8.0s watchdog timeout (160 * 50ms)
+        if attempts < 160 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-                self?.playChunkWhenReady(index: index)
+                self?.playChunkWhenReady(index: index, attempts: attempts + 1)
+            }
+        } else {
+            NSLog("[AgentSpeak] Chunk %d timed out waiting for audio render, advancing.", index)
+            let nextIndex = index + 1
+            if nextIndex < chunks.count {
+                currentChunkIndex = nextIndex
+                playChunkWhenReady(index: nextIndex)
+            } else {
+                finishPlayback()
             }
         }
+    }
+    
+    private func finishPlayback() {
+        isPlaying = false
+        stopTimer()
+        let cb = onClose
+        onClose = nil
+        cb?()
     }
     
     func togglePlayPause() {

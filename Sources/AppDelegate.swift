@@ -27,6 +27,12 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
     }
     
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        // 1. Immediately start transcript monitoring and IPC socket
+        TranscriptWatcher.shared.onSpeechRequest = { source, text in
+            SpeechQueueManager.shared.enqueue(source: source, text: text)
+        }
+        TranscriptWatcher.shared.start()
+        
         loadTrayIcons()
         
         // Ensure preferred menu bar position is registered away from the notch
@@ -39,7 +45,6 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
             setupMenuBar()
         }
         
-        setupDashboardWindow()
         NotchWindowController.shared.setupEscapeKeyTap()
         registerGlobalHotKeys()
         
@@ -51,11 +56,6 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         let trusted = AXIsProcessTrustedWithOptions(options)
         NSLog("[AgentSpeak] Accessibility permission on launch: \(trusted ? "TRUSTED" : "NOT TRUSTED")")
-        
-        TranscriptWatcher.shared.onSpeechRequest = { source, text in
-            SpeechQueueManager.shared.enqueue(source: source, text: text)
-        }
-        TranscriptWatcher.shared.start()
     }
     
     public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -421,6 +421,9 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
     }
     
     @objc public func showDashboard() {
+        if dashboardWindow == nil {
+            setupDashboardWindow()
+        }
         guard let window = dashboardWindow else { return }
         NSApp.setActivationPolicy(.regular)
         if let iconUrl = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
@@ -434,6 +437,9 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
     }
     
     @objc public func toggleDashboard() {
+        if dashboardWindow == nil {
+            setupDashboardWindow()
+        }
         guard let window = dashboardWindow else { return }
         if window.isVisible {
             stopDashboardDisplayLink()
@@ -453,36 +459,34 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         }
     }
     
-    public func captureAndSpeakSelectedText() {
-        // 1. First attempt: AXUIElement (Fastest, zero clipboard modification)
+    public func extractAXSelectedText() -> String? {
         let systemWide = AXUIElementCreateSystemWide()
         var focusedAppValue: AnyObject?
-        if AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute as CFString, &focusedAppValue) == .success,
-           let focusedApp = focusedAppValue {
-            var focusedElementValue: AnyObject?
-            if AXUIElementCopyAttributeValue(focusedApp as! AXUIElement, kAXFocusedUIElementAttribute as CFString, &focusedElementValue) == .success,
-               let focusedElem = focusedElementValue {
-                var selectedTextValue: AnyObject?
-                if AXUIElementCopyAttributeValue(focusedElem as! AXUIElement, kAXSelectedTextAttribute as CFString, &selectedTextValue) == .success,
-                   let str = selectedTextValue as? String {
-                    let trimmed = str.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !trimmed.isEmpty {
-                        let clean = TextSanitizer.sanitizeForSpeech(trimmed)
-                        if !clean.isEmpty {
-                            SpeechQueueManager.shared.enqueue(source: "Selected Text", text: clean)
-                            return
-                        }
-                    }
-                }
-            }
-        }
+        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute as CFString, &focusedAppValue) == .success,
+              let focusedApp = focusedAppValue else { return nil }
         
-        // 2. Second attempt: Synthetic Command + C simulation (Universal across Chrome, Safari, Electron, Code Editors)
+        var focusedElementValue: AnyObject?
+        guard AXUIElementCopyAttributeValue(focusedApp as! AXUIElement, kAXFocusedUIElementAttribute as CFString, &focusedElementValue) == .success,
+              let focusedElem = focusedElementValue else { return nil }
+        
+        var selectedTextValue: AnyObject?
+        if AXUIElementCopyAttributeValue(focusedElem as! AXUIElement, kAXSelectedTextAttribute as CFString, &selectedTextValue) == .success,
+           let str = selectedTextValue as? String {
+            let trimmed = str.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        }
+        return nil
+    }
+    
+    public func captureAndSpeakSelectedText() {
+        // Stop previous speech immediately so selection takes priority
+        SpeechQueueManager.shared.stopCurrent()
+        
         let pb = NSPasteboard.general
         let prevCount = pb.changeCount
-        let previousString = pb.string(forType: .string)
         
-        let src = CGEventSource(stateID: .hidSystemState)
+        // Post synthetic Command + C using combinedSessionState (independent of held modifier keys)
+        let src = CGEventSource(stateID: .combinedSessionState)
         let cDown = CGEvent(keyboardEventSource: src, virtualKey: 0x08, keyDown: true) // 'c'
         cDown?.flags = .maskCommand
         let cUp = CGEvent(keyboardEventSource: src, virtualKey: 0x08, keyDown: false)
@@ -490,37 +494,58 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         cDown?.post(tap: .cghidEventTap)
         cUp?.post(tap: .cghidEventTap)
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-            if pb.changeCount != prevCount,
-               let copied = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !copied.isEmpty {
-                let clean = TextSanitizer.sanitizeForSpeech(copied)
-                if !clean.isEmpty {
-                    SpeechQueueManager.shared.enqueue(source: "Selected Text", text: clean)
-                    return
-                }
-            }
-            
-            // 3. AppleScript keystroke fallback if CGEvent tap was filtered
+        // AppleScript fallback trigger in background for apps with strict event tap filtering
+        DispatchQueue.global(qos: .userInitiated).async {
+            usleep(35_000) // 35ms
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
             p.arguments = ["-e", "tell application \"System Events\" to keystroke \"c\" using {command down}"]
             try? p.run()
             p.waitUntilExit()
+        }
+        
+        let startTime = Date()
+        func checkPasteboardResult() {
+            if pb.changeCount != prevCount,
+               let copied = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !copied.isEmpty {
+                let clean = TextSanitizer.sanitizeForSpeech(copied)
+                if !clean.isEmpty {
+                    SpeechQueueManager.shared.enqueue(source: "Selected Text", text: clean, immediate: true)
+                    return
+                }
+            }
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.10) {
-                if let copied = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !copied.isEmpty, copied != previousString {
-                    let clean = TextSanitizer.sanitizeForSpeech(copied)
+            if Date().timeIntervalSince(startTime) < 0.35 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) {
+                    checkPasteboardResult()
+                }
+            } else {
+                // Fallback 1: Accessibility API text
+                if let axText = self.extractAXSelectedText() {
+                    let clean = TextSanitizer.sanitizeForSpeech(axText)
                     if !clean.isEmpty {
-                        SpeechQueueManager.shared.enqueue(source: "Selected Text", text: clean)
+                        SpeechQueueManager.shared.enqueue(source: "Selected Text", text: clean, immediate: true)
                         return
                     }
                 }
                 
-                // If nothing was selected, beep to give user feedback
+                // Fallback 2: Any existing clipboard text
+                if let existing = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !existing.isEmpty {
+                    let clean = TextSanitizer.sanitizeForSpeech(existing)
+                    if !clean.isEmpty {
+                        SpeechQueueManager.shared.enqueue(source: "Selected Text", text: clean, immediate: true)
+                        return
+                    }
+                }
+                
                 NSSound.beep()
             }
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            checkPasteboardResult()
         }
     }
     
@@ -528,7 +553,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         if let pbText = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines), !pbText.isEmpty {
             let clean = TextSanitizer.sanitizeForSpeech(pbText)
             if !clean.isEmpty {
-                SpeechQueueManager.shared.enqueue(source: "Clipboard", text: clean)
+                SpeechQueueManager.shared.enqueue(source: "Clipboard", text: clean, immediate: true)
             }
         }
     }

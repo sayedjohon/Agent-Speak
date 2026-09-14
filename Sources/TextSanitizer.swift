@@ -20,7 +20,7 @@ public struct TextSanitizer {
         str = replaceRegex(str, pattern: "https?://\\S+", with: "")
         
         // 6. Strip markdown table syntax (| col | col |)
-        str = replaceRegex(str, pattern: "\\|.*\\|", with: "")
+        str = replaceRegex(str, pattern: "^\\s*\\|.*\\|\\s*$", with: "", options: [.anchorsMatchLines])
         str = replaceRegex(str, pattern: "^[|\\-:\\s]+$", with: "", options: [.anchorsMatchLines])
         
         // 7. Strip markdown headings (# Title)

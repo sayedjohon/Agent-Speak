@@ -39,12 +39,13 @@ enum DashboardTab: String, CaseIterable, Identifiable {
 public struct DashboardView: View {
     @ObservedObject var queueManager = SpeechQueueManager.shared
     @State private var selectedTab: DashboardTab = .voice
+    @State private var hoveredTab: DashboardTab? = nil
     
     // Config States
     @State private var isEnabled: Bool = true
     @State private var voiceEngine: String = "macos_default"
     @State private var macosVoice: String = "default"
-    @State private var pocketVoice: String = "Jarvis"
+    @State private var pocketVoice: String = "Jarvis_Best"
     @State private var skipSeconds: Int = 5
     @State private var showTrayIcon: Bool = true
     @State private var availableSystemVoices: [SystemVoiceItem] = []
@@ -221,9 +222,13 @@ public struct DashboardView: View {
             .padding(.bottom, 20)
             
             // Nav Tab List
-            VStack(spacing: 5) {
+            VStack(spacing: 4) {
                 ForEach(DashboardTab.allCases) { tab in
-                    Button(action: { selectedTab = tab }) {
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.12)) {
+                            selectedTab = tab
+                        }
+                    }) {
                         HStack(spacing: 10) {
                             Image(systemName: tab.iconName)
                                 .font(.system(size: 13, weight: selectedTab == tab ? .semibold : .regular))
@@ -244,16 +249,21 @@ public struct DashboardView: View {
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 9)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .background(
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(selectedTab == tab ? Color.white.opacity(0.10) : Color.clear)
+                                .fill(selectedTab == tab ? Color.white.opacity(0.12) : (hoveredTab == tab ? Color.white.opacity(0.06) : Color.clear))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
-                                .stroke(selectedTab == tab ? Color.white.opacity(0.12) : Color.clear, lineWidth: 1)
+                                .stroke(selectedTab == tab ? Color.white.opacity(0.14) : Color.clear, lineWidth: 1)
                         )
+                        .contentShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(.plain)
+                    .onHover { isHovered in
+                        hoveredTab = isHovered ? tab : (hoveredTab == tab ? nil : hoveredTab)
+                    }
                 }
             }
             .padding(.horizontal, 12)
@@ -281,6 +291,7 @@ public struct DashboardView: View {
                     .background(queueManager.isSpeaking ? Color.red.opacity(0.25) : Color.white.opacity(0.08))
                     .foregroundColor(queueManager.isSpeaking ? .red : .white)
                     .cornerRadius(7)
+                    .contentShape(RoundedRectangle(cornerRadius: 7))
                 }
                 .buttonStyle(.plain)
                 
