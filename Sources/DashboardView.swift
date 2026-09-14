@@ -251,6 +251,32 @@ public struct DashboardView: View {
                             .frame(width: 190)
                             .onChange(of: pocketVoice) { _ in saveVoiceConfig() }
                         }
+                        
+                        if pocketVoice == "Jarvis" {
+                            Button(action: {
+                                let jarvisPaths = [
+                                    FileManager.default.homeDirectoryForCurrentUser.path + "/Downloads/Jarvis-trimmed.wav",
+                                    Bundle.main.bundlePath + "/Contents/Resources/voices/Jarvis.wav",
+                                    FileManager.default.homeDirectoryForCurrentUser.path + "/Documents/DEV_AREA/ssh linux/agent-speak/Resources/voices/Jarvis.wav"
+                                ]
+                                if let p = jarvisPaths.first(where: { FileManager.default.fileExists(atPath: $0) }) {
+                                    SpeechQueueManager.shared.playAudioFile(filePath: p, source: "Jarvis AI")
+                                }
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "waveform")
+                                        .font(.system(size: 11))
+                                    Text("Test Jarvis Voice Sample in Notch")
+                                        .font(.system(size: 11, weight: .semibold))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
+                                .background(Color.purple.opacity(0.2))
+                                .foregroundColor(.purple)
+                                .cornerRadius(6)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                     .padding(12)
                     .background(Color.white.opacity(0.04))

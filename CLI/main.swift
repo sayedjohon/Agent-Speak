@@ -41,6 +41,7 @@ func printHelp() {
       status      Check if Agent Speak is running
       say <text>  Speak text through the Liquid Glass notch player (Default System Voice)
       dashboard   Open the CleanMyMac-style 3D Visualizer Dashboard
+      test-jarvis Test playback of the Jarvis voice sample in the Notch Player
       stop        Stop current speech and dismiss the notch player
       quit        Terminate the Agent Speak application
     """)
@@ -99,6 +100,20 @@ case "dashboard":
             print("[Agent Speak] Launching Agent Speak App...")
         } else {
             print("Error: 'Agent Speak.app' not found in ~/Applications/")
+        }
+    }
+
+case "test-jarvis":
+    if sendSocketMessage("__CMD_TEST_JARVIS__") {
+        print("[Agent Speak] Presenting Jarvis voice sample in the Notch Player...")
+    } else {
+        print("Error: Agent Speak is not running. Launching app first...")
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let appURL = URL(fileURLWithPath: "\(home)/Applications/Agent Speak.app")
+        if FileManager.default.fileExists(atPath: appURL.path) {
+            NSWorkspace.shared.open(appURL)
+            usleep(800_000)
+            _ = sendSocketMessage("__CMD_TEST_JARVIS__")
         }
     }
 

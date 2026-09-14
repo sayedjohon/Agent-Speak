@@ -333,6 +333,15 @@ public class TranscriptWatcher {
                         DispatchQueue.main.async {
                             SpeechQueueManager.shared.stopCurrent()
                         }
+                    } else if raw == "__CMD_TEST_JARVIS__" {
+                        let jarvisPaths = [
+                            FileManager.default.homeDirectoryForCurrentUser.path + "/Downloads/Jarvis-trimmed.wav",
+                            Bundle.main.bundlePath + "/Contents/Resources/voices/Jarvis.wav",
+                            FileManager.default.homeDirectoryForCurrentUser.path + "/Documents/DEV_AREA/ssh linux/agent-speak/Resources/voices/Jarvis.wav"
+                        ]
+                        if let p = jarvisPaths.first(where: { FileManager.default.fileExists(atPath: $0) }) {
+                            SpeechQueueManager.shared.playAudioFile(filePath: p, source: "Jarvis AI")
+                        }
                     } else {
                         let clean = TextSanitizer.sanitizeForSpeech(raw)
                         if !clean.isEmpty {

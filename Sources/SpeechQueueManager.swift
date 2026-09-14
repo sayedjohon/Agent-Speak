@@ -25,6 +25,19 @@ public class SpeechQueueManager: ObservableObject {
         }
     }
     
+    public func playAudioFile(filePath: String, source: String = "Jarvis") {
+        DispatchQueue.main.async { [weak self] in
+            self?.isSpeaking = true
+            self?.currentSpeakerSource = source
+            NotchWindowController.shared.presentAudioFile(filePath: filePath, project: source) {
+                DispatchQueue.main.async {
+                    self?.isSpeaking = false
+                    self?.currentSpeakerSource = ""
+                }
+            }
+        }
+    }
+    
     public func stopCurrent() {
         queueLock.lock()
         queue.removeAll()

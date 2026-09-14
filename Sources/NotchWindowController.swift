@@ -121,6 +121,28 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         }
     }
     
+    init(audioFilePath: String, onClose: (() -> Void)?) {
+        self.onClose = onClose
+        super.init()
+        
+        self.totalChunksCount = 1
+        var chunk = AudioChunk(index: 0, text: "", filePath: audioFilePath)
+        if FileManager.default.fileExists(atPath: audioFilePath),
+           let p = try? AVAudioPlayer(contentsOf: URL(fileURLWithPath: audioFilePath)) {
+            p.delegate = self
+            p.prepareToPlay()
+            chunk.player = p
+            chunk.duration = p.duration
+            chunk.isReady = true
+            self.chunks = [chunk]
+            self.globalTotalDuration = max(1.0, p.duration)
+            p.play()
+            self.isPlaying = true
+            self.currentChunkIndex = 0
+            self.startTimer()
+        }
+    }
+    
     private func renderChunk(index: Int) {
         guard index < chunks.count, !isCancelled else { return }
         let c = chunks[index]
@@ -178,8 +200,12 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         if !renderedSuccessfully {
             let proc = Process()
             proc.executableURL = URL(fileURLWithPath: "/usr/bin/say")
-            // No -v flag: Uses your Mac's natural default system voice!
-            proc.arguments = ["-o", c.filePath, c.text]
+            if (voice == "Jarvis" || voice == "Daniel") && engine == "pocket_tts" {
+                proc.arguments = ["-v", "Daniel", "-o", c.filePath, c.text]
+            } else {
+                // Default system voice
+                proc.arguments = ["-o", c.filePath, c.text]
+            }
             
             self.activeRenderProcess = proc
             try? proc.run()
@@ -493,6 +519,73 @@ public class NotchWindowController {
             panel.hasShadow = false
             
             self.audioManager = StreamingAudioManager(text: text) { [weak self] in
+                self?.dismiss()
+                onFinished?()
+            }
+            
+            let hosting = NSHostingView(
+                rootView: PointyTopNotchBarView(state: self.audioManager!, hasNotch: hasNotch)
+            )
+            hosting.frame = NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight)
+            panel.contentView = hosting
+            panel.orderFront(nil)
+            self.window = panel
+            
+            self.setupEscapeKeyTap()
+        }
+    }
+    
+    public func presentAudioFile(filePath: String, project: String = "Jarvis", onFinished: (() -> Void)? = nil) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.dismiss()
+            
+            let mouseLoc = NSEvent.mouseLocation
+            let targetScreen = NSScreen.screens.first(where: { NSMouseInRect(mouseLoc, $0.frame, false) }) ?? NSScreen.main ?? NSScreen.screens[0]
+            
+            let hasNotch: Bool
+            if #available(macOS 12.0, *) {
+                hasNotch = targetScreen.safeAreaInsets.top > 0 || targetScreen.auxiliaryTopLeftArea != nil
+            } else {
+                hasNotch = false
+            }
+            
+            let notchWidth: CGFloat = 185.0
+            let barHeight: CGFloat = 30.0
+            let windowWidth = notchWidth + 24.0
+            let windowHeight = barHeight + 20.0
+            
+            let x = targetScreen.frame.origin.x + (targetScreen.frame.width - windowWidth) / 2
+            let topOfScreen = targetScreen.frame.origin.y + targetScreen.frame.height
+            let topOfVisible = targetScreen.visibleFrame.origin.y + targetScreen.visibleFrame.height
+            
+            let y: CGFloat
+            if hasNotch {
+                let notchHeight: CGFloat = targetScreen.safeAreaInsets.top > 0 ? targetScreen.safeAreaInsets.top : 32.0
+                y = topOfScreen - notchHeight - barHeight + 0.5
+            } else {
+                if topOfVisible < topOfScreen - 5 {
+                    y = topOfVisible - barHeight - 4.0
+                } else {
+                    y = topOfScreen - barHeight - 8.0
+                }
+            }
+            
+            let frame = NSRect(x: x, y: y, width: windowWidth, height: windowHeight)
+            let panel = NSPanel(
+                contentRect: frame,
+                styleMask: [.borderless, .nonactivatingPanel],
+                backing: .buffered,
+                defer: false
+            )
+            panel.isFloatingPanel = true
+            panel.level = .statusBar + 1
+            panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+            panel.backgroundColor = .clear
+            panel.isOpaque = false
+            panel.hasShadow = false
+            
+            self.audioManager = StreamingAudioManager(audioFilePath: filePath) { [weak self] in
                 self?.dismiss()
                 onFinished?()
             }
