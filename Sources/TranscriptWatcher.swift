@@ -75,7 +75,7 @@ public class TranscriptWatcher {
             
             if let attrs = try? FileManager.default.attributesOfItem(atPath: transcriptURL.path),
                let modDate = attrs[.modificationDate] as? Date {
-                if !isBootstrapping && (now - modDate.timeIntervalSince1970 > 60) {
+                if !isBootstrapping && (now - modDate.timeIntervalSince1970 > 600) {
                     continue
                 }
             }
@@ -87,7 +87,7 @@ public class TranscriptWatcher {
             let lines = content.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
             guard !lines.isEmpty else { continue }
             
-            let subset = lines.suffix(40)
+            let subset = lines.suffix(200)
             var latestModelText: String? = nil
             var latestStep: Int = -1
             var latestCreatedAt: String = ""
@@ -98,10 +98,12 @@ public class TranscriptWatcher {
                 
                 let src = json["source"] as? String
                 let typ = json["type"] as? String
-                let toolCalls = json["tool_calls"]
                 let cnt = (json["content"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 
-                if src == "MODEL" && typ == "PLANNER_RESPONSE" && !cnt.isEmpty && toolCalls == nil {
+                let tools = json["tool_calls"] as? [Any]
+                let hasNoTools = (tools == nil || tools!.isEmpty)
+                
+                if src == "MODEL" && typ == "PLANNER_RESPONSE" && !cnt.isEmpty && hasNoTools {
                     latestModelText = cnt
                     latestStep = json["step_index"] as? Int ?? -1
                     latestCreatedAt = json["created_at"] as? String ?? ""
@@ -115,10 +117,22 @@ public class TranscriptWatcher {
                 stateLock.lock()
                 let lastId = state[convKey]
                 
-                if isBootstrapping || lastId == nil {
+                if isBootstrapping {
                     state[convKey] = rawId
                     saveState()
                     stateLock.unlock()
+                    continue
+                }
+                
+                if lastId == nil {
+                    state[convKey] = rawId
+                    saveState()
+                    stateLock.unlock()
+                    
+                    let clean = TextSanitizer.sanitizeForSpeech(text)
+                    if !clean.isEmpty {
+                        onSpeechRequest?("Antigravity", clean)
+                    }
                     continue
                 }
                 
@@ -153,7 +167,7 @@ public class TranscriptWatcher {
             for file in files where file.pathExtension == "jsonl" {
                 if let attrs = try? FileManager.default.attributesOfItem(atPath: file.path),
                    let modDate = attrs[.modificationDate] as? Date {
-                    if !isBootstrapping && (now - modDate.timeIntervalSince1970 > 60) {
+                    if !isBootstrapping && (now - modDate.timeIntervalSince1970 > 600) {
                         continue
                     }
                 }
@@ -165,7 +179,7 @@ public class TranscriptWatcher {
                 let lines = content.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
                 guard !lines.isEmpty else { continue }
                 
-                let subset = lines.suffix(40)
+                let subset = lines.suffix(200)
                 var latestAssistantText: String? = nil
                 var latestMsgId: String = ""
                 
@@ -206,10 +220,22 @@ public class TranscriptWatcher {
                     stateLock.lock()
                     let lastId = state[convKey]
                     
-                    if isBootstrapping || lastId == nil {
+                    if isBootstrapping {
                         state[convKey] = rawId
                         saveState()
                         stateLock.unlock()
+                        continue
+                    }
+                    
+                    if lastId == nil {
+                        state[convKey] = rawId
+                        saveState()
+                        stateLock.unlock()
+                        
+                        let clean = TextSanitizer.sanitizeForSpeech(text)
+                        if !clean.isEmpty {
+                            onSpeechRequest?("Claude", clean)
+                        }
                         continue
                     }
                     
@@ -242,7 +268,7 @@ public class TranscriptWatcher {
         for file in files where file.pathExtension == "json" || file.pathExtension == "jsonl" {
             if let attrs = try? FileManager.default.attributesOfItem(atPath: file.path),
                let modDate = attrs[.modificationDate] as? Date {
-                if !isBootstrapping && (now - modDate.timeIntervalSince1970 > 60) {
+                if !isBootstrapping && (now - modDate.timeIntervalSince1970 > 600) {
                     continue
                 }
             }
@@ -262,10 +288,21 @@ public class TranscriptWatcher {
                 
                 stateLock.lock()
                 let lastId = state[convKey]
-                if isBootstrapping || lastId == nil {
+                if isBootstrapping {
                     state[convKey] = rawId
                     saveState()
                     stateLock.unlock()
+                    continue
+                }
+                
+                if lastId == nil {
+                    state[convKey] = rawId
+                    saveState()
+                    stateLock.unlock()
+                    let clean = TextSanitizer.sanitizeForSpeech(text)
+                    if !clean.isEmpty {
+                        onSpeechRequest?("OpenCode", clean)
+                    }
                     continue
                 }
                 

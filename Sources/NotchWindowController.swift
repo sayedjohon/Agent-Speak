@@ -275,7 +275,9 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         let finishedIndex = currentChunkIndex
         if finishedIndex < chunks.count {
-            try? FileManager.default.removeItem(atPath: chunks[finishedIndex].filePath)
+            if chunks[finishedIndex].filePath.hasPrefix("/tmp/") {
+                try? FileManager.default.removeItem(atPath: chunks[finishedIndex].filePath)
+            }
         }
         
         let nextIndex = finishedIndex + 1
@@ -286,7 +288,9 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
             isPlaying = false
             timer?.invalidate()
             timer = nil
-            onClose?()
+            let cb = onClose
+            onClose = nil
+            cb?()
         }
     }
     
@@ -340,15 +344,20 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
     
     func close() {
+        guard !isCancelled else { return }
         isCancelled = true
         activeRenderProcess?.terminate()
         for c in chunks {
             c.player?.stop()
-            try? FileManager.default.removeItem(atPath: c.filePath)
+            if c.filePath.hasPrefix("/tmp/") {
+                try? FileManager.default.removeItem(atPath: c.filePath)
+            }
         }
         timer?.invalidate()
         timer = nil
-        onClose?()
+        let cb = onClose
+        onClose = nil
+        cb?()
     }
 }
 
@@ -602,14 +611,22 @@ public class NotchWindowController {
         }
     }
     
+    private var isDismissing = false
     public func dismiss() {
+        guard !isDismissing else { return }
+        isDismissing = true
+        defer { isDismissing = false }
+        
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
             CFRunLoopRemoveSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0), .commonModes)
             eventTap = nil
         }
-        audioManager?.close()
+        let mgr = audioManager
         audioManager = nil
+        mgr?.onClose = nil
+        mgr?.close()
+        
         window?.orderOut(nil)
         window = nil
     }

@@ -20,14 +20,10 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
             SpeechQueueManager.shared.enqueue(source: source, text: text)
         }
         TranscriptWatcher.shared.start()
-        
-        // Show dashboard window on launch
-        showDashboard()
     }
     
     public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        showDashboard()
-        return true
+        return false
     }
     
     func setupMenuBar() {
