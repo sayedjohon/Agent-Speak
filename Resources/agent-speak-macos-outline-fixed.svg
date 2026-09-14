@@ -1,26 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="92" y="92" width="840" height="840" rx="168" stroke-width="24"/>
-
     <path
-      d="M512 220
-         C694 220 842 346 842 512
-         C842 678 694 804 512 804
-         C461 804 412 796 368 781
-         L270 846
-         C253 857 232 842 237 821
-         L265 728
-         C207 671 178 594 178 512
-         C178 346 326 220 512 220Z"
-      stroke-width="24"/>
-
-    <g stroke-width="42">
-      <path d="M358 524V586"/>
-      <path d="M435 474V636"/>
-      <path d="M512 410V700"/>
-      <path d="M589 474V636"/>
-      <path d="M666 524V586"/>
+      d="M512 140
+         C736 140 914 296 914 490
+         C914 684 736 840 512 840
+         C456 840 402 828 354 808
+         L242 888
+         C222 902 200 884 206 860
+         L234 762
+         C164 694 110 598 110 490
+         C110 296 288 140 512 140Z"
+      stroke-width="84"/>
+    <g stroke-width="96">
+      <path d="M370 480V580"/>
+      <path d="M512 360V700"/>
+      <path d="M654 480V580"/>
     </g>
   </g>
 </svg>

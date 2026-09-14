@@ -245,23 +245,10 @@ public struct TrayGradientOrbView: View {
                     }
                     .frame(width: 18, height: 16)
                 } else {
-                    // Clean, crisp native outline icon
-                    if let img = AppDelegate.shared?.idleIcon {
-                        Image(nsImage: img)
-                            .renderingMode(.template)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 17, height: 17)
-                            .foregroundColor(.primary)
-                    } else {
-                        // Minimal ready soundwave glyph
-                        HStack(spacing: 2.0) {
-                            RoundedRectangle(cornerRadius: 1.0).fill(Color.primary.opacity(0.65)).frame(width: 2.2, height: 5)
-                            RoundedRectangle(cornerRadius: 1.0).fill(Color.primary.opacity(0.95)).frame(width: 2.2, height: 11)
-                            RoundedRectangle(cornerRadius: 1.0).fill(Color.primary.opacity(0.65)).frame(width: 2.2, height: 7)
-                        }
-                        .frame(width: 18, height: 16)
-                    }
+                    // Stand-alone Bubble (No Tile)
+                    Image(systemName: "ellipsis.message.fill")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.primary)
                 }
             }
             .frame(width: 22, height: 20)

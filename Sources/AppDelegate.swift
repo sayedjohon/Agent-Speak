@@ -149,7 +149,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         
         // 3. System SF Symbol ultimate fallback
         if idleIcon == nil {
-            idleIcon = NSImage(systemSymbolName: "waveform.circle.fill", accessibilityDescription: "Agent Speak")
+            idleIcon = NSImage(systemSymbolName: "ellipsis.message.fill", accessibilityDescription: "Agent Speak")
             idleIcon?.isTemplate = true
         }
         if speakingIcon == nil {
