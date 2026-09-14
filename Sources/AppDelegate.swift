@@ -27,6 +27,31 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
     }
     
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        // 0. Single-Instance Guard: Ensure only ONE instance of Agent Speak runs at any time
+        let myPid = ProcessInfo.processInfo.processIdentifier
+        let bundleId = Bundle.main.bundleIdentifier ?? "com.agentspeak.app"
+        for app in NSRunningApplication.runningApplications(withBundleIdentifier: bundleId) {
+            if app.processIdentifier != myPid {
+                NSLog("[AgentSpeak] Another instance already running (PID %d). Terminating it.", app.processIdentifier)
+                app.terminate()
+            }
+        }
+        
+        let pidFile = "/tmp/agentspeak.pid"
+        if let existingPidStr = try? String(contentsOfFile: pidFile, encoding: .utf8),
+           let existingPid = Int32(existingPidStr.trimmingCharacters(in: .whitespacesAndNewlines)),
+           existingPid != myPid {
+            if kill(existingPid, 0) == 0 {
+                NSLog("[AgentSpeak] Terminating previous process PID %d", existingPid)
+                kill(existingPid, SIGTERM)
+                usleep(50_000)
+                if kill(existingPid, 0) == 0 {
+                    kill(existingPid, SIGKILL)
+                }
+            }
+        }
+        try? "\(myPid)".write(toFile: pidFile, atomically: true, encoding: .utf8)
+
         // 1. Immediately start transcript monitoring and IPC socket
         TranscriptWatcher.shared.onSpeechRequest = { source, text in
             SpeechQueueManager.shared.enqueue(source: source, text: text)
