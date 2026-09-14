@@ -272,6 +272,32 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         stopItem.isEnabled = isSpeaking
         menu.addItem(stopItem)
         
+        // Voice Quick Selection Submenu
+        let voiceMenu = NSMenu()
+        let currentVoice = loadCurrentMacosVoice()
+        let topVoices = [
+            ("default", "Default (System Default)"),
+            ("Samantha", "Samantha (US English)"),
+            ("Daniel", "Daniel (British English)"),
+            ("Karen", "Karen (Australian English)"),
+            ("Moira", "Moira (Irish English)"),
+            ("Rishi", "Rishi (Indian English)"),
+            ("Tessa", "Tessa (South African English)"),
+            ("Fred", "Fred (Classic macOS)"),
+            ("Piya", "Piya (Bengali)")
+        ]
+        for (vTag, vName) in topVoices {
+            let vItem = NSMenuItem(title: vName, action: #selector(selectVoiceFromMenu(_:)), keyEquivalent: "")
+            vItem.target = self
+            vItem.representedObject = vTag
+            vItem.state = ((vTag == currentVoice) || (currentVoice.isEmpty && vTag == "default")) ? .on : .off
+            voiceMenu.addItem(vItem)
+        }
+        let voiceSelectorItem = NSMenuItem(title: "Select MacBook Voice", action: nil, keyEquivalent: "")
+        voiceSelectorItem.image = NSImage(systemSymbolName: "person.wave.2", accessibilityDescription: nil)
+        voiceSelectorItem.submenu = voiceMenu
+        menu.addItem(voiceSelectorItem)
+        
         menu.addItem(NSMenuItem.separator())
         
         // 4. Monitored Workspaces Status
@@ -326,12 +352,48 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
         window.level = .floating
-        window.backgroundColor = .clear
+        window.isOpaque = true
+        window.backgroundColor = NSColor(red: 0.07, green: 0.08, blue: 0.10, alpha: 1.0)
         
         let hostingView = NSHostingView(rootView: DashboardView())
         window.contentView = hostingView
         
         self.dashboardWindow = window
+    }
+    
+    private func loadCurrentMacosVoice() -> String {
+        let configPath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".agentspeak/config.json")
+        guard let data = try? Data(contentsOf: configPath),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let audio = json["audio"] as? [String: Any],
+              let mv = audio["macos_voice"] as? String else {
+            return "default"
+        }
+        return mv
+    }
+    
+    private func saveMacosVoicePreference(voice: String) {
+        let configPath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".agentspeak/config.json")
+        guard let data = try? Data(contentsOf: configPath),
+              var json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+        
+        var audio = json["audio"] as? [String: Any] ?? [:]
+        audio["macos_voice"] = voice
+        json["audio"] = audio
+        
+        if let updated = try? JSONSerialization.data(withJSONObject: json, options: .prettyPrinted) {
+            try? updated.write(to: configPath)
+        }
+    }
+    
+    @objc func selectVoiceFromMenu(_ sender: NSMenuItem) {
+        guard let vTag = sender.representedObject as? String else { return }
+        saveMacosVoicePreference(voice: vTag)
+        let voiceName = vTag == "default" ? "System Default" : vTag
+        SpeechQueueManager.shared.enqueue(
+            source: "Agent Speak",
+            text: "Voice switched to \(voiceName)."
+        )
     }
     
     @objc public func showDashboard() {

@@ -7,6 +7,8 @@
   },
   "audio": {
     "engine": "macos_default",
+    "macos_voice": "default",
+    "skip_seconds": 5,
     "pocket_tts": {
       "enabled": false,
       "voice": "Jarvis",

@@ -1,5 +1,18 @@
 import SwiftUI
 import Cocoa
+import AVFoundation
+
+// MARK: - System Voice Model
+public struct SystemVoiceItem: Identifiable, Hashable {
+    public var id: String { tag }
+    public let tag: String
+    public let label: String
+    
+    public init(tag: String, label: String) {
+        self.tag = tag
+        self.label = label
+    }
+}
 
 // MARK: - Dashboard Navigation Tabs
 enum DashboardTab: String, CaseIterable, Identifiable {
@@ -88,9 +101,11 @@ public struct DashboardView: View {
     // Config States
     @State private var isEnabled: Bool = true
     @State private var voiceEngine: String = "macos_default"
+    @State private var macosVoice: String = "default"
     @State private var pocketVoice: String = "Jarvis"
     @State private var skipSeconds: Int = 5
     @State private var showTrayIcon: Bool = true
+    @State private var availableSystemVoices: [SystemVoiceItem] = []
     
     // Workspace States
     @State private var watchAntigravity: Bool = true
@@ -103,10 +118,7 @@ public struct DashboardView: View {
     
     private var brandLogoImage: NSImage? {
         let paths = [
-            Bundle.main.bundlePath + "/Contents/Resources/agent-speak-macos-outline-fixed.svg",
-            "/Users/sayedjohon/Downloads/agent-speak-macos-outline-fixed.svg",
-            Bundle.main.bundlePath + "/Contents/Resources/agent-speak-icon-tray.svg",
-            Bundle.main.bundlePath + "/Contents/Resources/TrayIcon_Idle@2x.png",
+            "/Users/sayedjohon/Downloads/Agent-Speak-logo.png",
             Bundle.main.bundlePath + "/Contents/Resources/Agent-Speak-logo.png",
             Bundle.main.bundlePath + "/Contents/Resources/AppIcon.icns"
         ]
@@ -118,6 +130,13 @@ public struct DashboardView: View {
         return NSImage(named: "AppIcon")
     }
     
+    private var selectedVoiceDisplayName: String {
+        if macosVoice == "default" || macosVoice.isEmpty {
+            return "System Default"
+        }
+        return availableSystemVoices.first(where: { $0.tag == macosVoice })?.label ?? macosVoice
+    }
+    
     // MARK: - Configuration I/O
     
     private func loadConfig() {
@@ -127,6 +146,7 @@ public struct DashboardView: View {
         
         if let audio = json["audio"] as? [String: Any] {
             if let engine = audio["engine"] as? String { voiceEngine = engine }
+            if let mv = audio["macos_voice"] as? String { macosVoice = mv }
             if let s = audio["skip_seconds"] as? Int { skipSeconds = s }
             if let ptts = audio["pocket_tts"] as? [String: Any], let v = ptts["voice"] as? String { pocketVoice = v }
         }
@@ -144,6 +164,7 @@ public struct DashboardView: View {
         
         var audio = json["audio"] as? [String: Any] ?? [:]
         audio["engine"] = voiceEngine
+        audio["macos_voice"] = macosVoice
         audio["skip_seconds"] = skipSeconds
         var ptts = audio["pocket_tts"] as? [String: Any] ?? [:]
         ptts["voice"] = pocketVoice
@@ -161,17 +182,51 @@ public struct DashboardView: View {
         }
     }
     
+    private func loadAvailableVoices() -> [SystemVoiceItem] {
+        var items: [SystemVoiceItem] = [
+            SystemVoiceItem(tag: "default", label: "Default (System Default)")
+        ]
+        let curated: [(tag: String, label: String)] = [
+            ("Samantha", "Samantha (US English)"),
+            ("Daniel", "Daniel (British English)"),
+            ("Karen", "Karen (Australian English)"),
+            ("Moira", "Moira (Irish English)"),
+            ("Rishi", "Rishi (Indian English)"),
+            ("Tessa", "Tessa (South African English)"),
+            ("Fred", "Fred (Classic macOS)"),
+            ("Piya", "Piya (Bengali)"),
+            ("Alex", "Alex (Natural US)")
+        ]
+        var seen = Set<String>(["default"])
+        for c in curated {
+            items.append(SystemVoiceItem(tag: c.tag, label: c.label))
+            seen.insert(c.tag.lowercased())
+        }
+        
+        let avVoices = AVSpeechSynthesisVoice.speechVoices()
+        for v in avVoices {
+            let name = v.name
+            if !seen.contains(name.lowercased()) {
+                seen.insert(name.lowercased())
+                let loc = Locale.current.localizedString(forIdentifier: v.language) ?? v.language
+                items.append(SystemVoiceItem(tag: name, label: "\(name) (\(loc))"))
+            }
+        }
+        return items
+    }
+    
     // MARK: - View Layout
     
     public var body: some View {
         HStack(spacing: 0) {
-            // Left Sidebar
+            // Left Sidebar with solid dark background
             sidebarView
                 .frame(width: 215)
+                .background(Color(red: 0.09, green: 0.10, blue: 0.13))
             
-            // Thin Divider
+            // Thin Solid Divider (eliminates see-through gap)
             Rectangle()
-                .fill(Color.white.opacity(0.08))
+                .fill(Color(red: 0.18, green: 0.20, blue: 0.25))
                 .frame(width: 1)
             
             // Right Detail Area (Zero Scrolling)
@@ -180,8 +235,10 @@ public struct DashboardView: View {
                 .background(Color(red: 0.06, green: 0.07, blue: 0.09))
         }
         .frame(width: 740, height: 490)
+        .background(Color(red: 0.07, green: 0.08, blue: 0.10))
         .onAppear {
             loadConfig()
+            availableSystemVoices = loadAvailableVoices()
             isAccessibilityTrusted = AXIsProcessTrusted()
         }
     }
@@ -372,19 +429,27 @@ public struct DashboardView: View {
                         .font(.system(size: 16))
                         .foregroundColor(.cyan)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Default Apple Silicon Voice (Native)")
+                        Text("MacBook System Voice")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.white)
-                        Text("Zero Python dependencies • Instant 0ms runway playback • 0% CPU load")
+                        Text("Active Voice: \(selectedVoiceDisplayName)")
                             .font(.system(size: 10))
                             .foregroundColor(.secondary)
                     }
                     Spacer()
+                    Picker("", selection: $macosVoice) {
+                        ForEach(availableSystemVoices) { v in
+                            Text(v.label).tag(v.tag)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 195)
+                    .onChange(of: macosVoice) { _ in saveConfig() }
                 }
                 .padding(11)
                 .background(Color.white.opacity(0.04))
                 .cornerRadius(10)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.cyan.opacity(0.3), lineWidth: 1))
             } else {
                 HStack(spacing: 12) {
                     Image(systemName: "sparkles")
@@ -453,9 +518,10 @@ public struct DashboardView: View {
             // Action Buttons
             HStack(spacing: 12) {
                 Button(action: {
+                    let sampleVoice = voiceEngine == "macos_default" ? selectedVoiceDisplayName : pocketVoice
                     SpeechQueueManager.shared.enqueue(
                         source: "Agent Speak",
-                        text: "Testing the default system voice. Agent Speak is running smoothly."
+                        text: "Testing \(sampleVoice). Agent Speak voice playback is clear and responsive."
                     )
                 }) {
                     HStack(spacing: 6) {

@@ -183,11 +183,13 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         // Read audio engine preference from config
         var engine = "macos_default"
         var voice = "Jarvis"
+        var macosVoice = "default"
         let configPath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".agentspeak/config.json")
         if let data = try? Data(contentsOf: configPath),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let audio = json["audio"] as? [String: Any] {
             engine = audio["engine"] as? String ?? "macos_default"
+            macosVoice = audio["macos_voice"] as? String ?? "default"
             if let ptts = audio["pocket_tts"] as? [String: Any],
                let v = ptts["voice"] as? String {
                 voice = v
@@ -235,6 +237,8 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
             proc.executableURL = URL(fileURLWithPath: "/usr/bin/say")
             if (voice == "Jarvis" || voice == "Daniel") && engine == "pocket_tts" {
                 proc.arguments = ["-v", "Daniel", "-o", c.filePath, c.text]
+            } else if macosVoice != "default" && !macosVoice.isEmpty {
+                proc.arguments = ["-v", macosVoice, "-o", c.filePath, c.text]
             } else {
                 // Default system voice
                 proc.arguments = ["-o", c.filePath, c.text]
