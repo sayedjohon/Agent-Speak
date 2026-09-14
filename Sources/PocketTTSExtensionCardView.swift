@@ -515,7 +515,7 @@ public struct CloningGuideModalView: View {
                     .toggleStyle(.checkbox)
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
-                    .onChange(of: dontShowAgain) { val in
+                    .onChange(of: dontShowAgain) { _, val in
                         UserDefaults.standard.set(val, forKey: "hasSeenCloningGuide")
                     }
                 

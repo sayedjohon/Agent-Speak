@@ -246,7 +246,7 @@ public struct DashboardHardwareView: View {
                         Spacer()
                         Toggle("", isOn: $showTrayIcon)
                             .toggleStyle(.switch)
-                            .onChange(of: showTrayIcon) { newValue in
+                            .onChange(of: showTrayIcon) { _, newValue in
                                 onSaveConfig()
                                 AppDelegate.shared?.setTrayIconVisible(newValue)
                             }

@@ -512,11 +512,7 @@ public struct VoiceCloningStudioSheet: View {
         }
         
         trimmerPlayer.loadAudio(url: url)
-        let dur = trimmerPlayer.duration > 0 ? trimmerPlayer.duration : {
-            let asset = AVURLAsset(url: url)
-            let s = CMTimeGetSeconds(asset.duration)
-            return s.isFinite ? s : 0.0
-        }()
+        let dur = trimmerPlayer.duration > 0 ? trimmerPlayer.duration : ((try? AVAudioPlayer(contentsOf: url))?.duration ?? 0.0)
         
         self.audioDuration = dur
         self.trimStartTime = 0.0

@@ -34,7 +34,11 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         
         if let existingApp = otherApps.first {
             NSLog("[AgentSpeak] Instance already running (PID %d). Activating existing instance and exiting.", existingApp.processIdentifier)
-            existingApp.activate(options: [.activateIgnoringOtherApps])
+            if #available(macOS 14.0, *) {
+                existingApp.activate()
+            } else {
+                existingApp.activate(options: [.activateIgnoringOtherApps])
+            }
             exit(0)
         }
         

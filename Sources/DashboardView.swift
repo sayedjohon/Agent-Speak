@@ -390,7 +390,7 @@ public struct DashboardView: View {
                     Text("Pocket-TTS Neural AI").tag("pocket_tts")
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: voiceEngine) { _ in
+                .onChange(of: voiceEngine) {
                     saveConfig()
                 }
             }
@@ -433,7 +433,7 @@ public struct DashboardView: View {
                             }
                             .pickerStyle(.menu)
                             .frame(maxWidth: 240)
-                            .onChange(of: macosVoice) { _ in
+                            .onChange(of: macosVoice) {
                                 saveConfig()
                             }
                             
@@ -541,7 +541,7 @@ public struct DashboardView: View {
                                 }
                                 .pickerStyle(.menu)
                                 .frame(maxWidth: 220)
-                                .onChange(of: pocketVoice) { _ in
+                                .onChange(of: pocketVoice) {
                                     saveConfig()
                                 }
                                 
@@ -742,7 +742,7 @@ public struct DashboardView: View {
                         }
                         .pickerStyle(.menu)
                         .frame(maxWidth: 160)
-                        .onChange(of: skipSeconds) { _ in
+                        .onChange(of: skipSeconds) {
                             saveConfig()
                         }
                     }

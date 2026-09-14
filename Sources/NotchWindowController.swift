@@ -777,7 +777,7 @@ public class NotchWindowController {
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         let target = GetEventDispatcherTarget()
         
-        let status = InstallEventHandler(target, { (handler, event, userData) -> OSStatus in
+        _ = InstallEventHandler(target, { (handler, event, userData) -> OSStatus in
             guard let event = event else { return noErr }
             var hotKeyID = EventHotKeyID()
             GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
