@@ -257,8 +257,20 @@ public struct AudioWaveformTrimmerView: View {
                 if !isCutActive {
                     startTime = 0.0
                     endTime = max(1.0, totalDuration)
-                } else if endTime <= startTime {
-                    endTime = min(totalDuration, startTime + 15.0)
+                } else {
+                    let currentSpan = endTime - startTime
+                    if currentSpan >= (totalDuration - 0.2) || endTime <= startTime {
+                        if totalDuration > 15.0 {
+                            startTime = 0.0
+                            endTime = 15.0
+                        } else if totalDuration > 4.0 {
+                            startTime = 0.0
+                            endTime = max(3.0, round(totalDuration * 0.70))
+                        } else {
+                            startTime = 0.0
+                            endTime = totalDuration
+                        }
+                    }
                 }
                 if player.isPlaying { player.stop() }
             }) {
@@ -312,7 +324,7 @@ public struct AudioWaveformTrimmerView: View {
                         let inCut = !isCutActive || (barX >= leftX && barX <= rightX)
                         
                         RoundedRectangle(cornerRadius: 1)
-                            .fill(inCut ? Color(red: 0.15, green: 0.62, blue: 1.0) : Color.white.opacity(0.16))
+                            .fill(inCut ? Color(red: 0.15, green: 0.75, blue: 1.0) : Color.white.opacity(0.12))
                             .frame(
                                 width: max(1.5, (trackWidth / CGFloat(samples.count)) - 2),
                                 height: max(4.0, samples[idx] * (trackHeight - 14))
@@ -323,6 +335,21 @@ public struct AudioWaveformTrimmerView: View {
                 
                 // Cut Highlight Overlay & Drag Handles
                 if isCutActive {
+                    // Left Dimming Curtain (dim outside of cut window)
+                    if leftX > 0 {
+                        Rectangle()
+                            .fill(Color.black.opacity(0.65))
+                            .frame(width: leftX, height: trackHeight)
+                    }
+                    
+                    // Right Dimming Curtain (dim outside of cut window)
+                    if rightX < trackWidth {
+                        Rectangle()
+                            .fill(Color.black.opacity(0.65))
+                            .frame(width: max(0, trackWidth - rightX), height: trackHeight)
+                            .offset(x: rightX)
+                    }
+                    
                     // 1. Shaded Selected Region (Draggable to pan cut window)
                     ZStack {
                         RoundedRectangle(cornerRadius: 4)
@@ -367,9 +394,12 @@ public struct AudioWaveformTrimmerView: View {
                         .gesture(
                             DragGesture(minimumDistance: 0)
                                 .onChanged { g in
-                                    isDraggingLeftHandle = true
-                                    let newStart = (Double(g.location.x) / Double(trackWidth)) * total
-                                    self.startTime = max(0.0, min(self.endTime - 1.0, newStart))
+                                    if !isDraggingLeftHandle {
+                                        isDraggingLeftHandle = true
+                                        dragInitialStart = startTime
+                                    }
+                                    let deltaSec = (Double(g.translation.width) / Double(trackWidth)) * total
+                                    self.startTime = max(0.0, min(self.endTime - 1.0, dragInitialStart + deltaSec))
                                     if player.isPlaying { player.stop() }
                                 }
                                 .onEnded { _ in
@@ -383,9 +413,12 @@ public struct AudioWaveformTrimmerView: View {
                         .gesture(
                             DragGesture(minimumDistance: 0)
                                 .onChanged { g in
-                                    isDraggingRightHandle = true
-                                    let newEnd = (Double(g.location.x) / Double(trackWidth)) * total
-                                    self.endTime = max(self.startTime + 1.0, min(total, newEnd))
+                                    if !isDraggingRightHandle {
+                                        isDraggingRightHandle = true
+                                        dragInitialEnd = endTime
+                                    }
+                                    let deltaSec = (Double(g.translation.width) / Double(trackWidth)) * total
+                                    self.endTime = max(self.startTime + 1.0, min(total, dragInitialEnd + deltaSec))
                                     if player.isPlaying { player.stop() }
                                 }
                                 .onEnded { _ in
@@ -463,13 +496,19 @@ public struct AudioWaveformTrimmerView: View {
         let isSelected = isCutActive && abs(currentLen - seconds) < 0.5
         
         return Button(action: {
-            isCutActive = true
-            let target = min(totalDuration, seconds)
-            if startTime + target <= totalDuration {
-                endTime = startTime + target
-            } else {
-                startTime = max(0.0, totalDuration - target)
+            if seconds >= totalDuration {
+                isCutActive = false
+                startTime = 0.0
                 endTime = totalDuration
+            } else {
+                isCutActive = true
+                let target = min(totalDuration, seconds)
+                if startTime + target <= totalDuration {
+                    endTime = startTime + target
+                } else {
+                    startTime = max(0.0, totalDuration - target)
+                    endTime = totalDuration
+                }
             }
             if player.isPlaying { player.stop() }
         }) {

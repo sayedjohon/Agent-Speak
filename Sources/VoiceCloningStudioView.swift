@@ -488,8 +488,16 @@ public struct VoiceCloningStudioView: View {
         
         self.audioDuration = dur
         self.trimStartTime = 0.0
-        self.trimEndTime = dur > 0 ? min(dur, 15.0) : 15.0
-        self.isCutActive = true
+        if dur > 15.0 {
+            self.trimEndTime = 15.0
+            self.isCutActive = true
+        } else if dur > 5.0 {
+            self.trimEndTime = max(3.0, round(dur * 0.70))
+            self.isCutActive = true
+        } else {
+            self.trimEndTime = dur
+            self.isCutActive = false
+        }
     }
     
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
