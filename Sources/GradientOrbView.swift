@@ -274,21 +274,26 @@ public struct CompactVisualizerOrbView: View {
     }
     
     public var body: some View {
-        HStack(spacing: 20) {
-            GradientOrbVisualizerView(isSpeaking: isSpeaking, size: 58)
+        HStack(spacing: 16) {
+            JarvisOrbVisualizerView(
+                isSpeaking: isSpeaking,
+                isPlayingMusic: BackgroundMusicManager.shared.isPlaying,
+                size: 64
+            )
+            .frame(width: 64, height: 64)
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(isSpeaking ? Color.green : Color(red: 0.2, green: 0.85, blue: 0.5))
+                        .fill(isSpeaking ? Color(red: 1.0, green: 0.55, blue: 0.1) : Color(red: 0.2, green: 0.85, blue: 0.5))
                         .frame(width: 8, height: 8)
                     
-                    Text(isSpeaking ? "ACTIVE PLAYBACK" : "SPEECH ENGINE READY")
+                    Text(isSpeaking ? "JARVIS HOLOGRAM ACTIVE" : "JARVIS CORE ONLINE")
                         .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundColor(isSpeaking ? .green : Color(red: 0.2, green: 0.85, blue: 0.5))
+                        .foregroundColor(isSpeaking ? Color(red: 1.0, green: 0.65, blue: 0.15) : Color(red: 0.2, green: 0.85, blue: 0.5))
                 }
                 
-                Text(isSpeaking ? "Vocalizing speech through the camera notch player..." : "Ready to speak assistant responses, clipboard text, and selection.")
+                Text(isSpeaking ? "Vocalizing speech through 120 FPS Jarvis holographic arc reactor..." : "Ready to speak assistant responses, clipboard text, and selection.")
                     .font(.system(size: 11, weight: .regular))
                     .foregroundColor(.secondary)
                     .lineLimit(2)
@@ -304,7 +309,7 @@ public struct CompactVisualizerOrbView: View {
                 .fill(Color(NSColor.windowBackgroundColor).opacity(0.6))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+                        .strokeBorder(isSpeaking ? Color.orange.opacity(0.35) : Color.white.opacity(0.08), lineWidth: 1)
                 )
         )
     }

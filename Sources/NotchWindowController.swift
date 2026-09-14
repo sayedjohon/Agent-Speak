@@ -508,7 +508,7 @@ public class NotchWindowController {
                 hasNotch = false
             }
             
-            let notchWidth: CGFloat = 185.0
+            let notchWidth: CGFloat = 212.0
             let barHeight: CGFloat = 30.0
             let windowWidth = notchWidth + 24.0
             let windowHeight = barHeight + 20.0

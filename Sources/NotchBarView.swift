@@ -6,7 +6,7 @@ struct PointyTopNotchBarView: View {
     @ObservedObject var state: StreamingAudioManager
     let hasNotch: Bool
     
-    let notchWidth: CGFloat = 185.0
+    let notchWidth: CGFloat = 212.0
     let barHeight: CGFloat = 30.0
     
     var topRadius: CGFloat { hasNotch ? 0 : 10 }
@@ -14,6 +14,14 @@ struct PointyTopNotchBarView: View {
     
     var body: some View {
         HStack(spacing: 5) {
+            // Mini Jarvis Hologram Arc Reactor Orb
+            JarvisOrbVisualizerView(
+                isSpeaking: state.isPlaying,
+                isPlayingMusic: BackgroundMusicManager.shared.isPlaying,
+                size: 20
+            )
+            .frame(width: 20, height: 20)
+            
             // Play / Pause
             Button(action: { state.togglePlayPause() }) {
                 Image(systemName: state.isPlaying ? "pause.fill" : "play.fill")
