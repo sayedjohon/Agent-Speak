@@ -40,7 +40,8 @@ func printHelp() {
     Commands:
       status      Check if Agent Speak is running
       say <text>  Speak text through the Liquid Glass notch player (Default System Voice)
-      pb          Speak copied clipboard text (perfect for ChatGPT, web, or any app)
+      selected    Speak highlighted or selected text (alias: sel)
+      pb          Speak copied clipboard text (alias: clipboard)
       settings    Open the Agent Speak Settings window (alias: dashboard)
       tray        Toggle or set menu bar tray icon (tray on | off | toggle)
       test-jarvis Test playback of the Jarvis voice sample in the Notch Player
@@ -137,6 +138,13 @@ case "dashboard", "settings":
         print("[Agent Speak] Showing Agent Speak Settings...")
     } else {
         print("Error: Could not launch Agent Speak Settings.")
+    }
+
+case "selected", "sel":
+    if ensureAppRunningAndSend("__CMD_SPEAK_SELECTED__") {
+        print("[Agent Speak] Capturing and speaking selected text...")
+    } else {
+        print("Error: Could not connect to Agent Speak socket.")
     }
 
 case "test-jarvis":

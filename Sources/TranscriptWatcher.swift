@@ -467,6 +467,14 @@ public class TranscriptWatcher {
                         DispatchQueue.main.async {
                             AppDelegate.shared?.showDashboard()
                         }
+                    } else if raw == "__CMD_SPEAK_SELECTED__" {
+                        DispatchQueue.main.async {
+                            AppDelegate.shared?.speakSelected()
+                        }
+                    } else if raw == "__CMD_SPEAK_CLIPBOARD__" {
+                        DispatchQueue.main.async {
+                            AppDelegate.shared?.speakClipboard()
+                        }
                     } else if raw == "__PING__" {
                         // Health check ping, no action required
                     } else if raw == "__CMD_TRAY_ON__" {

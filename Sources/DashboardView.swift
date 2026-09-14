@@ -720,9 +720,11 @@ public struct DashboardView: View {
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(.secondary)
                 
-                shortcutRow(keys: "Esc", title: "Instant Silence", desc: "Dismisses notch player and halts active speech immediately")
-                shortcutRow(keys: "⌘ P", title: "Read Clipboard", desc: "Available in menu bar tray menu to read copied browser/ChatGPT text")
-                shortcutRow(keys: "⌘ ,", title: "Settings", desc: "Open this Settings window from the menu bar icon")
+                shortcutRow(keys: "⌃ S", title: "Selected Play", desc: "Speak highlighted or selected text across any application")
+                shortcutRow(keys: "⌃ P", title: "Clipboard Play", desc: "Speak text currently copied on clipboard")
+                shortcutRow(keys: "⌃ ,", title: "Settings", desc: "Open Settings window from anywhere")
+                shortcutRow(keys: "⌃ X / Esc", title: "Instant Silence", desc: "Dismisses notch player and halts active speech immediately")
+                shortcutRow(keys: "⌘ Q", title: "Quit Application", desc: "Exit and terminate the Agent Speak daemon")
             }
             .padding(12)
             .background(Color.white.opacity(0.04))

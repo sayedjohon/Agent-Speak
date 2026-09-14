@@ -1,5 +1,6 @@
 import Cocoa
 import SwiftUI
+import Carbon
 
 public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     public static var shared: AppDelegate!
@@ -10,6 +11,9 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     
     var idleIcon: NSImage?
     var speakingIcon: NSImage?
+    
+    private var hotKeyRefs: [EventHotKeyRef] = []
+    private var eventHandlerRef: EventHandlerRef?
     
     public var isTrayIconVisible: Bool {
         return statusItem?.isVisible ?? false
@@ -35,6 +39,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         
         setupDashboardWindow()
         NotchWindowController.shared.setupEscapeKeyTap()
+        registerGlobalHotKeys()
         
         // Listen for live speech state to toggle tray visual indicator
         SpeechQueueManager.shared.onSpeakingChanged = { [weak self] isSpeaking in
@@ -240,9 +245,9 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         
         let isSpeaking = SpeechQueueManager.shared.isSpeaking
         
-        // 1. Settings (Traditional 1-word name, gear icon, ⌘,)
+        // 1. Settings (1 word, gear icon, ⌃,)
         let settingsItem = NSMenuItem(title: "Settings...", action: #selector(showDashboard), keyEquivalent: ",")
-        settingsItem.keyEquivalentModifierMask = [.command]
+        settingsItem.keyEquivalentModifierMask = [.control]
         if let icon = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Settings") {
             icon.isTemplate = true
             settingsItem.image = icon
@@ -252,19 +257,29 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
-        // 2. Speak Clipboard (2 words, clipboard icon, ⌘P)
-        let clipboardItem = NSMenuItem(title: "Speak Clipboard", action: #selector(speakClipboard), keyEquivalent: "p")
-        clipboardItem.keyEquivalentModifierMask = [.command]
-        if let icon = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "Clipboard") {
+        // 2. Selected Play (2 words, text cursor icon, ⌃S)
+        let selectedItem = NSMenuItem(title: "Selected Play", action: #selector(speakSelected), keyEquivalent: "s")
+        selectedItem.keyEquivalentModifierMask = [.control]
+        if let icon = NSImage(systemSymbolName: "text.cursor", accessibilityDescription: "Selected Play") {
+            icon.isTemplate = true
+            selectedItem.image = icon
+        }
+        selectedItem.target = self
+        menu.addItem(selectedItem)
+        
+        // 3. Clipboard Play (2 words, clipboard icon, ⌃P)
+        let clipboardItem = NSMenuItem(title: "Clipboard Play", action: #selector(speakClipboard), keyEquivalent: "p")
+        clipboardItem.keyEquivalentModifierMask = [.control]
+        if let icon = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "Clipboard Play") {
             icon.isTemplate = true
             clipboardItem.image = icon
         }
         clipboardItem.target = self
         menu.addItem(clipboardItem)
         
-        // 3. Stop (1 word, stop icon, ⌘S)
-        let stopItem = NSMenuItem(title: "Stop", action: #selector(stopSpeech), keyEquivalent: "s")
-        stopItem.keyEquivalentModifierMask = [.command]
+        // 4. Stop (1 word, stop icon, ⌃X)
+        let stopItem = NSMenuItem(title: "Stop", action: #selector(stopSpeech), keyEquivalent: "x")
+        stopItem.keyEquivalentModifierMask = [.control]
         if let icon = NSImage(systemSymbolName: "stop.circle", accessibilityDescription: "Stop") {
             icon.isTemplate = true
             stopItem.image = icon
@@ -275,7 +290,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
-        // 4. Quit (1 word, power icon, ⌘Q)
+        // 5. Quit (1 word, power icon, ⌘Q)
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q")
         quitItem.keyEquivalentModifierMask = [.command]
         if let icon = NSImage(systemSymbolName: "power", accessibilityDescription: "Quit") {
@@ -366,6 +381,84 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     
     // MARK: - Actions
     
+    @objc func speakSelected() {
+        // Wait 0.15s to ensure previous application window has key focus if triggered from menu click
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            self?.captureAndSpeakSelectedText()
+        }
+    }
+    
+    public func captureAndSpeakSelectedText() {
+        // 1. First attempt: AXUIElement (Fastest, zero clipboard modification)
+        let systemWide = AXUIElementCreateSystemWide()
+        var focusedAppValue: AnyObject?
+        if AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute as CFString, &focusedAppValue) == .success,
+           let focusedApp = focusedAppValue {
+            var focusedElementValue: AnyObject?
+            if AXUIElementCopyAttributeValue(focusedApp as! AXUIElement, kAXFocusedUIElementAttribute as CFString, &focusedElementValue) == .success,
+               let focusedElem = focusedElementValue {
+                var selectedTextValue: AnyObject?
+                if AXUIElementCopyAttributeValue(focusedElem as! AXUIElement, kAXSelectedTextAttribute as CFString, &selectedTextValue) == .success,
+                   let str = selectedTextValue as? String {
+                    let trimmed = str.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty {
+                        let clean = TextSanitizer.sanitizeForSpeech(trimmed)
+                        if !clean.isEmpty {
+                            SpeechQueueManager.shared.enqueue(source: "Selected Text", text: clean)
+                            return
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 2. Second attempt: Synthetic Command + C simulation (Universal across Chrome, Safari, Electron, Code Editors)
+        let pb = NSPasteboard.general
+        let prevCount = pb.changeCount
+        let previousString = pb.string(forType: .string)
+        
+        let src = CGEventSource(stateID: .hidSystemState)
+        let cDown = CGEvent(keyboardEventSource: src, virtualKey: 0x08, keyDown: true) // 'c'
+        cDown?.flags = .maskCommand
+        let cUp = CGEvent(keyboardEventSource: src, virtualKey: 0x08, keyDown: false)
+        cUp?.flags = .maskCommand
+        cDown?.post(tap: .cghidEventTap)
+        cUp?.post(tap: .cghidEventTap)
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            if pb.changeCount != prevCount,
+               let copied = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !copied.isEmpty {
+                let clean = TextSanitizer.sanitizeForSpeech(copied)
+                if !clean.isEmpty {
+                    SpeechQueueManager.shared.enqueue(source: "Selected Text", text: clean)
+                    return
+                }
+            }
+            
+            // 3. AppleScript keystroke fallback if CGEvent tap was filtered
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            p.arguments = ["-e", "tell application \"System Events\" to keystroke \"c\" using {command down}"]
+            try? p.run()
+            p.waitUntilExit()
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.10) {
+                if let copied = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !copied.isEmpty, copied != previousString {
+                    let clean = TextSanitizer.sanitizeForSpeech(copied)
+                    if !clean.isEmpty {
+                        SpeechQueueManager.shared.enqueue(source: "Selected Text", text: clean)
+                        return
+                    }
+                }
+                
+                // If nothing was selected, beep to give user feedback
+                NSSound.beep()
+            }
+        }
+    }
+    
     @objc func speakClipboard() {
         if let pbText = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines), !pbText.isEmpty {
             let clean = TextSanitizer.sanitizeForSpeech(pbText)
@@ -384,6 +477,62 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     
     @objc func stopSpeech() {
         SpeechQueueManager.shared.stopCurrent()
+    }
+    
+    // MARK: - Global HotKeys (Carbon)
+    
+    private func registerGlobalHotKeys() {
+        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        let target = GetEventDispatcherTarget()
+        
+        InstallEventHandler(target, { (handler, event, userData) -> OSStatus in
+            guard let event = event else { return noErr }
+            var hotKeyID = EventHotKeyID()
+            GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
+            
+            DispatchQueue.main.async {
+                guard let appDelegate = NSApp.delegate as? AppDelegate else { return }
+                switch hotKeyID.id {
+                case 1: // Ctrl + S: Selected Play
+                    appDelegate.captureAndSpeakSelectedText()
+                case 2: // Ctrl + P: Clipboard Play
+                    appDelegate.speakClipboard()
+                case 3: // Ctrl + ,: Settings
+                    appDelegate.showDashboard()
+                case 4: // Ctrl + X: Stop
+                    appDelegate.stopSpeech()
+                default:
+                    break
+                }
+            }
+            return noErr
+        }, 1, &eventType, nil, &eventHandlerRef)
+        
+        let sig: OSType = 0x4153504B // "ASPK"
+        
+        // 1. Ctrl + S (Selected Play)
+        var ref1: EventHotKeyRef?
+        if RegisterEventHotKey(UInt32(kVK_ANSI_S), UInt32(controlKey), EventHotKeyID(signature: sig, id: 1), target, 0, &ref1) == noErr, let r = ref1 {
+            hotKeyRefs.append(r)
+        }
+        
+        // 2. Ctrl + P (Clipboard Play)
+        var ref2: EventHotKeyRef?
+        if RegisterEventHotKey(UInt32(kVK_ANSI_P), UInt32(controlKey), EventHotKeyID(signature: sig, id: 2), target, 0, &ref2) == noErr, let r = ref2 {
+            hotKeyRefs.append(r)
+        }
+        
+        // 3. Ctrl + , (Settings)
+        var ref3: EventHotKeyRef?
+        if RegisterEventHotKey(UInt32(kVK_ANSI_Comma), UInt32(controlKey), EventHotKeyID(signature: sig, id: 3), target, 0, &ref3) == noErr, let r = ref3 {
+            hotKeyRefs.append(r)
+        }
+        
+        // 4. Ctrl + X (Stop)
+        var ref4: EventHotKeyRef?
+        if RegisterEventHotKey(UInt32(kVK_ANSI_X), UInt32(controlKey), EventHotKeyID(signature: sig, id: 4), target, 0, &ref4) == noErr, let r = ref4 {
+            hotKeyRefs.append(r)
+        }
     }
     
     @objc func confirmHideTrayIcon() {
