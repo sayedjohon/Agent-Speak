@@ -46,7 +46,22 @@ if [[ -d "$SCRIPT_DIR/Resources" ]]; then
     echo -e "${CYAN}→ Installing custom brand assets & icons...${NC}"
     cp -R "$SCRIPT_DIR/Resources/"* "$APPS_DIR/Agent Speak.app/Contents/Resources/"
 fi
+
+# Clean extended attributes (prevents 'resource fork detritus' codesign error)
+xattr -cr "$APPS_DIR/Agent Speak.app"
+
+# Deep Codesign to bind bundle ID and seal resources for TCC / Accessibility
+echo -e "${CYAN}→ Signing Agent Speak.app bundle (com.agentspeak.app)...${NC}"
+codesign --force --deep --sign - --identifier "com.agentspeak.app" "$APPS_DIR/Agent Speak.app"
+
+# Register LaunchServices so Finder displays AppIcon.icns
+echo -e "${CYAN}→ Registering custom application icon in macOS Finder...${NC}"
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APPS_DIR/Agent Speak.app" 2>/dev/null || true
 touch "$APPS_DIR/Agent Speak.app"
+
+# Configure menu bar tray position (distance 360pt from right, safely away from notch)
+defaults write com.agentspeak.app "NSStatusItem Preferred Position AgentSpeakTray" -float 360
+defaults write com.agentspeak.app "NSStatusItem Preferred Position Item-0" -float 360
 
 # Also keep a copy in bin/
 mkdir -p "$SCRIPT_DIR/bin"
@@ -73,27 +88,51 @@ if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
     cp "$SCRIPT_DIR/config/default_config.json" "$CONFIG_DIR/config.json"
 fi
 
-# 5. Add to macOS Login Items for Auto-Start on Boot
-echo -e "${CYAN}→ Registering Agent Speak as a macOS Login Item...${NC}"
-osascript -e '
-tell application "System Events"
-    set appPath to (POSIX file "'"$APPS_DIR/Agent Speak.app"'") as text
-    if not (exists login item "Agent Speak") then
-        make new login item at end with properties {path:appPath, hidden:true, name:"Agent Speak"}
-    end if
-end tell
-' 2>/dev/null || true
+# 5. Clean Obsolete Legacy LaunchAgents & Register 24/7 Daemon
+echo -e "${CYAN}→ Registering Agent Speak as a permanent background service...${NC}"
+launchctl unload "$HOME/Library/LaunchAgents/com.sayedjohon.antigravity-voice-watcher.plist" 2>/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/com.sayedjohon.antigravity-voice-watcher.plist"
+launchctl unload "$HOME/Library/LaunchAgents/com.antigravity.jarvis.plist" 2>/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/com.antigravity.jarvis.plist"
+pkill -9 -f "antigravity_voice_watcher" 2>/dev/null || true
 
-# 6. Launch Application
-echo -e "${CYAN}→ Launching Agent Speak...${NC}"
-open "$APPS_DIR/Agent Speak.app"
+PLIST_PATH="$HOME/Library/LaunchAgents/com.agentspeak.app.plist"
+launchctl unload "$PLIST_PATH" 2>/dev/null || true
+
+cat <<EOF > "$PLIST_PATH"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.agentspeak.app</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$APPS_DIR/Agent Speak.app/Contents/MacOS/AgentSpeak</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+    <key>StandardOutPath</key>
+    <string>/tmp/agentspeak.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/agentspeak_err.log</string>
+</dict>
+</plist>
+EOF
+
+chmod 644 "$PLIST_PATH"
+launchctl load -w "$PLIST_PATH"
 
 echo -e "\n${GREEN}${BOLD}✓ Agent Speak installed successfully!${NC}"
 echo -e "${BLUE}• Application:${NC}     $APPS_DIR/Agent Speak.app"
 echo -e "${BLUE}• CLI Controller:${NC}  $BIN_DIR/agentspeak (alias: aspk)"
 echo -e "${BLUE}• Voice Engine:${NC}    Default System Voice (Natural macOS)"
-echo -e "${BLUE}• Permissions:${NC}     Single Accessibility item: 'Agent Speak.app'"
-echo -e "${BLUE}• Auto-Start:${NC}      Registered in macOS Login Items\n"
+echo -e "${BLUE}• Background:${NC}      Launchd KeepAlive 24/7 (com.agentspeak.app)\n"
 
-sleep 1
+sleep 1.5
+"$BIN_DIR/agentspeak" status
 "$BIN_DIR/agentspeak" say "Agent Speak is installed and running with your natural system voice."

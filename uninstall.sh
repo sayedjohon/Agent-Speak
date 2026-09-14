@@ -7,7 +7,9 @@ set -e
 
 echo "Uninstalling Agent Speak..."
 
-# Stop running processes
+# Stop running processes & unload LaunchAgent
+launchctl unload "$HOME/Library/LaunchAgents/com.agentspeak.app.plist" 2>/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/com.agentspeak.app.plist"
 pkill -9 -f "AgentSpeak" 2>/dev/null || true
 
 # Remove Login Item

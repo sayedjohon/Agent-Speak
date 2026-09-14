@@ -1,6 +1,7 @@
 import Cocoa
 import SwiftUI
 import AVFoundation
+import Carbon
 
 // MARK: - Sentence Chunker
 func splitTextIntoChunks(text: String) -> [String] {
@@ -13,14 +14,20 @@ func splitTextIntoChunks(text: String) -> [String] {
         cur.append(char)
         if char == "." || char == "!" || char == "?" || char == "\n" {
             let s = cur.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !s.isEmpty { rawSentences.append(s) }
+            if !s.isEmpty && s.contains(where: { $0.isLetter || $0.isNumber }) {
+                rawSentences.append(s)
+            }
             cur = ""
         }
     }
     let rem = cur.trimmingCharacters(in: .whitespacesAndNewlines)
-    if !rem.isEmpty { rawSentences.append(rem) }
+    if !rem.isEmpty && rem.contains(where: { $0.isLetter || $0.isNumber }) {
+        rawSentences.append(rem)
+    }
     
-    if rawSentences.isEmpty { return [clean] }
+    if rawSentences.isEmpty {
+        return clean.contains(where: { $0.isLetter || $0.isNumber }) ? [clean] : []
+    }
     if rawSentences.count == 1 { return rawSentences }
     
     let minChunk0Words = 6
@@ -84,6 +91,7 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published var isDragging = false
     @Published var currentChunkIndex: Int = 0
     @Published var totalChunksCount: Int = 1
+    @Published var skipSeconds: Int = 5
     
     var chunks: [AudioChunk] = []
     var timer: Timer?
@@ -93,26 +101,47 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var activeRenderProcess: Process?
     private let renderQueue = DispatchQueue(label: "com.agentspeak.speech.render", qos: .userInitiated)
     
+    static func loadSkipSeconds() -> Int {
+        let configPath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".agentspeak/config.json")
+        guard let data = try? Data(contentsOf: configPath),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let audio = json["audio"] as? [String: Any],
+              let s = audio["skip_seconds"] as? Int else {
+            return 5
+        }
+        return s
+    }
+    
     init(text: String, onClose: (() -> Void)?) {
         self.onClose = onClose
+        self.skipSeconds = StreamingAudioManager.loadSkipSeconds()
         super.init()
         
         let sessionId = UInt32.random(in: 1000...9999)
         let textChunks = splitTextIntoChunks(text: text)
-        self.totalChunksCount = max(1, textChunks.count)
+        if textChunks.isEmpty {
+            DispatchQueue.main.async { [weak self] in
+                self?.close()
+            }
+            return
+        }
+        
+        self.totalChunksCount = textChunks.count
         self.chunks = textChunks.enumerated().map { idx, chunkText in
             AudioChunk(index: idx, text: chunkText, filePath: "/tmp/speech_chunk_\(sessionId)_\(idx).aiff")
         }
         
         // Render Chunk 0 synchronously for instant start (~50-80ms)
-        if !self.chunks.isEmpty {
-            renderChunk(index: 0)
-            if let p = self.chunks[0].player {
-                p.play()
-                self.isPlaying = true
-                self.currentChunkIndex = 0
-                self.updateTimelineDurations()
-                self.startTimer()
+        renderChunk(index: 0)
+        if let p = self.chunks[0].player {
+            p.play()
+            self.isPlaying = true
+            self.currentChunkIndex = 0
+            self.updateTimelineDurations()
+            self.startTimer()
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.close()
             }
         }
         
@@ -140,6 +169,10 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
             self.isPlaying = true
             self.currentChunkIndex = 0
             self.startTimer()
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.close()
+            }
         }
     }
     
@@ -383,9 +416,9 @@ struct PointyTopNotchBarView: View {
             }
             .buttonStyle(.plain)
             
-            // Skip Back 15s
-            Button(action: { state.skip(seconds: -15) }) {
-                Image(systemName: "gobackward.15")
+            // Skip Back (Configurable Step)
+            Button(action: { state.skip(seconds: -Double(state.skipSeconds)) }) {
+                Image(systemName: "gobackward.\(state.skipSeconds)")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundColor(.white.opacity(0.95))
                     .frame(width: 16, height: 16)
@@ -432,9 +465,9 @@ struct PointyTopNotchBarView: View {
             }
             .frame(height: 12)
             
-            // Skip Forward 15s
-            Button(action: { state.skip(seconds: 15) }) {
-                Image(systemName: "goforward.15")
+            // Skip Forward (Configurable Step)
+            Button(action: { state.skip(seconds: Double(state.skipSeconds)) }) {
+                Image(systemName: "goforward.\(state.skipSeconds)")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundColor(.white.opacity(0.95))
                     .frame(width: 16, height: 16)
@@ -467,13 +500,34 @@ struct PointyTopNotchBarView: View {
     }
 }
 
+// MARK: - Keyable Floating Panel
+class KeyablePanel: NSPanel {
+    override var canBecomeKey: Bool { return true }
+    override var canBecomeMain: Bool { return true }
+    
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 53 { // Escape
+            DispatchQueue.main.async {
+                SpeechQueueManager.shared.stopCurrent()
+            }
+            return
+        }
+        super.keyDown(with: event)
+    }
+}
+
 // MARK: - Notch Window Controller
 public class NotchWindowController {
     public static let shared = NotchWindowController()
     
-    private var window: NSPanel?
+    private var window: KeyablePanel?
     private var audioManager: StreamingAudioManager?
     private var eventTap: CFMachPort?
+    private var runLoopSource: CFRunLoopSource?
+    private var globalKeyMonitor: Any?
+    private var localKeyMonitor: Any?
+    private var hotKeyRef: EventHotKeyRef?
+    private var eventHandlerRef: EventHandlerRef?
     
     private init() {}
     
@@ -514,7 +568,7 @@ public class NotchWindowController {
             }
             
             let frame = NSRect(x: x, y: y, width: windowWidth, height: windowHeight)
-            let panel = NSPanel(
+            let panel = KeyablePanel(
                 contentRect: frame,
                 styleMask: [.borderless, .nonactivatingPanel],
                 backing: .buffered,
@@ -540,7 +594,22 @@ public class NotchWindowController {
             panel.orderFront(nil)
             self.window = panel
             
+            // Instant Autoplay Verification
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                guard let self = self, let mgr = self.audioManager else { return }
+                if !mgr.isPlaying {
+                    if let p = mgr.chunks.first?.player {
+                        p.play()
+                        mgr.isPlaying = true
+                        mgr.startTimer()
+                    } else {
+                        self.dismiss()
+                    }
+                }
+            }
+            
             self.setupEscapeKeyTap()
+            self.registerGlobalEscapeHotKey()
         }
     }
     
@@ -581,7 +650,7 @@ public class NotchWindowController {
             }
             
             let frame = NSRect(x: x, y: y, width: windowWidth, height: windowHeight)
-            let panel = NSPanel(
+            let panel = KeyablePanel(
                 contentRect: frame,
                 styleMask: [.borderless, .nonactivatingPanel],
                 backing: .buffered,
@@ -607,7 +676,22 @@ public class NotchWindowController {
             panel.orderFront(nil)
             self.window = panel
             
+            // Instant Autoplay Verification
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                guard let self = self, let mgr = self.audioManager else { return }
+                if !mgr.isPlaying {
+                    if let p = mgr.chunks.first?.player {
+                        p.play()
+                        mgr.isPlaying = true
+                        mgr.startTimer()
+                    } else {
+                        self.dismiss()
+                    }
+                }
+            }
+            
             self.setupEscapeKeyTap()
+            self.registerGlobalEscapeHotKey()
         }
     }
     
@@ -617,48 +701,136 @@ public class NotchWindowController {
         isDismissing = true
         defer { isDismissing = false }
         
-        if let tap = eventTap {
-            CGEvent.tapEnable(tap: tap, enable: false)
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0), .commonModes)
-            eventTap = nil
-        }
+        unregisterGlobalEscapeHotKey()
+        
         let mgr = audioManager
         audioManager = nil
-        mgr?.onClose = nil
         mgr?.close()
         
         window?.orderOut(nil)
         window = nil
     }
     
-    private func setupEscapeKeyTap() {
-        guard eventTap == nil else { return }
-        let eventMask = (1 << CGEventType.keyDown.rawValue)
-        let refcon = Unmanaged.passUnretained(self).toOpaque()
+    public func setupEscapeKeyTap() {
+        // 1. CoreGraphics Global Event Tap (Active interceptor)
+        if eventTap == nil {
+            let eventMask = (1 << CGEventType.keyDown.rawValue)
+            let refcon = Unmanaged.passUnretained(self).toOpaque()
+            
+            if let tap = CGEvent.tapCreate(
+                tap: .cgSessionEventTap,
+                place: .headInsertEventTap,
+                options: .defaultTap,
+                eventsOfInterest: CGEventMask(eventMask),
+                callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
+                    if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                        if let refcon = refcon {
+                            let controller = Unmanaged<NotchWindowController>.fromOpaque(refcon).takeUnretainedValue()
+                            if let t = controller.eventTap {
+                                CGEvent.tapEnable(tap: t, enable: true)
+                            }
+                        }
+                        return nil
+                    }
+                    
+                    let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+                    if keyCode == 53 { // Escape
+                        if let refcon = refcon {
+                            let controller = Unmanaged<NotchWindowController>.fromOpaque(refcon).takeUnretainedValue()
+                            if controller.window != nil || SpeechQueueManager.shared.isSpeaking {
+                                DispatchQueue.main.async {
+                                    SpeechQueueManager.shared.stopCurrent()
+                                }
+                                return nil // Swallows Escape so background windows aren't affected
+                            }
+                        }
+                    }
+                    return Unmanaged.passUnretained(event)
+                },
+                userInfo: refcon
+            ) {
+                let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+                CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+                CGEvent.tapEnable(tap: tap, enable: true)
+                self.eventTap = tap
+                self.runLoopSource = source
+                NSLog("[AgentSpeak] CGEventTap for Escape key installed.")
+            } else {
+                NSLog("[AgentSpeak] Warning: CGEventTap could not be created. Using NSEvent monitors.")
+            }
+        } else if let tap = eventTap {
+            CGEvent.tapEnable(tap: tap, enable: true)
+        }
         
-        if let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: CGEventMask(eventMask),
-            callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
-                let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-                if keyCode == 53 { // Escape
-                    if let refcon = refcon {
-                        let controller = Unmanaged<NotchWindowController>.fromOpaque(refcon).takeUnretainedValue()
+        // 2. Global Event Monitor (Passive fallback for when active tap is bypassed)
+        if globalKeyMonitor == nil {
+            globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                if event.keyCode == 53 { // Escape
+                    guard let self = self else { return }
+                    if self.window != nil || SpeechQueueManager.shared.isSpeaking {
                         DispatchQueue.main.async {
-                            controller.dismiss()
+                            SpeechQueueManager.shared.stopCurrent()
                         }
                     }
                 }
-                return Unmanaged.passUnretained(event)
-            },
-            userInfo: refcon
-        ) {
-            let runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
-            CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
-            CGEvent.tapEnable(tap: tap, enable: true)
-            self.eventTap = tap
+            }
+        }
+        
+        // 3. Local Key Monitor (Active when notch window or application has focus)
+        if localKeyMonitor == nil {
+            localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                if event.keyCode == 53 { // Escape
+                    guard let self = self else { return event }
+                    if self.window != nil || SpeechQueueManager.shared.isSpeaking {
+                        DispatchQueue.main.async {
+                            SpeechQueueManager.shared.stopCurrent()
+                        }
+                        return nil
+                    }
+                }
+                return event
+            }
+        }
+    }
+    
+    // MARK: - 4. Carbon Global HotKey (0 Permissions Required — macOS System-Wide Native Dispatch)
+    public func registerGlobalEscapeHotKey() {
+        guard hotKeyRef == nil else { return }
+        
+        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        let target = GetEventDispatcherTarget()
+        
+        let status = InstallEventHandler(target, { (handler, event, userData) -> OSStatus in
+            guard let event = event else { return noErr }
+            var hotKeyID = EventHotKeyID()
+            GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
+            
+            if hotKeyID.id == 53 {
+                DispatchQueue.main.async {
+                    SpeechQueueManager.shared.stopCurrent()
+                }
+                return noErr
+            }
+            return noErr
+        }, 1, &eventType, nil, &eventHandlerRef)
+        
+        let hotKeyID = EventHotKeyID(signature: 0x4153504B, id: 53) // "ASPK", 53
+        let regStatus = RegisterEventHotKey(UInt32(kVK_Escape), 0, hotKeyID, target, 0, &hotKeyRef)
+        if regStatus == noErr {
+            NSLog("[AgentSpeak] Carbon Global Escape HotKey registered (Zero permissions required).")
+        } else {
+            NSLog("[AgentSpeak] Carbon RegisterEventHotKey returned code \(regStatus).")
+        }
+    }
+    
+    public func unregisterGlobalEscapeHotKey() {
+        if let ref = hotKeyRef {
+            UnregisterEventHotKey(ref)
+            hotKeyRef = nil
+        }
+        if let handler = eventHandlerRef {
+            RemoveEventHandler(handler)
+            eventHandlerRef = nil
         }
     }
 }

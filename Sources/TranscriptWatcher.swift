@@ -6,10 +6,14 @@ public class TranscriptWatcher {
     private var state: [String: String] = [:]
     private let stateLock = NSLock()
     private let stateURL: URL
-    private var timer: Timer?
+    private var scanTimer: DispatchSourceTimer?
+    private let scanQueue = DispatchQueue(label: "com.agentspeak.scanner", qos: .utility)
     private let socketPath = "/tmp/agentspeak.sock"
     private var socketSource: DispatchSourceRead?
-    private var isBootstrapping: Bool = false
+    private var fileMetadataCache: [String: (mtime: TimeInterval, size: UInt64)] = [:]
+    
+    private var activeAntigravityTranscripts: [(url: URL, convId: String)] = []
+    private var lastAntigravityRefresh: TimeInterval = 0
     
     public var onSpeechRequest: ((_ source: String, _ text: String) -> Void)?
     
@@ -23,21 +27,23 @@ public class TranscriptWatcher {
     }
     
     public func start() {
-        // Initial silent baseline scan so existing conversation history is NEVER spoken on launch
-        self.isBootstrapping = true
-        self.scan()
-        self.isBootstrapping = false
-        
-        DispatchQueue.main.async { [weak self] in
-            self?.timer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { _ in
+        scanQueue.async { [weak self] in
+            guard let self = self else { return }
+            self.scan()
+            
+            let timer = DispatchSource.makeTimerSource(queue: self.scanQueue)
+            timer.schedule(deadline: .now() + 0.4, repeating: 0.4)
+            timer.setEventHandler { [weak self] in
                 self?.scan()
             }
+            timer.resume()
+            self.scanTimer = timer
         }
     }
     
     public func stop() {
-        timer?.invalidate()
-        timer = nil
+        scanTimer?.cancel()
+        scanTimer = nil
     }
     
     private func loadState() {
@@ -53,6 +59,19 @@ public class TranscriptWatcher {
         }
     }
     
+    private func readTailOfFile(at url: URL, maxBytes: Int = 131072) -> String? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        
+        let fileSize = handle.seekToEndOfFile()
+        if fileSize == 0 { return nil }
+        let readSize = min(fileSize, UInt64(maxBytes))
+        let offset = fileSize - readSize
+        handle.seek(toFileOffset: offset)
+        let data = handle.readData(ofLength: Int(readSize))
+        return String(data: data, encoding: .utf8)
+    }
+    
     public func scan() {
         scanAntigravity()
         scanClaude()
@@ -64,30 +83,51 @@ public class TranscriptWatcher {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let brainDir = home.appendingPathComponent(".gemini/antigravity/brain")
         guard FileManager.default.fileExists(atPath: brainDir.path) else { return }
-        
-        guard let convDirs = try? FileManager.default.contentsOfDirectory(at: brainDir, includingPropertiesForKeys: [.contentModificationDateKey], options: .skipsHiddenFiles) else { return }
-        
         let now = Date().timeIntervalSince1970
         
-        for convDir in convDirs {
-            let transcriptURL = convDir.appendingPathComponent(".system_generated/logs/transcript.jsonl")
-            guard FileManager.default.fileExists(atPath: transcriptURL.path) else { continue }
-            
-            if let attrs = try? FileManager.default.attributesOfItem(atPath: transcriptURL.path),
-               let modDate = attrs[.modificationDate] as? Date {
-                if !isBootstrapping && (now - modDate.timeIntervalSince1970 > 600) {
-                    continue
+        // Refresh active candidate transcripts periodically (every 6 seconds or on startup)
+        if activeAntigravityTranscripts.isEmpty || (now - lastAntigravityRefresh > 6.0) {
+            lastAntigravityRefresh = now
+            if let convDirs = try? FileManager.default.contentsOfDirectory(at: brainDir, includingPropertiesForKeys: nil, options: .skipsHiddenFiles) {
+                var candidates: [(url: URL, convId: String)] = []
+                for convDir in convDirs {
+                    let transcriptURL = convDir.appendingPathComponent(".system_generated/logs/transcript.jsonl")
+                    if let attrs = try? FileManager.default.attributesOfItem(atPath: transcriptURL.path),
+                       let modDate = attrs[.modificationDate] as? Date {
+                        let age = now - modDate.timeIntervalSince1970
+                        if age < 7200 {
+                            candidates.append((url: transcriptURL, convId: convDir.lastPathComponent))
+                        }
+                    }
                 }
+                activeAntigravityTranscripts = candidates
             }
+        }
+        
+        for item in activeAntigravityTranscripts {
+            let transcriptURL = item.url
+            let convId = item.convId
+            guard let attrs = try? FileManager.default.attributesOfItem(atPath: transcriptURL.path),
+                  let modDate = attrs[.modificationDate] as? Date,
+                  let fileSize = attrs[.size] as? UInt64 else { continue }
             
-            let convId = convDir.lastPathComponent
+            let modTime = modDate.timeIntervalSince1970
+            let timeSinceMod = now - modTime
+            if timeSinceMod > 7200 { continue }
+            
+            let tPath = transcriptURL.path
+            if let cached = fileMetadataCache[tPath], cached.mtime == modTime, cached.size == fileSize {
+                continue
+            }
+            fileMetadataCache[tPath] = (modTime, fileSize)
+            
             let convKey = "antigravity_\(convId)"
             
-            guard let content = try? String(contentsOf: transcriptURL, encoding: .utf8) else { continue }
+            guard let content = readTailOfFile(at: transcriptURL) else { continue }
             let lines = content.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
             guard !lines.isEmpty else { continue }
             
-            let subset = lines.suffix(200)
+            let subset = lines.suffix(150)
             var latestModelText: String? = nil
             var latestStep: Int = -1
             var latestCreatedAt: String = ""
@@ -112,27 +152,15 @@ public class TranscriptWatcher {
             }
             
             if let text = latestModelText {
-                let rawId = "\(latestCreatedAt)_\(latestStep)"
+                let rawId = "\(latestCreatedAt)_\(latestStep)_\(text.prefix(60))"
                 
                 stateLock.lock()
                 let lastId = state[convKey]
                 
-                if isBootstrapping {
+                if lastId == nil && timeSinceMod > 90 {
                     state[convKey] = rawId
                     saveState()
                     stateLock.unlock()
-                    continue
-                }
-                
-                if lastId == nil {
-                    state[convKey] = rawId
-                    saveState()
-                    stateLock.unlock()
-                    
-                    let clean = TextSanitizer.sanitizeForSpeech(text)
-                    if !clean.isEmpty {
-                        onSpeechRequest?("Antigravity", clean)
-                    }
                     continue
                 }
                 
@@ -143,7 +171,9 @@ public class TranscriptWatcher {
                     
                     let clean = TextSanitizer.sanitizeForSpeech(text)
                     if !clean.isEmpty {
-                        onSpeechRequest?("Antigravity", clean)
+                        DispatchQueue.main.async { [weak self] in
+                            self?.onSpeechRequest?("Antigravity", clean)
+                        }
                     }
                 } else {
                     stateLock.unlock()
@@ -162,24 +192,31 @@ public class TranscriptWatcher {
         let now = Date().timeIntervalSince1970
         
         for pFolder in projectFolders {
-            guard let files = try? FileManager.default.contentsOfDirectory(at: pFolder, includingPropertiesForKeys: [.contentModificationDateKey], options: .skipsHiddenFiles) else { continue }
+            guard let files = try? FileManager.default.contentsOfDirectory(at: pFolder, includingPropertiesForKeys: nil, options: .skipsHiddenFiles) else { continue }
             
             for file in files where file.pathExtension == "jsonl" {
-                if let attrs = try? FileManager.default.attributesOfItem(atPath: file.path),
-                   let modDate = attrs[.modificationDate] as? Date {
-                    if !isBootstrapping && (now - modDate.timeIntervalSince1970 > 600) {
-                        continue
-                    }
+                guard let attrs = try? FileManager.default.attributesOfItem(atPath: file.path),
+                      let modDate = attrs[.modificationDate] as? Date,
+                      let fileSize = attrs[.size] as? UInt64 else { continue }
+                
+                let modTime = modDate.timeIntervalSince1970
+                let timeSinceMod = now - modTime
+                if timeSinceMod > 7200 { continue }
+                
+                let fPath = file.path
+                if let cached = fileMetadataCache[fPath], cached.mtime == modTime, cached.size == fileSize {
+                    continue
                 }
+                fileMetadataCache[fPath] = (modTime, fileSize)
                 
                 let sessionId = file.deletingPathExtension().lastPathComponent
                 let convKey = "claude_\(sessionId)"
                 
-                guard let content = try? String(contentsOf: file, encoding: .utf8) else { continue }
+                guard let content = readTailOfFile(at: file) else { continue }
                 let lines = content.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
                 guard !lines.isEmpty else { continue }
                 
-                let subset = lines.suffix(200)
+                let subset = lines.suffix(150)
                 var latestAssistantText: String? = nil
                 var latestMsgId: String = ""
                 
@@ -215,27 +252,15 @@ public class TranscriptWatcher {
                 }
                 
                 if let text = latestAssistantText, !latestMsgId.isEmpty {
-                    let rawId = latestMsgId
+                    let rawId = "\(latestMsgId)_\(text.prefix(60))"
                     
                     stateLock.lock()
                     let lastId = state[convKey]
                     
-                    if isBootstrapping {
+                    if lastId == nil && timeSinceMod > 90 {
                         state[convKey] = rawId
                         saveState()
                         stateLock.unlock()
-                        continue
-                    }
-                    
-                    if lastId == nil {
-                        state[convKey] = rawId
-                        saveState()
-                        stateLock.unlock()
-                        
-                        let clean = TextSanitizer.sanitizeForSpeech(text)
-                        if !clean.isEmpty {
-                            onSpeechRequest?("Claude", clean)
-                        }
                         continue
                     }
                     
@@ -246,7 +271,9 @@ public class TranscriptWatcher {
                         
                         let clean = TextSanitizer.sanitizeForSpeech(text)
                         if !clean.isEmpty {
-                            onSpeechRequest?("Claude", clean)
+                            DispatchQueue.main.async { [weak self] in
+                                self?.onSpeechRequest?("Claude", clean)
+                            }
                         }
                     } else {
                         stateLock.unlock()
@@ -258,25 +285,108 @@ public class TranscriptWatcher {
     
     // MARK: - OpenCode & Generic Agent Scanner
     private func scanOpenCode() {
+        scanOpenCodeSQLite()
+        scanOpenCodeLegacyFiles()
+    }
+    
+    private func scanOpenCodeSQLite() {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let dbPath = "\(home)/.local/share/opencode/opencode.db"
+        let walPath = "\(home)/.local/share/opencode/opencode.db-wal"
+        guard FileManager.default.fileExists(atPath: dbPath) else { return }
+        
+        let now = Date().timeIntervalSince1970
+        var targetPath = dbPath
+        if FileManager.default.fileExists(atPath: walPath) {
+            targetPath = walPath
+        }
+        
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: targetPath),
+              let modDate = attrs[.modificationDate] as? Date,
+              let fileSize = attrs[.size] as? UInt64 else { return }
+        
+        let modTime = modDate.timeIntervalSince1970
+        let timeSinceMod = now - modTime
+        if timeSinceMod > 7200 { return }
+        
+        if let cached = fileMetadataCache[targetPath], cached.mtime == modTime, cached.size == fileSize {
+            return
+        }
+        fileMetadataCache[targetPath] = (modTime, fileSize)
+        
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
+        proc.arguments = [
+            dbPath,
+            "SELECT part.id, json_extract(part.data, '$.text') FROM part JOIN message ON part.message_id = message.id WHERE json_extract(message.data, '$.role') = 'assistant' AND json_extract(part.data, '$.type') = 'text' ORDER BY part.time_created DESC LIMIT 1;"
+        ]
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        try? proc.run()
+        proc.waitUntilExit()
+        
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        guard let str = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), !str.isEmpty else { return }
+        
+        let parts = str.components(separatedBy: "|")
+        guard parts.count >= 2 else { return }
+        let partId = parts[0]
+        let text = parts.dropFirst().joined(separator: "|")
+        
+        let convKey = "opencode_sqlite_latest"
+        stateLock.lock()
+        let lastId = state[convKey]
+        
+        if lastId == nil && timeSinceMod > 90 {
+            state[convKey] = partId
+            saveState()
+            stateLock.unlock()
+            return
+        }
+        
+        if partId != lastId {
+            state[convKey] = partId
+            saveState()
+            stateLock.unlock()
+            
+            let clean = TextSanitizer.sanitizeForSpeech(text)
+            if !clean.isEmpty {
+                DispatchQueue.main.async { [weak self] in
+                    self?.onSpeechRequest?("OpenCode", clean)
+                }
+            }
+        } else {
+            stateLock.unlock()
+        }
+    }
+    
+    private func scanOpenCodeLegacyFiles() {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let opencodeDir = home.appendingPathComponent(".opencode/sessions")
         guard FileManager.default.fileExists(atPath: opencodeDir.path) else { return }
         
-        guard let files = try? FileManager.default.contentsOfDirectory(at: opencodeDir, includingPropertiesForKeys: [.contentModificationDateKey], options: .skipsHiddenFiles) else { return }
+        guard let files = try? FileManager.default.contentsOfDirectory(at: opencodeDir, includingPropertiesForKeys: nil, options: .skipsHiddenFiles) else { return }
         let now = Date().timeIntervalSince1970
         
         for file in files where file.pathExtension == "json" || file.pathExtension == "jsonl" {
-            if let attrs = try? FileManager.default.attributesOfItem(atPath: file.path),
-               let modDate = attrs[.modificationDate] as? Date {
-                if !isBootstrapping && (now - modDate.timeIntervalSince1970 > 600) {
-                    continue
-                }
+            guard let attrs = try? FileManager.default.attributesOfItem(atPath: file.path),
+                  let modDate = attrs[.modificationDate] as? Date,
+                  let fileSize = attrs[.size] as? UInt64 else { continue }
+            
+            let modTime = modDate.timeIntervalSince1970
+            let timeSinceMod = now - modTime
+            if timeSinceMod > 7200 { continue }
+            
+            let fPath = file.path
+            if let cached = fileMetadataCache[fPath], cached.mtime == modTime, cached.size == fileSize {
+                continue
             }
+            fileMetadataCache[fPath] = (modTime, fileSize)
             
             let sessionId = file.deletingPathExtension().lastPathComponent
             let convKey = "opencode_\(sessionId)"
             
-            guard let content = try? String(contentsOf: file, encoding: .utf8) else { continue }
+            guard let content = readTailOfFile(at: file) else { continue }
             let lines = content.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
             guard let lastLine = lines.last,
                   let data = lastLine.data(using: .utf8),
@@ -288,21 +398,10 @@ public class TranscriptWatcher {
                 
                 stateLock.lock()
                 let lastId = state[convKey]
-                if isBootstrapping {
+                if lastId == nil && timeSinceMod > 90 {
                     state[convKey] = rawId
                     saveState()
                     stateLock.unlock()
-                    continue
-                }
-                
-                if lastId == nil {
-                    state[convKey] = rawId
-                    saveState()
-                    stateLock.unlock()
-                    let clean = TextSanitizer.sanitizeForSpeech(text)
-                    if !clean.isEmpty {
-                        onSpeechRequest?("OpenCode", clean)
-                    }
                     continue
                 }
                 
@@ -312,7 +411,9 @@ public class TranscriptWatcher {
                     stateLock.unlock()
                     let clean = TextSanitizer.sanitizeForSpeech(text)
                     if !clean.isEmpty {
-                        onSpeechRequest?("OpenCode", clean)
+                        DispatchQueue.main.async { [weak self] in
+                            self?.onSpeechRequest?("OpenCode", clean)
+                        }
                     }
                 } else {
                     stateLock.unlock()
@@ -365,6 +466,19 @@ public class TranscriptWatcher {
                     if raw == "__CMD_SHOW_DASHBOARD__" {
                         DispatchQueue.main.async {
                             AppDelegate.shared?.showDashboard()
+                        }
+                    } else if raw == "__CMD_TRAY_ON__" {
+                        DispatchQueue.main.async {
+                            AppDelegate.shared?.setTrayIconVisible(true)
+                        }
+                    } else if raw == "__CMD_TRAY_OFF__" {
+                        DispatchQueue.main.async {
+                            AppDelegate.shared?.setTrayIconVisible(false)
+                        }
+                    } else if raw == "__CMD_TOGGLE_TRAY__" {
+                        DispatchQueue.main.async {
+                            let cur = AppDelegate.shared?.isTrayIconVisible ?? true
+                            AppDelegate.shared?.setTrayIconVisible(!cur)
                         }
                     } else if raw == "__CMD_STOP_SPEECH__" {
                         DispatchQueue.main.async {

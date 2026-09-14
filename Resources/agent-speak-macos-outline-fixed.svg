@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="92" y="92" width="840" height="840" rx="168" stroke-width="24"/>
+
+    <path
+      d="M512 220
+         C694 220 842 346 842 512
+         C842 678 694 804 512 804
+         C461 804 412 796 368 781
+         L270 846
+         C253 857 232 842 237 821
+         L265 728
+         C207 671 178 594 178 512
+         C178 346 326 220 512 220Z"
+      stroke-width="24"/>
+
+    <g stroke-width="42">
+      <path d="M358 524V586"/>
+      <path d="M435 474V636"/>
+      <path d="M512 410V700"/>
+      <path d="M589 474V636"/>
+      <path d="M666 524V586"/>
+    </g>
+  </g>
+</svg>

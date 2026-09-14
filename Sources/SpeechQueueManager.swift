@@ -4,7 +4,16 @@ import Cocoa
 public class SpeechQueueManager: ObservableObject {
     public static let shared = SpeechQueueManager()
     
-    @Published public var isSpeaking: Bool = false
+    public var onSpeakingChanged: ((Bool) -> Void)?
+    
+    @Published public var isSpeaking: Bool = false {
+        didSet {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.onSpeakingChanged?(self.isSpeaking)
+            }
+        }
+    }
     @Published public var queueCount: Int = 0
     @Published public var currentSpeakerSource: String = ""
     
@@ -66,7 +75,11 @@ public class SpeechQueueManager: ObservableObject {
         queueLock.unlock()
         
         DispatchQueue.main.async { [weak self] in
-            NotchWindowController.shared.presentSpeech(text: item.text, project: item.source) {
+            var finishedOnce = false
+            let finishHandler: () -> Void = {
+                guard !finishedOnce else { return }
+                finishedOnce = true
+                
                 self?.queueLock.lock()
                 self?.isSpeaking = false
                 self?.queueLock.unlock()
@@ -77,6 +90,21 @@ public class SpeechQueueManager: ObservableObject {
                     self?.cleanupTmpAudio()
                     self?.processNext()
                 }
+            }
+            
+            let trimmed = item.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                finishHandler()
+                return
+            }
+            
+            // Watchdog timeout to prevent frozen queue state
+            DispatchQueue.main.asyncAfter(deadline: .now() + 300) {
+                finishHandler()
+            }
+            
+            NotchWindowController.shared.presentSpeech(text: trimmed, project: item.source) {
+                finishHandler()
             }
         }
     }

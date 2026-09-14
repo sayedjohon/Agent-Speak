@@ -40,7 +40,9 @@ func printHelp() {
     Commands:
       status      Check if Agent Speak is running
       say <text>  Speak text through the Liquid Glass notch player (Default System Voice)
+      pb          Speak copied clipboard text (perfect for ChatGPT, web, or any app)
       dashboard   Open the CleanMyMac-style 3D Visualizer Dashboard
+      tray        Toggle or set menu bar tray icon (tray on | off | toggle)
       test-jarvis Test playback of the Jarvis voice sample in the Notch Player
       stop        Stop current speech and dismiss the notch player
       quit        Terminate the Agent Speak application
@@ -77,6 +79,12 @@ func getActiveConfigInfo() -> (engine: String, voice: String) {
 func ensureAppRunningAndSend(_ message: String) -> Bool {
     if sendSocketMessage(message) { return true }
     
+    // Clean stale socket if process not alive
+    let apps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.agentspeak.app")
+    if apps.isEmpty && FileManager.default.fileExists(atPath: socketPath) {
+        try? FileManager.default.removeItem(atPath: socketPath)
+    }
+    
     print("Agent Speak is starting up...")
     let home = FileManager.default.homeDirectoryForCurrentUser.path
     let appURL = URL(fileURLWithPath: "\(home)/Applications/Agent Speak.app")
@@ -95,15 +103,19 @@ func ensureAppRunningAndSend(_ message: String) -> Bool {
 
 switch cmd {
 case "status":
-    let isRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: "com.agentspeak.app").isEmpty
-    let socketExists = FileManager.default.fileExists(atPath: socketPath)
+    let apps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.agentspeak.app")
+    let isRunning = !apps.isEmpty
+    let socketResponds = sendSocketMessage("")
     let info = getActiveConfigInfo()
-    if isRunning || socketExists {
+    if isRunning {
         print("Agent Speak Status: 🟢 RUNNING (100% Native Swift)")
         print("Voice Engine:       \(info.engine == "pocket_tts" ? "Pocket-TTS Neural Extension" : "Default System Voice (macOS)")")
         print("Active Voice:       \(info.voice)")
-        print("IPC Socket:         \(socketPath)")
+        print("IPC Socket:         \(socketPath) (\(socketResponds ? "Healthy" : "Connecting..."))")
     } else {
+        if FileManager.default.fileExists(atPath: socketPath) {
+            try? FileManager.default.removeItem(atPath: socketPath)
+        }
         print("Agent Speak Status: 🔴 NOT RUNNING")
         print("Run 'open -a \"Agent Speak\"' or 'agentspeak dashboard' to launch.")
     }
@@ -132,6 +144,39 @@ case "test-jarvis":
         print("[Agent Speak] Presenting Jarvis voice sample in the Notch Player...")
     } else {
         print("Error: Could not trigger Jarvis test sample.")
+    }
+
+case "pb", "clipboard", "pasteboard":
+    if let pbText = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines), !pbText.isEmpty {
+        if ensureAppRunningAndSend(pbText) {
+            print("[Agent Speak] Speaking clipboard text through notch player...")
+        } else {
+            print("Error: Could not connect to Agent Speak socket.")
+        }
+    } else {
+        print("Error: Clipboard is empty or contains no text.")
+    }
+
+case "tray":
+    let sub = args.count > 2 ? args[2].lowercased() : "toggle"
+    if sub == "on" || sub == "show" {
+        if ensureAppRunningAndSend("__CMD_TRAY_ON__") {
+            print("[Agent Speak] Menu bar tray icon enabled.")
+        } else {
+            print("Error: Could not connect to Agent Speak socket.")
+        }
+    } else if sub == "off" || sub == "hide" {
+        if ensureAppRunningAndSend("__CMD_TRAY_OFF__") {
+            print("[Agent Speak] Menu bar tray icon hidden.")
+        } else {
+            print("Error: Could not connect to Agent Speak socket.")
+        }
+    } else {
+        if ensureAppRunningAndSend("__CMD_TOGGLE_TRAY__") {
+            print("[Agent Speak] Menu bar tray icon toggled.")
+        } else {
+            print("Error: Could not connect to Agent Speak socket.")
+        }
     }
 
 case "stop":
