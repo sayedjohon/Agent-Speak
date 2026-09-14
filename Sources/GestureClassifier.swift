@@ -83,6 +83,7 @@ public class GestureClassifier {
     
     public var pinchThreshold: CGFloat = 0.055
     public var scrollSensitivity: CGFloat = 1.0
+    public var trackingAnchor: String = "wrist" // "wrist", "indexMCP", "indexTip"
     
     // Right hand tracking state
     private var isRightPinched: Bool = false
@@ -208,10 +209,20 @@ public class GestureClassifier {
             lastScrollPoint = nil
         }
         
-        // Map target screen coordinates from index tip
+        // Map target screen coordinates from selected anchor (default: wrist joint)
+        let anchorPt: CGPoint
+        switch trackingAnchor {
+        case "indexTip":
+            anchorPt = hand.indexTip
+        case "indexMCP":
+            anchorPt = hand.indexMCP
+        default:
+            anchorPt = hand.wrist
+        }
+        
         let screenPoint = MouseCursorController.shared.mapCameraPointToScreen(
-            normX: hand.indexTip.x,
-            normY: hand.indexTip.y
+            normX: anchorPt.x,
+            normY: anchorPt.y
         )
         
         // B. Right Click: Middle Finger + Thumb Pinch
@@ -229,15 +240,17 @@ public class GestureClassifier {
         
         if isCurrentlyPinched {
             if !isRightPinched {
-                // Pinch just started
+                // Pinch just started -> Lock cursor position immediately for zero-drift clicking!
                 isRightPinched = true
                 rightPinchStartTime = now
+                MouseCursorController.shared.lockCursorAtCurrentPosition()
             } else {
                 // Pinch is being held
                 let holdDuration = now - rightPinchStartTime
                 if holdDuration > 0.22 && !isDraggingActive {
-                    // Transition to Drag & Drop
+                    // Transition to Drag & Drop -> Unlock cursor to follow hand
                     isDraggingActive = true
+                    MouseCursorController.shared.unlockCursor()
                     MouseCursorController.shared.startDrag(at: screenPoint)
                     onGestureDetected?(.clickAndDrag, "Drag Started")
                 }
@@ -254,11 +267,15 @@ public class GestureClassifier {
                 if isDraggingActive {
                     MouseCursorController.shared.endDrag(at: screenPoint)
                     isDraggingActive = false
+                    MouseCursorController.shared.unlockCursor()
                     onGestureDetected?(.clickAndDrag, "Drag Released")
                 } else if pinchDuration < 0.28 {
-                    // Quick release -> Single or Double Left Click
-                    MouseCursorController.shared.leftClick(at: screenPoint)
+                    // Quick release -> Single or Double Left Click at locked anchor!
+                    MouseCursorController.shared.leftClick()
+                    MouseCursorController.shared.unlockCursor()
                     onGestureDetected?(.leftClick, "Left Click")
+                } else {
+                    MouseCursorController.shared.unlockCursor()
                 }
                 isRightPinched = false
                 lastRightPinchReleaseTime = now
@@ -313,23 +330,34 @@ public class GestureClassifier {
             return
         }
         
-        // 3. Whisper Flow Dictation Hold: CLOSED FIST (all 4 fingers curled)
+        // 3. Whisper / Dictation Engine: CLOSED FIST (all 4 fingers curled)
         let isClosedFist = (!indexExt && !middleExt && !ringExt && !littleExt)
         if isClosedFist {
             if !isLeftFistHolding {
                 isLeftFistHolding = true
-                KeyboardShortcutController.shared.setWhisperModifierHold(active: true)
-                onGestureDetected?(.whisperFlowHold, "Holding ⌘ (Whisper Dictation)")
+                if GroqWhisperManager.shared.engineMode == .modifierHold {
+                    KeyboardShortcutController.shared.setWhisperModifierHold(active: true)
+                    onGestureDetected?(.whisperFlowHold, "Holding ⌘ (Whisper Dictation)")
+                } else {
+                    GroqWhisperManager.shared.startRecording()
+                    onGestureDetected?(.whisperFlowHold, "Dictating (\(GroqWhisperManager.shared.selectedModel))...")
+                }
             } else {
-                onGestureDetected?(.whisperFlowHold, "Dictating...")
+                if GroqWhisperManager.shared.engineMode == .modifierHold {
+                    onGestureDetected?(.whisperFlowHold, "Dictating...")
+                }
             }
             return
         } else {
             if isLeftFistHolding {
-                // Released fist -> release Command key immediately!
                 isLeftFistHolding = false
-                KeyboardShortcutController.shared.setWhisperModifierHold(active: false)
-                onGestureDetected?(.whisperFlowHold, "Released ⌘ (Transcription Pasting)")
+                if GroqWhisperManager.shared.engineMode == .modifierHold {
+                    KeyboardShortcutController.shared.setWhisperModifierHold(active: false)
+                    onGestureDetected?(.whisperFlowHold, "Released ⌘ (Transcription Pasting)")
+                } else {
+                    GroqWhisperManager.shared.stopRecordingAndTranscribe()
+                    onGestureDetected?(.whisperFlowHold, "Transcribing speech...")
+                }
             }
         }
         

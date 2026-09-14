@@ -112,13 +112,9 @@ public class MouseCursorController {
         let clampedX = max(minNormX, min(maxNormX, mirroredX))
         let clampedY = max(minNormY, min(maxNormY, normY))
         
-        // Normalize 0.0...1.0 inside active zone
+        // Normalize 0.0...1.0 inside active zone (Vision Y: 0.0 bottom, 1.0 top)
         let relativeX = (clampedX - minNormX) / (maxNormX - minNormX)
-        var relativeY = (clampedY - minNormY) / (maxNormY - minNormY)
-        
-        // Vision Y coordinates are 0 at bottom, 1 at top. macOS coordinates have 0 at bottom.
-        // Invert Y for standard top-down cursor feel
-        relativeY = 1.0 - relativeY
+        let relativeY = (clampedY - minNormY) / (maxNormY - minNormY)
         
         // Apply smooth acceleration curve
         let centeredX = relativeX - 0.5
@@ -134,13 +130,33 @@ public class MouseCursorController {
         let filteredX = filterX.filter(value: Double(rawTargetX), timestamp: now)
         let filteredY = filterY.filter(value: Double(rawTargetY), timestamp: now)
         
-        // Flip target Y for CGEvent (CGEvent uses top-left origin = 0,0)
+        // CGEvent uses top-left origin (Y=0 is top of screen).
+        // Since Vision Y is bottom-up (1.0 is top), screenH - filteredY maps hand-up to screen-top!
         let cgY = screenH - CGFloat(filteredY)
         return CGPoint(x: CGFloat(filteredX), y: cgY)
     }
     
+    // MARK: - Zero-Drift Pinch Click Anchor Lock
+    public private(set) var isCursorLocked: Bool = false
+    private var lockedPoint: CGPoint?
+    
+    public func lockCursorAtCurrentPosition() {
+        isCursorLocked = true
+        lockedPoint = currentCursorPoint
+    }
+    
+    public func unlockCursor() {
+        isCursorLocked = false
+        lockedPoint = nil
+    }
+    
     // MARK: - Movement
     public func moveCursor(to targetPoint: CGPoint) {
+        if isCursorLocked && !isDragging, let lock = lockedPoint {
+            currentCursorPoint = lock
+            return
+        }
+        
         currentCursorPoint = targetPoint
         
         if isDragging {

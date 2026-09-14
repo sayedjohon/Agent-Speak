@@ -4,6 +4,7 @@ import AVFoundation
 // MARK: - Hand Skeleton Canvas View
 struct HandSkeletonCanvasView: View {
     let hands: [HandSkeletonData]
+    let anchorType: String
     
     var body: some View {
         Canvas { context, size in
@@ -12,10 +13,9 @@ struct HandSkeletonCanvasView: View {
                 let glowColor: Color = hand.isRightHand ? Color.cyan.opacity(0.4) : Color.orange.opacity(0.4)
                 
                 // Helper to transform normalized (0...1) camera coords to canvas coords
-                // Mirror horizontally for natural webcam view
                 func screenPt(_ pt: CGPoint) -> CGPoint {
-                    let mx = 1.0 - pt.x
-                    let my = 1.0 - pt.y // Vision Y is bottom-up
+                    let mx = 1.0 - pt.x // Mirror horizontally for natural webcam reflection
+                    let my = 1.0 - pt.y // Vision Y is bottom-up (1.0 = top)
                     return CGPoint(x: mx * size.width, y: my * size.height)
                 }
                 
@@ -44,7 +44,7 @@ struct HandSkeletonCanvasView: View {
                     [w, mMCP, mPIP, mTip],
                     [w, rMCP, rPIP, rTip],
                     [w, lMCP, lPIP, lTip],
-                    [iMCP, mMCP, rMCP, lMCP] // Knuckle palm arch
+                    [iMCP, mMCP, rMCP, lMCP]
                 ]
                 
                 // Draw bone lines
@@ -62,6 +62,19 @@ struct HandSkeletonCanvasView: View {
                     context.fill(Path(ellipseIn: rect), with: .color(.white))
                     context.stroke(Path(ellipseIn: rect), with: .color(color), lineWidth: 1.5)
                 }
+                
+                // Highlight active tracking anchor on Right Hand with a prominent pulse ring
+                if hand.isRightHand {
+                    let activeAnchorPt: CGPoint
+                    switch anchorType {
+                    case "indexTip": activeAnchorPt = iTip
+                    case "indexMCP": activeAnchorPt = iMCP
+                    default: activeAnchorPt = w
+                    }
+                    
+                    let ringRect = CGRect(x: activeAnchorPt.x - 9, y: activeAnchorPt.y - 9, width: 18, height: 18)
+                    context.stroke(Path(ellipseIn: ringRect), with: .color(.green), lineWidth: 2.5)
+                }
             }
         }
     }
@@ -70,11 +83,35 @@ struct HandSkeletonCanvasView: View {
 // MARK: - Dashboard Gesture View
 public struct DashboardGestureView: View {
     @ObservedObject var manager = CameraGestureManager.shared
+    @ObservedObject var whisperManager = GroqWhisperManager.shared
+    
     @State private var cursorSpeed: Double = 1.2
     @State private var smoothing: Double = 0.85
     @State private var pinchDist: Double = 0.055
-    @State private var whisperModifier: String = "command"
+    @State private var trackingAnchor: String = "wrist"
     @State private var isHudActive: Bool = true
+    @State private var isApiKeyVisible: Bool = false
+    @State private var isTestingRecord: Bool = false
+    
+    private let supportedLanguages: [(code: String, name: String)] = [
+        ("", "Auto-detect (All Languages)"),
+        ("en", "English"),
+        ("bn", "Bengali (বাংলা)"),
+        ("es", "Spanish (Español)"),
+        ("fr", "French (Français)"),
+        ("de", "German (Deutsch)"),
+        ("it", "Italian (Italiano)"),
+        ("pt", "Portuguese (Português)"),
+        ("ru", "Russian (Русский)"),
+        ("ja", "Japanese (日本語)"),
+        ("ko", "Korean (한국어)"),
+        ("zh", "Chinese (中文)"),
+        ("ar", "Arabic (العربية)"),
+        ("hi", "Hindi (हिन्दी)"),
+        ("tr", "Turkish (Türkçe)"),
+        ("nl", "Dutch (Nederlands)"),
+        ("id", "Indonesian (Bahasa Indonesia)")
+    ]
     
     public init() {}
     
@@ -83,6 +120,7 @@ public struct DashboardGestureView: View {
             headerBanner
             cameraPreviewCard
             controlsAndSlidersCard
+            dictationEngineCard
             gestureTestGridCard
             gestureReferenceGuideCard
         }
@@ -170,7 +208,7 @@ public struct DashboardGestureView: View {
                     .frame(height: 220)
                 
                 if manager.isRunning {
-                    HandSkeletonCanvasView(hands: manager.detectedHands)
+                    HandSkeletonCanvasView(hands: manager.detectedHands, anchorType: trackingAnchor)
                         .frame(height: 220)
                     
                     if manager.detectedHands.isEmpty {
@@ -235,6 +273,27 @@ public struct DashboardGestureView: View {
                 .foregroundColor(.white)
             
             Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 14) {
+                // Tracking Anchor (Wrist vs Knuckle vs Tip)
+                GridRow {
+                    Text("Tracking Anchor")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.gray)
+                    
+                    Picker("", selection: $trackingAnchor) {
+                        Text("Wrist Joint (Rock-Solid / No Click Drift)").tag("wrist")
+                        Text("Knuckle Base (Index MCP)").tag("indexMCP")
+                        Text("Index Fingertip").tag("indexTip")
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                    .onChange(of: trackingAnchor) { _, val in
+                        GestureClassifier.shared.trackingAnchor = val
+                        saveGesturePreferences()
+                    }
+                    
+                    Text("📍")
+                        .frame(width: 45, alignment: .trailing)
+                }
+                
                 GridRow {
                     Text("Cursor Speed")
                         .font(.system(size: 12, weight: .medium))
@@ -283,30 +342,6 @@ public struct DashboardGestureView: View {
             
             Divider().background(Color.white.opacity(0.1))
             
-            // Whisper flow modifier configuration
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Whisper Flow Dictation Modifier")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white)
-                    Text("Held down automatically when left hand forms a closed fist.")
-                        .font(.system(size: 11))
-                        .foregroundColor(.gray)
-                }
-                Spacer()
-                Picker("", selection: $whisperModifier) {
-                    Text("Command (⌘)").tag("command")
-                    Text("Option / Alt (⌥)").tag("option")
-                    Text("Control (⌃)").tag("control")
-                }
-                .pickerStyle(SegmentedPickerStyle())
-                .frame(width: 250)
-                .onChange(of: whisperModifier) { _, val in
-                    KeyboardShortcutController.shared.whisperModifierKey = val
-                    saveGesturePreferences()
-                }
-            }
-            
             // Floating HUD toggle
             Toggle(isOn: $isHudActive) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -327,6 +362,258 @@ public struct DashboardGestureView: View {
         .padding(16)
         .background(Color(white: 0.1, opacity: 0.6))
         .cornerRadius(12)
+    }
+    
+    // MARK: - Voice Dictation & Whisper Settings Card
+    private var dictationEngineCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Label("Voice Dictation & Whisper Engine", systemImage: "waveform.badge.mic")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                Text("Triggered by Left Hand Closed Fist")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.orange)
+            }
+            
+            // Engine Mode Picker
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Dictation Engine:")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.gray)
+                
+                Picker("", selection: $whisperManager.engineMode) {
+                    ForEach(DictationEngineMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(MenuPickerStyle())
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .onChange(of: whisperManager.engineMode) { _, _ in
+                    whisperManager.saveConfig()
+                }
+            }
+            
+            // Engine-specific options
+            switch whisperManager.engineMode {
+            case .groqCloud:
+                groqSettingsSection
+            case .appleOnDevice:
+                appleOnDeviceSection
+            case .localEndpoint:
+                localEndpointSection
+            case .modifierHold:
+                modifierHoldSection
+            }
+            
+            Divider().background(Color.white.opacity(0.1))
+            
+            // Language & Auto-Submit options
+            HStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Spoken Language:")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.gray)
+                    
+                    Picker("", selection: $whisperManager.languageCode) {
+                        ForEach(supportedLanguages, id: \.code) { lang in
+                            Text(lang.name).tag(lang.code)
+                        }
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                    .frame(width: 220)
+                    .onChange(of: whisperManager.languageCode) { _, _ in
+                        whisperManager.saveConfig()
+                    }
+                }
+                
+                Spacer()
+                
+                Toggle(isOn: $whisperManager.autoSubmitReturn) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Auto-Submit (Return ↵)")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white)
+                        Text("Press Return after pasting text")
+                            .font(.system(size: 10))
+                            .foregroundColor(.gray)
+                    }
+                }
+                .onChange(of: whisperManager.autoSubmitReturn) { _, _ in
+                    whisperManager.saveConfig()
+                }
+            }
+            
+            // Test Dictation Button & Status
+            HStack {
+                Button(action: {
+                    if whisperManager.isRecording {
+                        whisperManager.stopRecordingAndTranscribe()
+                        isTestingRecord = false
+                    } else {
+                        whisperManager.startRecording()
+                        isTestingRecord = true
+                    }
+                }) {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(whisperManager.isRecording ? Color.red : Color.blue)
+                            .frame(width: 8, height: 8)
+                        
+                        Text(whisperManager.isRecording ? "Stop & Transcribe" : "Test Voice Dictation")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(whisperManager.isRecording ? Color.red.opacity(0.2) : Color.white.opacity(0.1))
+                    .cornerRadius(6)
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                Text(whisperManager.statusMessage)
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundColor(whisperManager.isRecording ? .red : (whisperManager.isTranscribing ? .yellow : .gray))
+                    .padding(.leading, 8)
+                
+                Spacer()
+            }
+            .padding(.top, 4)
+        }
+        .padding(16)
+        .background(Color(white: 0.1, opacity: 0.6))
+        .cornerRadius(12)
+    }
+    
+    // MARK: - Groq Cloud Settings Section
+    private var groqSettingsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // API Key field
+            HStack {
+                Text("Groq API Key:")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.gray)
+                    .frame(width: 110, alignment: .leading)
+                
+                if isApiKeyVisible {
+                    TextField("gsk_...", text: $whisperManager.groqApiKey)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .onChange(of: whisperManager.groqApiKey) { _, _ in whisperManager.saveConfig() }
+                } else {
+                    SecureField("gsk_...", text: $whisperManager.groqApiKey)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .onChange(of: whisperManager.groqApiKey) { _, _ in whisperManager.saveConfig() }
+                }
+                
+                Button(action: { isApiKeyVisible.toggle() }) {
+                    Image(systemName: isApiKeyVisible ? "eye.slash" : "eye")
+                        .foregroundColor(.gray)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            
+            // Model Selector
+            HStack {
+                Text("Model:")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.gray)
+                    .frame(width: 110, alignment: .leading)
+                
+                Picker("", selection: $whisperManager.selectedModel) {
+                    Text("Whisper Large v3 (Highest Accuracy)").tag("whisper-large-v3")
+                    Text("Whisper Large v3 Turbo (Blazing Fast)").tag("whisper-large-v3-turbo")
+                    Text("Distil Whisper Large v3 (English Only)").tag("distil-whisper-large-v3-en")
+                    Text("Custom Model ID...").tag("custom")
+                }
+                .pickerStyle(MenuPickerStyle())
+                .onChange(of: whisperManager.selectedModel) { _, _ in whisperManager.saveConfig() }
+            }
+            
+            // Custom Model ID (if selected)
+            if whisperManager.selectedModel == "custom" {
+                HStack {
+                    Text("Custom Model:")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.gray)
+                        .frame(width: 110, alignment: .leading)
+                    
+                    TextField("e.g. whisper-large-v3 or custom ID", text: $whisperManager.customModelId)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .onChange(of: whisperManager.customModelId) { _, _ in whisperManager.saveConfig() }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Apple On-Device Section (100% Offline)
+    private var appleOnDeviceSection: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "applelogo")
+                .font(.system(size: 24))
+                .foregroundColor(.white)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("100% On-Device Neural Engine Dictation")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
+                Text("Zero cloud calls, zero monthly subscriptions, complete offline privacy. Dictation is recognized natively by Apple Silicon.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.gray)
+            }
+        }
+        .padding(12)
+        .background(Color.white.opacity(0.04))
+        .cornerRadius(8)
+    }
+    
+    // MARK: - Local Endpoint Section
+    private var localEndpointSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Base URL:")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.gray)
+                    .frame(width: 110, alignment: .leading)
+                
+                TextField("http://localhost:8080/v1/audio/transcriptions", text: $whisperManager.customBaseUrl)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .onChange(of: whisperManager.customBaseUrl) { _, _ in whisperManager.saveConfig() }
+            }
+            
+            HStack {
+                Text("Model ID:")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.gray)
+                    .frame(width: 110, alignment: .leading)
+                
+                TextField("whisper-large-v3", text: $whisperManager.customModelId)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .onChange(of: whisperManager.customModelId) { _, _ in whisperManager.saveConfig() }
+            }
+        }
+    }
+    
+    // MARK: - Modifier Hold Section
+    private var modifierHoldSection: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("External Whisper App Modifier Hold")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white)
+                Text("Holds down the Command key while your left fist is closed for external apps like Whisper Flow.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.gray)
+            }
+            Spacer()
+            Text("⌘ Command")
+                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Color.white.opacity(0.1))
+                .cornerRadius(6)
+        }
     }
     
     // MARK: - Live Gesture Test Grid
@@ -387,12 +674,13 @@ public struct DashboardGestureView: View {
                 .foregroundColor(.white)
             
             VStack(alignment: .leading, spacing: 8) {
-                guideRow(hand: "Right", pose: "Index Extended", action: "Moves cursor smoothly across screens")
-                guideRow(hand: "Right", pose: "Index + Thumb Pinch", action: "Left click / focus input")
+                guideRow(hand: "Right", pose: "Wrist / Hand Glide", action: "Moves cursor smoothly with zero pinch drift")
+                guideRow(hand: "Right", pose: "Index + Thumb Pinch", action: "Left click / focus input with position lock")
                 guideRow(hand: "Right", pose: "Pinch & Hold (>200ms)", action: "Click and drag windows, text, or files")
                 guideRow(hand: "Right", pose: "Middle + Thumb Pinch", action: "Right click context menu")
                 guideRow(hand: "Right", pose: "2 Fingers Extended", action: "Smooth vertical and horizontal scroll")
-                guideRow(hand: "Left", pose: "Closed Fist", action: "Holds Command key (Whisper Flow dictation)")
+                guideRow(hand: "Left", pose: "Closed Fist", action: "Records dictation (Groq Large v3 / Apple Silicon)")
+                guideRow(hand: "Left", pose: "Open Fist", action: "Stops dictation, transcribes & auto-pastes text")
                 guideRow(hand: "Left", pose: "Index Tap / Pinch", action: "Return / Enter (submits chat query)")
                 guideRow(hand: "Left", pose: "V / Peace Sign", action: "Paste (Cmd + V)")
                 guideRow(hand: "Left", pose: "C Hand Pose", action: "Copy (Cmd + C)")
@@ -435,14 +723,14 @@ public struct DashboardGestureView: View {
         if let speed = gestures["cursor_speed"] as? Double { cursorSpeed = speed }
         if let sm = gestures["smoothing_factor"] as? Double { smoothing = sm }
         if let p = gestures["pinch_threshold"] as? Double { pinchDist = p }
-        if let w = gestures["whisper_modifier"] as? String { whisperModifier = w }
         if let h = gestures["hud_enabled"] as? Bool { isHudActive = h }
+        if let anchor = gestures["tracking_anchor"] as? String { trackingAnchor = anchor }
         if let cam = gestures["camera_device_id"] as? String { manager.selectedCameraId = cam }
         
         MouseCursorController.shared.cursorSpeed = CGFloat(cursorSpeed)
         MouseCursorController.shared.smoothingFactor = smoothing
         GestureClassifier.shared.pinchThreshold = CGFloat(pinchDist)
-        KeyboardShortcutController.shared.whisperModifierKey = whisperModifier
+        GestureClassifier.shared.trackingAnchor = trackingAnchor
         manager.isHUDEnabled = isHudActive
     }
     
@@ -459,7 +747,7 @@ public struct DashboardGestureView: View {
         gestures["cursor_speed"] = cursorSpeed
         gestures["smoothing_factor"] = smoothing
         gestures["pinch_threshold"] = pinchDist
-        gestures["whisper_modifier"] = whisperModifier
+        gestures["tracking_anchor"] = trackingAnchor
         gestures["hud_enabled"] = isHudActive
         gestures["camera_device_id"] = manager.selectedCameraId
         json["gestures"] = gestures

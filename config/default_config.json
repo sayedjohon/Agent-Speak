@@ -82,7 +82,17 @@
     "cursor_speed": 1.2,
     "smoothing_factor": 0.85,
     "pinch_threshold": 0.05,
+    "tracking_anchor": "wrist",
     "whisper_modifier": "command",
     "hud_enabled": true
+  },
+  "dictation": {
+    "mode": "Groq Whisper v3 (Cloud)",
+    "groq_api_key": "",
+    "model": "whisper-large-v3",
+    "custom_model": "",
+    "custom_base_url": "",
+    "language": "",
+    "auto_submit_return": false
   }
 }

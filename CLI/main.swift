@@ -506,19 +506,28 @@ case "gesture", "gestures":
         var isEnabled = false
         var speed = 1.2
         var smoothing = 0.85
-        var whisperMod = "command"
+        var anchor = "wrist"
+        var dictMode = "Groq Whisper v3 (Cloud)"
+        var dictModel = "whisper-large-v3"
         if let data = try? Data(contentsOf: cfgURL),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let g = json["gestures"] as? [String: Any] {
-            isEnabled = g["enabled"] as? Bool ?? false
-            speed = g["cursor_speed"] as? Double ?? 1.2
-            smoothing = g["smoothing_factor"] as? Double ?? 0.85
-            whisperMod = g["whisper_modifier"] as? String ?? "command"
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let g = json["gestures"] as? [String: Any] {
+                isEnabled = g["enabled"] as? Bool ?? false
+                speed = g["cursor_speed"] as? Double ?? 1.2
+                smoothing = g["smoothing_factor"] as? Double ?? 0.85
+                anchor = g["tracking_anchor"] as? String ?? "wrist"
+            }
+            if let d = json["dictation"] as? [String: Any] {
+                dictMode = d["mode"] as? String ?? "Groq Whisper v3 (Cloud)"
+                dictModel = d["model"] as? String ?? "whisper-large-v3"
+            }
         }
         print("Vision Hand Gestures: \(isEnabled ? "🟢 ACTIVE" : "⚪ STANDBY (Off)")")
+        print("Tracking Anchor:     \(anchor.capitalized) Joint (Rock-Solid)")
         print("Cursor Speed:        \(String(format: "%.1fx", speed))")
         print("Jitter Smoothing:    \(Int(smoothing * 100))%")
-        print("Whisper Flow Key:    \(whisperMod.capitalized) (Held by Left Fist)")
+        print("Dictation Engine:    \(dictMode)")
+        print("Whisper Model:       \(dictModel)")
         print("Toggle Hotkey:       Control + G")
     } else if sub == "list" {
         print("""
