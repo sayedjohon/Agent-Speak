@@ -190,11 +190,8 @@ public class BackgroundMusicManager: ObservableObject {
             
             playerNode.volume = 0.0
             playerNode.scheduleSegment(file, startingFrame: startFrame, frameCount: frameCount, at: nil) { [weak self] in
-                // Handle looping if speech outlasts remaining track duration
-                DispatchQueue.main.async {
-                    guard let self = self, self.isPlaying, !self.isFadingOut else { return }
-                    self.scheduleLoopingTrack()
-                }
+                // Handle infinite seamless looping of the same audio
+                self?.scheduleLoopingTrack()
             }
             
             playerNode.play()
@@ -214,11 +211,13 @@ public class BackgroundMusicManager: ObservableObject {
     
     private func scheduleLoopingTrack() {
         guard let file = activeAudioFile, isPlaying, !isFadingOut else { return }
-        playerNode.scheduleFile(file, at: nil) { [weak self] in
-            DispatchQueue.main.async {
-                guard let self = self, self.isPlaying, !self.isFadingOut else { return }
-                self.scheduleLoopingTrack()
-            }
+        file.framePosition = 0
+        let totalFrames = AVAudioFrameCount(file.length)
+        playerNode.scheduleSegment(file, startingFrame: 0, frameCount: totalFrames, at: nil) { [weak self] in
+            self?.scheduleLoopingTrack()
+        }
+        if !playerNode.isPlaying {
+            playerNode.play()
         }
     }
     
