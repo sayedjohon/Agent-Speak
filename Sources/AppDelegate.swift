@@ -3,12 +3,13 @@ import SwiftUI
 import Carbon
 import QuartzCore
 
-public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate {
     public static var shared: AppDelegate!
     
     var statusItem: NSStatusItem?
     var dashboardWindow: NSWindow?
     var trayHostingView: PassthroughHostingView<TrayGradientOrbView>?
+    private var dashboardDisplayLink: CADisplayLink?
     
     var idleIcon: NSImage?
     var speakingIcon: NSImage?
@@ -323,11 +324,47 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         window.isOpaque = true
         window.backgroundColor = NSColor(red: 0.07, green: 0.08, blue: 0.10, alpha: 1.0)
         
+        window.delegate = self
+        
         let hostingView = NSHostingView(rootView: DashboardView())
         hostingView.wantsLayer = true
+        hostingView.layerContentsRedrawPolicy = .onSetNeedsDisplay
         window.contentView = hostingView
         
         self.dashboardWindow = window
+    }
+    
+    // MARK: - Hardware ProMotion 120Hz Window Engine
+    
+    public func startDashboardDisplayLink() {
+        guard dashboardDisplayLink == nil else { return }
+        if #available(macOS 14.0, *), let view = dashboardWindow?.contentView {
+            let link = view.displayLink(target: self, selector: #selector(onDashboardDisplayTick(link:)))
+            link.preferredFrameRateRange = CAFrameRateRange(minimum: 80, maximum: 120, preferred: 120)
+            link.add(to: .main, forMode: .common)
+            self.dashboardDisplayLink = link
+        }
+    }
+    
+    public func stopDashboardDisplayLink() {
+        dashboardDisplayLink?.invalidate()
+        dashboardDisplayLink = nil
+    }
+    
+    @objc private func onDashboardDisplayTick(link: CADisplayLink) {
+        // Locks macOS WindowServer compositor to true 120Hz ProMotion mode
+    }
+    
+    public func windowDidBecomeKey(_ notification: Notification) {
+        if notification.object as? NSWindow == dashboardWindow {
+            startDashboardDisplayLink()
+        }
+    }
+    
+    public func windowWillClose(_ notification: Notification) {
+        if notification.object as? NSWindow == dashboardWindow {
+            stopDashboardDisplayLink()
+        }
     }
     
     private func loadCurrentMacosVoice() -> String {
@@ -369,12 +406,14 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let window = dashboardWindow else { return }
         window.center()
         window.makeKeyAndOrderFront(nil)
+        startDashboardDisplayLink()
         NSApp.activate(ignoringOtherApps: true)
     }
     
     @objc public func toggleDashboard() {
         guard let window = dashboardWindow else { return }
         if window.isVisible {
+            stopDashboardDisplayLink()
             window.orderOut(nil)
         } else {
             showDashboard()

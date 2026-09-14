@@ -76,25 +76,30 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
             AudioChunk(index: idx, text: chunkText, filePath: "/tmp/speech_chunk_\(sessionId)_\(idx).aiff")
         }
         
-        // Render Chunk 0 synchronously for instant start (~50-80ms)
-        renderChunk(index: 0)
-        if let p = self.chunks[0].player {
-            p.play()
-            self.isPlaying = true
-            self.currentChunkIndex = 0
-            self.updateTimelineDurations()
-            self.startTimer()
-        } else {
-            DispatchQueue.main.async { [weak self] in
-                self?.close()
+        // Render Chunk 0 asynchronously on userInitiated queue (zero main thread stall)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self, !self.isCancelled else { return }
+            self.renderChunk(index: 0)
+            
+            DispatchQueue.main.async {
+                guard !self.isCancelled else { return }
+                if let p = self.chunks[0].player {
+                    p.play()
+                    self.isPlaying = true
+                    self.currentChunkIndex = 0
+                    self.updateTimelineDurations()
+                    self.startTimer()
+                } else {
+                    self.close()
+                }
             }
-        }
-        
-        if self.chunks.count > 1 {
-            self.startBackgroundRenderingPipeline(fullText: text)
-        } else if self.chunks.count == 1 {
-            if FileManager.default.fileExists(atPath: self.chunks[0].filePath) {
-                LastVoiceManager.shared.recordVoice(text: text, chunkFilePaths: [self.chunks[0].filePath])
+            
+            if self.chunks.count > 1 {
+                self.startBackgroundRenderingPipeline(fullText: text)
+            } else if self.chunks.count == 1 {
+                if FileManager.default.fileExists(atPath: self.chunks[0].filePath) {
+                    LastVoiceManager.shared.recordVoice(text: text, chunkFilePaths: [self.chunks[0].filePath])
+                }
             }
         }
     }
@@ -274,11 +279,7 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private func tick() {
         guard !isDragging else { return }
         guard currentChunkIndex < chunks.count, let p = chunks[currentChunkIndex].player, p.isPlaying else {
-            if SpeechQueueManager.shared.audioLevel > 0.01 {
-                SpeechQueueManager.shared.audioLevel *= 0.88
-            } else {
-                SpeechQueueManager.shared.audioLevel = 0.0
-            }
+            AudioLevelMeter.shared.decay()
             return
         }
         let chunkStart = chunks[currentChunkIndex].startTime
@@ -288,10 +289,7 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
             p.updateMeters()
             let power = p.averagePower(forChannel: 0)
             let norm = max(0.0, min(1.0, Double(power + 44.0) / 44.0))
-            let targetLevel = Float(norm)
-            let prev = SpeechQueueManager.shared.audioLevel
-            let factor: Float = targetLevel > prev ? 0.25 : 0.10
-            SpeechQueueManager.shared.audioLevel = prev * (1.0 - factor) + targetLevel * factor
+            AudioLevelMeter.shared.update(targetLevel: Float(norm))
         }
     }
     
@@ -481,17 +479,11 @@ public class NotchWindowController {
             panel.orderFront(nil)
             self.window = panel
             
-            // Instant Autoplay Verification
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            // Watchdog: dismiss if speech synthesis fails completely after timeout
+            DispatchQueue.main.asyncAfter(deadline: .now() + 25.0) { [weak self] in
                 guard let self = self, let mgr = self.audioManager else { return }
-                if !mgr.isPlaying {
-                    if let p = mgr.chunks.first?.player {
-                        p.play()
-                        mgr.isPlaying = true
-                        mgr.startTimer()
-                    } else {
-                        self.dismiss()
-                    }
+                if !mgr.isPlaying && mgr.currentChunkIndex == 0 && mgr.chunks.first?.player == nil {
+                    self.dismiss()
                 }
             }
             

@@ -86,7 +86,11 @@ if ! echo "$PATH" | grep -q "$BIN_DIR"; then
     fi
 fi
 
-# 4. Install Default Configuration
+# 4. Install Default Configuration & BGM tracks
+mkdir -p "$CONFIG_DIR/bgm"
+if [[ -f "$SCRIPT_DIR/Resources/bgm/AC_DC - Back In Black.mp3" && ! -f "$CONFIG_DIR/bgm/AC_DC - Back In Black.mp3" ]]; then
+    cp "$SCRIPT_DIR/Resources/bgm/AC_DC - Back In Black.mp3" "$CONFIG_DIR/bgm/AC_DC - Back In Black.mp3"
+fi
 if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
     cp "$SCRIPT_DIR/config/default_config.json" "$CONFIG_DIR/config.json"
 fi

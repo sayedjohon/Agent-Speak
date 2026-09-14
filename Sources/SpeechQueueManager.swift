@@ -1,6 +1,32 @@
 import Foundation
 import Cocoa
 
+// MARK: - Isolated 120Hz Audio Level Meter (Zero Dashboard Layout Thrashing)
+public class AudioLevelMeter: ObservableObject {
+    public static let shared = AudioLevelMeter()
+    @Published public var level: Float = 0.0
+    
+    private init() {}
+    
+    public func update(targetLevel: Float) {
+        let prev = level
+        let factor: Float = targetLevel > prev ? 0.25 : 0.10
+        level = prev * (1.0 - factor) + targetLevel * factor
+    }
+    
+    public func decay() {
+        if level > 0.01 {
+            level *= 0.88
+        } else {
+            level = 0.0
+        }
+    }
+    
+    public func reset() {
+        level = 0.0
+    }
+}
+
 public class SpeechQueueManager: ObservableObject {
     public static let shared = SpeechQueueManager()
     
@@ -16,7 +42,12 @@ public class SpeechQueueManager: ObservableObject {
     }
     @Published public var queueCount: Int = 0
     @Published public var currentSpeakerSource: String = ""
-    @Published public var audioLevel: Float = 0.0
+    
+    /// Decoupled from @Published on SpeechQueueManager to prevent 120Hz layout thrashing across all observers.
+    public var audioLevel: Float {
+        get { AudioLevelMeter.shared.level }
+        set { AudioLevelMeter.shared.level = newValue }
+    }
     
     private var queue: [(source: String, text: String)] = []
     private let queueLock = NSLock()
@@ -39,11 +70,13 @@ public class SpeechQueueManager: ObservableObject {
         DispatchQueue.main.async { [weak self] in
             self?.isSpeaking = true
             self?.currentSpeakerSource = source
+            BackgroundMusicManager.shared.start()
             NotchWindowController.shared.presentAudioFile(filePath: filePath, project: source) {
                 DispatchQueue.main.async {
                     self?.isSpeaking = false
                     self?.audioLevel = 0.0
                     self?.currentSpeakerSource = ""
+                    BackgroundMusicManager.shared.stopWithFadeAndReverb()
                 }
             }
         }
@@ -60,6 +93,7 @@ public class SpeechQueueManager: ObservableObject {
             self.audioLevel = 0.0
             self.queueCount = 0
             self.currentSpeakerSource = ""
+            BackgroundMusicManager.shared.stopWithFadeAndReverb()
         }
         cleanupTmpAudio()
     }
@@ -77,6 +111,10 @@ public class SpeechQueueManager: ObservableObject {
         self.currentSpeakerSource = item.source
         queueLock.unlock()
         
+        DispatchQueue.main.async {
+            BackgroundMusicManager.shared.start()
+        }
+        
         DispatchQueue.main.async { [weak self] in
             var finishedOnce = false
             let finishHandler: () -> Void = {
@@ -85,12 +123,16 @@ public class SpeechQueueManager: ObservableObject {
                 
                 self?.queueLock.lock()
                 self?.isSpeaking = false
+                let remaining = self?.queue.count ?? 0
                 self?.queueLock.unlock()
                 
                 DispatchQueue.main.async {
+                    if remaining == 0 {
+                        BackgroundMusicManager.shared.stopWithFadeAndReverb()
+                    }
                     self?.currentSpeakerSource = ""
                     self?.audioLevel = 0.0
-                    self?.queueCount = self?.queue.count ?? 0
+                    self?.queueCount = remaining
                     self?.cleanupTmpAudio()
                     self?.processNext()
                 }

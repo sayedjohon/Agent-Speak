@@ -12,7 +12,7 @@ public class PassthroughHostingView<Content: View>: NSHostingView<Content> {
 /// Replaces the React/Three.js shader with a 100% native Apple Silicon GPU visualizer.
 /// Subtle audio reactivity: calm majestic drift with gentle organic swell (no harsh jumping).
 public struct GradientOrbVisualizerView: View {
-    @ObservedObject var queueManager = SpeechQueueManager.shared
+    @ObservedObject var meter = AudioLevelMeter.shared
     
     public var isSpeaking: Bool
     public var size: CGFloat
@@ -35,19 +35,28 @@ public struct GradientOrbVisualizerView: View {
     }
     
     public var body: some View {
-        TimelineView(.animation) { timeline in
-            let now = timeline.date.timeIntervalSinceReferenceDate
-            let level = CGFloat(queueManager.audioLevel) // 0.0 ... 1.0 (smoothly filtered)
-            
-            // Ultra-calm, majestic rotation speed (steady & serene drift)
-            let speed = isSpeaking ? 0.28 : 0.18
-            let rot1 = Angle.radians(now * speed)
-            let rot2 = Angle.radians(-now * (speed * 0.72))
-            
-            // Subtle, organic breathing swell (max ~2% variation, butter smooth)
-            let breath = sin(now * (isSpeaking ? 1.6 : 1.0)) * 0.012
-            let audioPulse = isSpeaking ? (level * 0.022) : 0.0
-            let scale = 1.0 + CGFloat(breath) + audioPulse
+        if isSpeaking {
+            TimelineView(.animation(minimumInterval: 1.0 / 120.0)) { timeline in
+                let now = timeline.date.timeIntervalSinceReferenceDate
+                let level = CGFloat(meter.level)
+                renderOrb(now: now, level: level)
+            }
+        } else {
+            renderOrb(now: 0.0, level: 0.0)
+        }
+    }
+    
+    @ViewBuilder
+    private func renderOrb(now: Double, level: CGFloat) -> some View {
+        // Ultra-calm, majestic rotation speed (steady & serene drift)
+        let speed = isSpeaking ? 0.28 : 0.18
+        let rot1 = Angle.radians(now * speed)
+        let rot2 = Angle.radians(-now * (speed * 0.72))
+        
+        // Subtle, organic breathing swell (max ~2% variation, butter smooth)
+        let breath = isSpeaking ? sin(now * 1.6) * 0.012 : 0.0
+        let audioPulse = isSpeaking ? (level * 0.022) : 0.0
+        let scale = 1.0 + CGFloat(breath) + audioPulse
             
             ZStack {
                 // 1. Soft Ambient Halo Glow
@@ -213,22 +222,21 @@ public struct GradientOrbVisualizerView: View {
             .frame(width: size * 1.25, height: size * 1.25)
         }
     }
-}
 
 // MARK: - Native macOS Menu Bar Tray (Subtle & Elegant Indicator)
 public struct TrayGradientOrbView: View {
     @ObservedObject var queueManager = SpeechQueueManager.shared
+    @ObservedObject var meter = AudioLevelMeter.shared
     
     public init() {}
     
     public var body: some View {
-        TimelineView(.animation) { timeline in
-            let isSpeaking = queueManager.isSpeaking
-            let level = CGFloat(queueManager.audioLevel)
-            let now = timeline.date.timeIntervalSinceReferenceDate
-            
-            HStack(alignment: .center, spacing: 0) {
-                if isSpeaking {
+        HStack(alignment: .center, spacing: 0) {
+            if queueManager.isSpeaking {
+                TimelineView(.animation(minimumInterval: 1.0 / 120.0)) { timeline in
+                    let level = CGFloat(meter.level)
+                    let now = timeline.date.timeIntervalSinceReferenceDate
+                    
                     // 3 Subtle, calm equalizer pill bars (Apple Music / Siri elegance)
                     HStack(alignment: .center, spacing: 2.2) {
                         ForEach(0..<3) { i in
@@ -244,16 +252,16 @@ public struct TrayGradientOrbView: View {
                         }
                     }
                     .frame(width: 18, height: 16)
-                } else {
-                    // Stand-alone Bubble (No Tile)
-                    Image(systemName: "ellipsis.message.fill")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(.primary)
                 }
+            } else {
+                // Stand-alone Bubble (No Tile) - Zero CPU, Zero timeline when idle
+                Image(systemName: "ellipsis.message.fill")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(.primary)
             }
-            .frame(width: 22, height: 20)
-            .allowsHitTesting(false)
         }
+        .frame(width: 22, height: 20)
+        .allowsHitTesting(false)
     }
 }
 

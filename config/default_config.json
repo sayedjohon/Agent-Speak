@@ -21,6 +21,17 @@
     },
     "volume": 1.0
   },
+  "bgm": {
+    "enabled": true,
+    "volume": 0.20,
+    "random_offset": true,
+    "shuffle": true,
+    "fade_out_duration": 2.5,
+    "fade_in_duration": 0.8,
+    "reverb_enabled": true,
+    "reverb_preset": "largeHall",
+    "reverb_wet_dry": 30.0
+  },
   "notch_display": {
     "enabled": true,
     "notch_width": 185,

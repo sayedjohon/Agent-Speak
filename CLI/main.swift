@@ -46,6 +46,7 @@ func printHelp() {
       settings    Open the Agent Speak Settings window (alias: dashboard)
       tray        Toggle or set menu bar tray icon (tray on | off | toggle)
       voice       Manage voices and extensions (status | list | set | install | clone)
+      bgm         Manage Iron Man background soundtrack (on | off | vol | test | open | status)
       test-jarvis Test playback of the Jarvis voice sample in the Notch Player
       stop        Stop current speech and dismiss the notch player
       quit        Terminate the Agent Speak application
@@ -281,6 +282,99 @@ case "voice":
     } else {
         print("Unknown voice subcommand: \(sub)")
         print("Available subcommands: status, list, set, install, clone")
+    }
+
+case "bgm":
+    let sub = args.count > 2 ? args[2].lowercased() : "status"
+    let home = FileManager.default.homeDirectoryForCurrentUser.path
+    let cfgURL = URL(fileURLWithPath: "\(home)/.agentspeak/config.json")
+    let bgmDir = "\(home)/.agentspeak/bgm"
+    
+    if sub == "on" || sub == "enable" {
+        _ = sendSocketMessage("__CMD_BGM_ON__")
+        if let data = try? Data(contentsOf: cfgURL),
+           var json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           var bgm = json["bgm"] as? [String: Any] {
+            bgm["enabled"] = true
+            json["bgm"] = bgm
+            if let updated = try? JSONSerialization.data(withJSONObject: json, options: .prettyPrinted) {
+                try? updated.write(to: cfgURL)
+            }
+        }
+        print("[Agent Speak] Background music enabled.")
+    } else if sub == "off" || sub == "disable" {
+        _ = sendSocketMessage("__CMD_BGM_OFF__")
+        if let data = try? Data(contentsOf: cfgURL),
+           var json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           var bgm = json["bgm"] as? [String: Any] {
+            bgm["enabled"] = false
+            json["bgm"] = bgm
+            if let updated = try? JSONSerialization.data(withJSONObject: json, options: .prettyPrinted) {
+                try? updated.write(to: cfgURL)
+            }
+        }
+        print("[Agent Speak] Background music disabled.")
+    } else if sub == "toggle" {
+        _ = sendSocketMessage("__CMD_BGM_TOGGLE__")
+        print("[Agent Speak] Background music toggled.")
+    } else if sub == "open" || sub == "folder" {
+        _ = sendSocketMessage("__CMD_BGM_OPEN__")
+        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: bgmDir)
+        print("[Agent Speak] Opened background music folder: \(bgmDir)")
+    } else if sub == "test" {
+        if ensureAppRunningAndSend("__CMD_BGM_TEST__") {
+            print("[Agent Speak] Testing background music: Playing 4s preview followed by 2.5s reverb decay...")
+        } else {
+            print("Error: Could not connect to Agent Speak socket.")
+        }
+    } else if sub == "vol" || sub == "volume" {
+        guard args.count >= 4, let intVal = Int(args[3]), intVal >= 0 && intVal <= 100 else {
+            print("Usage: aspk bgm vol <0-100>")
+            print("Example: aspk bgm vol 20")
+            exit(1)
+        }
+        _ = sendSocketMessage("__CMD_BGM_VOL_\(intVal)__")
+        if let data = try? Data(contentsOf: cfgURL),
+           var json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           var bgm = json["bgm"] as? [String: Any] {
+            bgm["volume"] = Double(intVal) / 100.0
+            json["bgm"] = bgm
+            if let updated = try? JSONSerialization.data(withJSONObject: json, options: .prettyPrinted) {
+                try? updated.write(to: cfgURL)
+            }
+        }
+        print("[Agent Speak] Background music volume set to \(intVal)%.")
+    } else if sub == "status" || sub == "info" {
+        print("─── Background Music Status ───")
+        var isEnabled = true
+        var vol = 0.20
+        var randomOffset = true
+        var shuffle = true
+        var reverb = true
+        if let data = try? Data(contentsOf: cfgURL),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let bgm = json["bgm"] as? [String: Any] {
+            isEnabled = bgm["enabled"] as? Bool ?? true
+            vol = bgm["volume"] as? Double ?? 0.20
+            randomOffset = bgm["random_offset"] as? Bool ?? true
+            shuffle = bgm["shuffle"] as? Bool ?? true
+            reverb = bgm["reverb_enabled"] as? Bool ?? true
+        }
+        print("Enabled:        \(isEnabled ? "🟢 YES" : "🔴 NO")")
+        print("Volume:         \(Int(vol * 100))%")
+        print("Random Offset:  \(randomOffset ? "Active (Starts from random beat)" : "Inactive (Starts at 0:00)")")
+        print("Shuffle:        \(shuffle ? "Active" : "Sequential")")
+        print("Reverb Decay:   \(reverb ? "Active (2.5s Spatial Tail)" : "Disabled")")
+        print("Music Folder:   \(bgmDir)")
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: bgmDir)) ?? []
+        let audioFiles = files.filter { ["mp3", "m4a", "wav", "aiff", "aac", "flac"].contains(($0 as NSString).pathExtension.lowercased()) }
+        print("Tracks Found:   \(audioFiles.count)")
+        for f in audioFiles {
+            print("  • \(f)")
+        }
+    } else {
+        print("Unknown bgm subcommand: \(sub)")
+        print("Available subcommands: on, off, toggle, vol <0-100>, test, open, status")
     }
 
 case "stop":

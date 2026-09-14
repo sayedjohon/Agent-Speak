@@ -503,6 +503,45 @@ public class TranscriptWatcher {
                         if let p = jarvisPaths.first(where: { FileManager.default.fileExists(atPath: $0) }) {
                             SpeechQueueManager.shared.playAudioFile(filePath: p, source: "Jarvis AI")
                         }
+                    } else if raw == "__CMD_BGM_ON__" {
+                        DispatchQueue.main.async {
+                            BackgroundMusicManager.shared.isEnabled = true
+                            BackgroundMusicManager.shared.saveConfig()
+                        }
+                    } else if raw == "__CMD_BGM_OFF__" {
+                        DispatchQueue.main.async {
+                            BackgroundMusicManager.shared.isEnabled = false
+                            BackgroundMusicManager.shared.saveConfig()
+                            BackgroundMusicManager.shared.stopImmediately()
+                        }
+                    } else if raw == "__CMD_BGM_TOGGLE__" {
+                        DispatchQueue.main.async {
+                            let cur = BackgroundMusicManager.shared.isEnabled
+                            BackgroundMusicManager.shared.isEnabled = !cur
+                            BackgroundMusicManager.shared.saveConfig()
+                            if cur {
+                                BackgroundMusicManager.shared.stopImmediately()
+                            }
+                        }
+                    } else if raw == "__CMD_BGM_OPEN__" {
+                        DispatchQueue.main.async {
+                            BackgroundMusicManager.shared.openBgmFolderInFinder()
+                        }
+                    } else if raw == "__CMD_BGM_TEST__" {
+                        DispatchQueue.main.async {
+                            BackgroundMusicManager.shared.start()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                                BackgroundMusicManager.shared.stopWithFadeAndReverb()
+                            }
+                        }
+                    } else if raw.hasPrefix("__CMD_BGM_VOL_") && raw.hasSuffix("__") {
+                        let inner = raw.replacingOccurrences(of: "__CMD_BGM_VOL_", with: "").replacingOccurrences(of: "__", with: "")
+                        if let intVal = Float(inner) {
+                            let vol = intVal / 100.0
+                            DispatchQueue.main.async {
+                                BackgroundMusicManager.shared.setVolume(vol)
+                            }
+                        }
                     } else {
                         let clean = TextSanitizer.sanitizeForSpeech(raw)
                         if !clean.isEmpty {

@@ -17,6 +17,7 @@ public struct SystemVoiceItem: Identifiable, Hashable {
 // MARK: - Dashboard Navigation Tabs
 enum DashboardTab: String, CaseIterable, Identifiable {
     case voice = "Voice & Audio"
+    case bgm = "Background Music"
     case workspaces = "Connected AI"
     case hardware = "Notch & Menu Bar"
     case shortcuts = "Shortcuts & CLI"
@@ -26,6 +27,7 @@ enum DashboardTab: String, CaseIterable, Identifiable {
     var iconName: String {
         switch self {
         case .voice: return "waveform"
+        case .bgm: return "music.quarternote.3"
         case .workspaces: return "circle.hexagongrid.fill"
         case .hardware: return "macbook.and.ipad"
         case .shortcuts: return "command.square.fill"
@@ -236,6 +238,8 @@ public struct DashboardView: View {
                             
                             if tab == .voice && queueManager.isSpeaking {
                                 Circle().fill(Color.green).frame(width: 6, height: 6)
+                            } else if tab == .bgm && BackgroundMusicManager.shared.isPlaying {
+                                Circle().fill(Color.purple).frame(width: 6, height: 6)
                             }
                         }
                         .padding(.horizontal, 12)
@@ -319,6 +323,8 @@ public struct DashboardView: View {
                     switch selectedTab {
                     case .voice:
                         voiceSettingsTab
+                    case .bgm:
+                        BackgroundMusicView()
                     case .workspaces:
                         workspacesTab
                     case .hardware:
@@ -335,6 +341,7 @@ public struct DashboardView: View {
     private var tabSubtitle: String {
         switch selectedTab {
         case .voice: return "Select native Apple Silicon voice or neural Pocket-TTS extension."
+        case .bgm: return "Play soundtrack audio behind speech with shuffle, random offset, and reverb decay."
         case .workspaces: return "Monitors text output from local AI assistants. Never accesses microphone."
         case .hardware: return "Customize dynamic camera notch HUD and menu bar status icon."
         case .shortcuts: return "Global keyboard shortcuts and terminal command cheat sheet."
