@@ -438,11 +438,21 @@ case "stop":
     print("[Agent Speak] Speech stopped.")
 
 case "quit":
+    let uid = getuid()
+    let proc = Process()
+    proc.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+    proc.arguments = ["bootout", "gui/\(uid)/com.agentspeak.app"]
+    try? proc.run()
+    proc.waitUntilExit()
+    
+    let pidFile = "/tmp/agentspeak.pid"
+    try? FileManager.default.removeItem(atPath: pidFile)
+    
     let apps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.agentspeak.app")
     for a in apps {
         a.terminate()
     }
-    print("[Agent Speak] Application terminated.")
+    print("[Agent Speak] Application quit cleanly. Background service stopped.")
 
 default:
     print("Unknown command: \(cmd)")

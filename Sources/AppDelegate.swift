@@ -27,29 +27,18 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
     }
     
     public func applicationDidFinishLaunching(_ notification: Notification) {
-        // 0. Single-Instance Guard: Ensure only ONE instance of Agent Speak runs at any time
+        // 0. Single-Instance Guard: If already running, activate the existing instance and exit immediately
         let myPid = ProcessInfo.processInfo.processIdentifier
         let bundleId = Bundle.main.bundleIdentifier ?? "com.agentspeak.app"
-        for app in NSRunningApplication.runningApplications(withBundleIdentifier: bundleId) {
-            if app.processIdentifier != myPid {
-                NSLog("[AgentSpeak] Another instance already running (PID %d). Terminating it.", app.processIdentifier)
-                app.terminate()
-            }
+        let otherApps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).filter { $0.processIdentifier != myPid }
+        
+        if let existingApp = otherApps.first {
+            NSLog("[AgentSpeak] Instance already running (PID %d). Activating existing instance and exiting.", existingApp.processIdentifier)
+            existingApp.activate(options: [.activateIgnoringOtherApps])
+            exit(0)
         }
         
         let pidFile = "/tmp/agentspeak.pid"
-        if let existingPidStr = try? String(contentsOfFile: pidFile, encoding: .utf8),
-           let existingPid = Int32(existingPidStr.trimmingCharacters(in: .whitespacesAndNewlines)),
-           existingPid != myPid {
-            if kill(existingPid, 0) == 0 {
-                NSLog("[AgentSpeak] Terminating previous process PID %d", existingPid)
-                kill(existingPid, SIGTERM)
-                usleep(50_000)
-                if kill(existingPid, 0) == 0 {
-                    kill(existingPid, SIGKILL)
-                }
-            }
-        }
         try? "\(myPid)".write(toFile: pidFile, atomically: true, encoding: .utf8)
 
         // 1. Immediately start transcript monitoring and IPC socket
@@ -683,6 +672,17 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
     }
     
     @objc func quitApp() {
+        // Unload launch agent so launchd will not automatically restart the app on user quit
+        let uid = getuid()
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        proc.arguments = ["bootout", "gui/\(uid)/com.agentspeak.app"]
+        try? proc.run()
+        proc.waitUntilExit()
+        
+        let pidFile = "/tmp/agentspeak.pid"
+        try? FileManager.default.removeItem(atPath: pidFile)
+        
         NSApp.terminate(nil)
     }
 }
