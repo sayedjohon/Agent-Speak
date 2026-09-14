@@ -33,66 +33,6 @@ enum DashboardTab: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Compact 3D Visualizer Orb
-struct CompactVisualizerOrbView: View {
-    @Binding var isSpeaking: Bool
-    @State private var phase: CGFloat = 0.0
-    
-    var body: some View {
-        TimelineView(.animation) { _ in
-            Canvas { context, size in
-                let center = CGPoint(x: size.width / 2, y: size.height / 2)
-                let baseRadius = min(size.width, size.height) * 0.30
-                
-                let ringColors: [Color] = [
-                    Color(red: 0.18, green: 0.62, blue: 1.0).opacity(0.85),
-                    Color(red: 0.12, green: 0.88, blue: 0.78).opacity(0.65),
-                    Color(red: 0.52, green: 0.32, blue: 1.0).opacity(0.55)
-                ]
-                
-                for (idx, color) in ringColors.enumerated() {
-                    let offsetPhase = phase + CGFloat(idx) * 0.85
-                    var path = Path()
-                    let points = 48
-                    for p in 0...points {
-                        let angle = (CGFloat(p) / CGFloat(points)) * 2 * .pi
-                        let wave = sin(angle * 4 + offsetPhase) * (isSpeaking ? 8 : 3)
-                        let r = baseRadius + wave + CGFloat(idx * 4)
-                        let x = center.x + cos(angle) * r
-                        let y = center.y + sin(angle) * r
-                        if p == 0 {
-                            path.move(to: CGPoint(x: x, y: y))
-                        } else {
-                            path.addLine(to: CGPoint(x: x, y: y))
-                        }
-                    }
-                    path.closeSubpath()
-                    context.stroke(path, with: .color(color), lineWidth: 1.8)
-                }
-                
-                let coreGradient = Gradient(colors: [
-                    Color.white.opacity(0.95),
-                    Color(red: 0.15, green: 0.75, blue: 1.0).opacity(0.8),
-                    Color(red: 0.05, green: 0.2, blue: 0.5).opacity(0.15)
-                ])
-                let coreRect = CGRect(
-                    x: center.x - baseRadius * 0.45,
-                    y: center.y - baseRadius * 0.45,
-                    width: baseRadius * 0.9,
-                    height: baseRadius * 0.9
-                )
-                context.fill(Path(ellipseIn: coreRect), with: .radialGradient(coreGradient, center: center, startRadius: 0.0, endRadius: baseRadius * 0.45))
-            }
-        }
-        .frame(height: 70)
-        .onAppear {
-            withAnimation(.linear(duration: 4.0).repeatForever(autoreverses: false)) {
-                phase = .pi * 2
-            }
-        }
-    }
-}
-
 // MARK: - Dashboard Main View
 public struct DashboardView: View {
     @ObservedObject var queueManager = SpeechQueueManager.shared
