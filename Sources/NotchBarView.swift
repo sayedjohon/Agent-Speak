@@ -103,6 +103,6 @@ struct PointyTopNotchBarView: View {
                 .strokeBorder(Color.white.opacity(0.25), lineWidth: 0.65)
         )
         .shadow(color: Color.black.opacity(0.40), radius: 10, x: 0, y: 4)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }

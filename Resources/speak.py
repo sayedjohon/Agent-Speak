@@ -57,13 +57,20 @@ PREDEFINED_NAMES = [
 ]
 
 def sanitize_text_for_speech(text: str) -> str:
-    # Convert pauses and stage directions to clean commas
-    t = re.sub(r'\s*[\(\[]\s*(?:[bB]|pause|breath|breeth|silent|silence)\s*[\)\]]\s*', ', ', text)
-    # Strip markdown symbols (*, #, `, _, ~)
-    t = re.sub(r'[*#`_~]', '', t)
-    # Strip URL links
-    t = re.sub(r'https?://\S+', 'link', t)
-    # Replace multiple spaces/newlines
+    # 1. Strip complete code blocks and unclosed trailing code blocks
+    t = re.sub(r'```[\s\S]*?```', '', text)
+    t = re.sub(r'```[\s\S]*$', '', t)
+    # 2. Strip inline code
+    t = re.sub(r'`([^`]+)`', r'\1', t)
+    # 3. Strip emojis & supplementary plane symbols
+    t = re.sub(r'[\U00010000-\U0010ffff]', '', t)
+    # 4. Convert pauses and stage directions to clean commas
+    t = re.sub(r'\s*[\(\[]\s*(?:[bB]|pause|breath|breeth|silent|silence)\s*[\)\]]\s*', ', ', t)
+    # 5. Strip markdown symbols (*, #, _, ~)
+    t = re.sub(r'[*#_~]', '', t)
+    # 6. Strip URL links
+    t = re.sub(r'https?://\S+', '', t)
+    # 7. Replace multiple spaces/newlines
     t = re.sub(r'\s+', ' ', t).strip()
     return t
 
@@ -83,6 +90,10 @@ def trim_trailing_silence(samples, sample_rate, silence_thresh=0.008, pad=0.25):
 
 
 def get_native_fallback_voice(text: str) -> str:
+    # Prioritize Japanese Kana so Japanese sentences containing Kanji route to Kyoko
+    if any(0x3040 <= ord(ch) <= 0x30FF for ch in text):
+        return "Kyoko"
+
     for ch in text:
         v = ord(ch)
         if v == 0x0964 or v == 0x0965:
@@ -91,15 +102,13 @@ def get_native_fallback_voice(text: str) -> str:
             return "Piya"
         if 0x0900 <= v <= 0x097F:
             return "Lekha"
-        if 0x0600 <= v <= 0x06FF or 0x0750 <= v <= 0x077F:
+        if 0x0600 <= v <= 0x06FF or 0x0750 <= v <= 0x077F or 0x08A0 <= v <= 0x08FF:
             return "Majed"
-        if 0x3040 <= v <= 0x30FF:
-            return "Kyoko"
-        if 0xAC00 <= v <= 0xD7AF:
+        if 0xAC00 <= v <= 0xD7AF or 0x1100 <= v <= 0x11FF:
             return "Yuna"
-        if 0x4E00 <= v <= 0x9FFF:
+        if 0x4E00 <= v <= 0x9FFF or 0x3400 <= v <= 0x4DBF:
             return "Tingting"
-        if 0x0400 <= v <= 0x04FF:
+        if 0x0400 <= v <= 0x04FF or 0x0500 <= v <= 0x052F:
             return "Milena"
         if 0x0B80 <= v <= 0x0BFF:
             return "Vani"
@@ -121,6 +130,7 @@ def main():
     parser.add_argument("--voice", "-v", default="Jarvis_Best", help="Voice name or filename (default: Jarvis_Best)")
     parser.add_argument("--play", "-p", action="store_true", default=True, help="Automatically play audio via afplay (default: True)")
     parser.add_argument("--no-play", action="store_false", dest="play", help="Do not play audio automatically")
+    parser.add_argument("--no-gain", action="store_true", help="Skip soft-knee saturation gain in python (applied by host)")
     parser.add_argument("--output", "-o", help="Custom output wav path")
     args = parser.parse_args()
 
@@ -141,7 +151,11 @@ def main():
     if native_voice:
         out_file = Path(args.output) if args.output else (OUTPUTS_DIR / "last_spoken.wav")
         tmp_aiff = out_file.with_suffix(".aiff")
-        subprocess.run(["/usr/bin/say", "-v", native_voice, "-o", str(tmp_aiff), text], check=True)
+        try:
+            subprocess.run(["/usr/bin/say", "-v", native_voice, "-o", str(tmp_aiff), text], check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # Fall back to macOS default voice if requested voice is not installed
+            subprocess.run(["/usr/bin/say", "-o", str(tmp_aiff), text], check=False)
         if out_file.suffix.lower() == ".wav":
             subprocess.run(["/usr/bin/afconvert", "-f", "WAVE", "-d", "LEI16@24000", str(tmp_aiff), str(out_file)], check=True)
             if tmp_aiff.exists():
@@ -149,7 +163,7 @@ def main():
         elif tmp_aiff != out_file:
             tmp_aiff.rename(out_file)
         vol = get_configured_volume()
-        if vol > 100 and out_file.exists() and out_file.suffix.lower() == ".wav":
+        if not args.no_gain and vol > 100 and out_file.exists() and out_file.suffix.lower() == ".wav":
             try:
                 rate, data = scipy.io.wavfile.read(str(out_file))
                 float_data = data.astype(np.float32) / 32767.0
@@ -249,9 +263,10 @@ def main():
     # Trim trailing silence/dead air
     arr = trim_trailing_silence(arr, model.sample_rate)
     
-    # Apply configured volume & force gain boost
+    # Apply configured volume & force gain boost unless host app applies it
     vol = get_configured_volume()
-    arr = apply_soft_knee_gain(arr, vol)
+    if not args.no_gain:
+        arr = apply_soft_knee_gain(arr, vol)
     
     out_file = Path(args.output) if args.output else (OUTPUTS_DIR / "last_spoken.wav")
     scipy.io.wavfile.write(str(out_file), model.sample_rate, arr)

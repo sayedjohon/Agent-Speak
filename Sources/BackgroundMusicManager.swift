@@ -242,7 +242,7 @@ public class BackgroundMusicManager: ObservableObject {
         var currentStep = 0
         
         DispatchQueue.main.async {
-            self.fadeTimer = Timer.scheduledTimer(withTimeInterval: stepInterval, repeats: true) { [weak self] t in
+            let timer = Timer(timeInterval: stepInterval, repeats: true) { [weak self] t in
                 guard let self = self else {
                     t.invalidate()
                     return
@@ -260,10 +260,23 @@ public class BackgroundMusicManager: ObservableObject {
                 if currentStep >= steps {
                     t.invalidate()
                     self.fadeTimer = nil
-                    self.stopImmediately()
+                    self.playerNode.stop()
+                    DispatchQueue.main.async {
+                        self.isPlaying = false
+                        self.isFadingOut = false
+                        self.currentTrackTitle = ""
+                    }
                     completion?()
+                    
+                    // Allow spatial reverb echo tail to dissolve naturally before stopping engine
+                    DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                        guard let self = self, !self.isPlaying else { return }
+                        self.engine.stop()
+                    }
                 }
             }
+            RunLoop.main.add(timer, forMode: .common)
+            self.fadeTimer = timer
         }
     }
     

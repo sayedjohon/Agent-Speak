@@ -68,10 +68,12 @@ public class SpeechQueueManager: ObservableObject {
         DispatchQueue.main.async {
             self.queueCount = count
             if immediate && self.isSpeaking {
+                // Dismissing the active speech triggers its onClose/finishHandler,
+                // which unlocks and advances to processNext() cleanly without race conditions.
                 NotchWindowController.shared.dismiss()
-                self.isSpeaking = false
+            } else {
+                self.processNext()
             }
-            self.processNext()
         }
     }
     
@@ -167,11 +169,16 @@ public class SpeechQueueManager: ObservableObject {
     private func cleanupTmpAudio() {
         let fileManager = FileManager.default
         let tmp = URL(fileURLWithPath: "/tmp")
-        if let files = try? fileManager.contentsOfDirectory(at: tmp, includingPropertiesForKeys: nil) {
+        let now = Date()
+        if let files = try? fileManager.contentsOfDirectory(at: tmp, includingPropertiesForKeys: [.contentModificationDateKey]) {
             for f in files {
                 let name = f.lastPathComponent
                 if name.hasPrefix("speech_chunk_") || name.hasPrefix("speech_bar_") || name.hasPrefix("test_speech") {
-                    try? fileManager.removeItem(at: f)
+                    if let res = try? f.resourceValues(forKeys: [.contentModificationDateKey]),
+                       let modDate = res.contentModificationDate,
+                       now.timeIntervalSince(modDate) > 120 {
+                        try? fileManager.removeItem(at: f)
+                    }
                 }
             }
         }

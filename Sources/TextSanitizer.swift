@@ -4,13 +4,17 @@ public struct TextSanitizer {
     public static func sanitizeForSpeech(_ text: String) -> String {
         var str = text
         
-        // 1. Strip fenced code blocks ```...```
+        // 1. Strip fenced code blocks ```...``` (both complete and unclosed trailing)
         str = replaceRegex(str, pattern: "```[\\s\\S]*?```", with: "")
+        str = replaceRegex(str, pattern: "```[\\s\\S]*$", with: "")
         
         // 2. Strip inline code `...`
         str = replaceRegex(str, pattern: "`([^`]+)`", with: "$1")
         
-        // 3. Strip images ![alt](url)
+        // 3. Strip emojis & pictorial symbols (prevents verbose voiceover & TTS static)
+        str = replaceRegex(str, pattern: "[\\p{Extended_Pictographic}\\p{EMOJI_MODIFIER}\\p{EMOJI_COMPONENT}\\p{EMOJI_PRESENTATION}]", with: "")
+        
+        // 4. Strip images ![alt](url)
         str = replaceRegex(str, pattern: "!\\[.*?\\]\\(.*?\\)", with: "")
         
         // 4. Convert markdown links [Label](url) -> Label

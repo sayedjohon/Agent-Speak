@@ -128,7 +128,7 @@ public class LastVoiceManager: NSObject, ObservableObject, AVAudioPlayerDelegate
                         export.exportAsynchronously {
                             sema.signal()
                         }
-                        sema.wait()
+                        _ = sema.wait(timeout: .now() + 15.0)
                         
                         if fileManager.fileExists(atPath: tempOutput.path),
                            let attrs = try? fileManager.attributesOfItem(atPath: tempOutput.path),

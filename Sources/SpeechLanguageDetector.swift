@@ -268,9 +268,9 @@ public struct SpeechLanguageDetector {
         var hasBengali = false
         var hasDevanagari = false
         var hasArabic = false
-        var hasJapanese = false
+        var hasJapaneseKana = false
         var hasKorean = false
-        var hasChinese = false
+        var hasHanIdeograph = false
         var hasCyrillic = false
         var hasTamil = false
         var hasTelugu = false
@@ -288,9 +288,9 @@ public struct SpeechLanguageDetector {
             if (0x0980...0x09FF).contains(v) { hasBengali = true; break }
             else if (0x0900...0x097F).contains(v) { hasDevanagari = true; break }
             else if (0x0600...0x06FF).contains(v) || (0x0750...0x077F).contains(v) || (0x08A0...0x08FF).contains(v) || (0xFB50...0xFDFF).contains(v) || (0xFE70...0xFEFF).contains(v) { hasArabic = true; break }
-            else if (0x3040...0x30FF).contains(v) { hasJapanese = true; break }
+            else if (0x3040...0x30FF).contains(v) { hasJapaneseKana = true }
             else if (0xAC00...0xD7AF).contains(v) || (0x1100...0x11FF).contains(v) { hasKorean = true; break }
-            else if (0x4E00...0x9FFF).contains(v) || (0x3400...0x4DBF).contains(v) { hasChinese = true; break }
+            else if (0x4E00...0x9FFF).contains(v) || (0x3400...0x4DBF).contains(v) { hasHanIdeograph = true }
             else if (0x0400...0x04FF).contains(v) || (0x0500...0x052F).contains(v) { hasCyrillic = true; break }
             else if (0x0B80...0x0BFF).contains(v) { hasTamil = true; break }
             else if (0x0C00...0x0C7F).contains(v) { hasTelugu = true; break }
@@ -313,13 +313,13 @@ public struct SpeechLanguageDetector {
         if hasArabic {
             return AVSpeechSynthesisVoice(language: "ar-001")?.name ?? AVSpeechSynthesisVoice(language: "ar-SA")?.name ?? "Majed"
         }
-        if hasJapanese {
+        if hasJapaneseKana {
             return AVSpeechSynthesisVoice(language: "ja-JP")?.name ?? "Kyoko"
         }
         if hasKorean {
             return AVSpeechSynthesisVoice(language: "ko-KR")?.name ?? "Yuna"
         }
-        if hasChinese {
+        if hasHanIdeograph {
             return AVSpeechSynthesisVoice(language: "zh-CN")?.name ?? "Tingting"
         }
         if hasCyrillic {

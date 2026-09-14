@@ -74,7 +74,7 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         
         self.totalChunksCount = textChunks.count
         self.chunks = textChunks.enumerated().map { idx, chunkText in
-            AudioChunk(index: idx, text: chunkText, filePath: "/tmp/speech_chunk_\(sessionId)_\(idx).aiff")
+            AudioChunk(index: idx, text: chunkText, filePath: "/tmp/speech_chunk_\(sessionId)_\(idx).wav")
         }
         
         // Render Chunk 0 asynchronously on userInitiated queue (zero main thread stall)
@@ -169,7 +169,7 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
                let py = PocketTTSManager.shared.activePythonPath {
                 let proc = Process()
                 proc.executableURL = URL(fileURLWithPath: py)
-                proc.arguments = [script, c.text, "--voice", voice, "--output", c.filePath, "--no-play"]
+                proc.arguments = [script, c.text, "--voice", voice, "--output", c.filePath, "--no-play", "--no-gain"]
                 self.activeRenderProcess = proc
                 try? proc.run()
                 proc.waitUntilExit()
@@ -452,7 +452,7 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         
         // Clean up temporary chunks after giving LastVoiceManager time to read and merge
         let chunksToClean = self.chunks
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 2.0) {
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 5.0) {
             for c in chunksToClean {
                 if c.filePath.hasPrefix("/tmp/") {
                     try? FileManager.default.removeItem(atPath: c.filePath)
@@ -520,12 +520,12 @@ public class NotchWindowController {
             let y: CGFloat
             if hasNotch {
                 let notchHeight: CGFloat = targetScreen.safeAreaInsets.top > 0 ? targetScreen.safeAreaInsets.top : 32.0
-                y = topOfScreen - notchHeight - barHeight + 0.5
+                y = topOfScreen - notchHeight - windowHeight
             } else {
                 if topOfVisible < topOfScreen - 5 {
-                    y = topOfVisible - barHeight - 4.0
+                    y = topOfVisible - windowHeight - 4.0
                 } else {
-                    y = topOfScreen - barHeight - 8.0
+                    y = topOfScreen - windowHeight - 8.0
                 }
             }
             
@@ -558,8 +558,9 @@ public class NotchWindowController {
             self.window = panel
             
             // Watchdog: dismiss if speech synthesis fails completely after timeout
+            let targetMgr = self.audioManager
             DispatchQueue.main.asyncAfter(deadline: .now() + 25.0) { [weak self] in
-                guard let self = self, let mgr = self.audioManager else { return }
+                guard let self = self, let mgr = self.audioManager, mgr === targetMgr else { return }
                 if !mgr.isPlaying && mgr.currentChunkIndex == 0 && mgr.chunks.first?.player == nil {
                     self.dismiss()
                 }
@@ -597,12 +598,12 @@ public class NotchWindowController {
             let y: CGFloat
             if hasNotch {
                 let notchHeight: CGFloat = targetScreen.safeAreaInsets.top > 0 ? targetScreen.safeAreaInsets.top : 32.0
-                y = topOfScreen - notchHeight - barHeight + 0.5
+                y = topOfScreen - notchHeight - windowHeight
             } else {
                 if topOfVisible < topOfScreen - 5 {
-                    y = topOfVisible - barHeight - 4.0
+                    y = topOfVisible - windowHeight - 4.0
                 } else {
-                    y = topOfScreen - barHeight - 8.0
+                    y = topOfScreen - windowHeight - 8.0
                 }
             }
             
@@ -635,8 +636,9 @@ public class NotchWindowController {
             self.window = panel
             
             // Instant Autoplay Verification
+            let targetMgr = self.audioManager
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-                guard let self = self, let mgr = self.audioManager else { return }
+                guard let self = self, let mgr = self.audioManager, mgr === targetMgr else { return }
                 if !mgr.isPlaying {
                     if let p = mgr.chunks.first?.player {
                         p.play()

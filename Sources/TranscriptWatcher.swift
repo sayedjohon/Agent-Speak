@@ -464,12 +464,21 @@ public class TranscriptWatcher {
                 }
             }
             guard clientFd >= 0 else { return }
+            defer { close(clientFd) }
             
-            var buffer = [UInt8](repeating: 0, count: 65536)
-            let n = read(clientFd, &buffer, buffer.count)
-            if n > 0 {
-                let data = Data(buffer.prefix(n))
-                if let raw = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
+            var fullData = Data()
+            var chunk = [UInt8](repeating: 0, count: 16384)
+            while true {
+                let n = read(clientFd, &chunk, chunk.count)
+                if n > 0 {
+                    fullData.append(chunk, count: n)
+                } else {
+                    break
+                }
+            }
+            
+            if !fullData.isEmpty {
+                if let raw = String(data: fullData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
                     if raw == "__CMD_SHOW_DASHBOARD__" {
                         DispatchQueue.main.async {
                             AppDelegate.shared?.showDashboard()
@@ -569,7 +578,6 @@ public class TranscriptWatcher {
                     }
                 }
             }
-            close(clientFd)
         }
         src.resume()
         self.socketSource = src

@@ -202,15 +202,16 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
     
     public func setTrayIconVisible(_ visible: Bool) {
         saveTrayPreference(visible: visible)
-        if visible {
-            if statusItem == nil || statusItem?.isVisible == false {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    exit(0)
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            if visible {
+                if self.statusItem == nil {
+                    self.setupMenuBar()
+                } else {
+                    self.statusItem?.isVisible = true
                 }
-            }
-        } else {
-            DispatchQueue.main.async { [weak self] in
-                self?.statusItem?.isVisible = false
+            } else {
+                self.statusItem?.isVisible = false
             }
         }
     }

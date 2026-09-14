@@ -82,10 +82,13 @@ public class VoiceVolumeManager: ObservableObject {
     }
     
     public func saveConfig() {
-        guard let data = try? Data(contentsOf: configPath),
-              var json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              var audio = json["audio"] as? [String: Any] else { return }
-        
+        try? FileManager.default.createDirectory(at: configPath.deletingLastPathComponent(), withIntermediateDirectories: true)
+        var json: [String: Any] = [:]
+        if let data = try? Data(contentsOf: configPath),
+           let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            json = parsed
+        }
+        var audio = json["audio"] as? [String: Any] ?? [:]
         audio["volume"] = self.volume
         json["audio"] = audio
         
