@@ -240,105 +240,48 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         
         let isSpeaking = SpeechQueueManager.shared.isSpeaking
         
-        // 1. Live Status Header
-        let statusTitle = isSpeaking ? "🟢 Agent Speak: Speaking..." : "⚪ Agent Speak: Ready & Monitoring"
-        let statusItem = NSMenuItem(title: statusTitle, action: #selector(showDashboard), keyEquivalent: "")
-        statusItem.target = self
-        let font = NSFont.boldSystemFont(ofSize: 13)
-        statusItem.attributedTitle = NSAttributedString(string: statusTitle, attributes: [.font: font])
-        menu.addItem(statusItem)
-        
-        if isSpeaking && !SpeechQueueManager.shared.currentSpeakerSource.isEmpty {
-            let sourceItem = NSMenuItem(title: "    Active Source: \(SpeechQueueManager.shared.currentSpeakerSource)", action: nil, keyEquivalent: "")
-            sourceItem.isEnabled = false
-            menu.addItem(sourceItem)
+        // 1. Settings (Traditional 1-word name, gear icon, ⌘,)
+        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(showDashboard), keyEquivalent: ",")
+        settingsItem.keyEquivalentModifierMask = [.command]
+        if let icon = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Settings") {
+            icon.isTemplate = true
+            settingsItem.image = icon
         }
+        settingsItem.target = self
+        menu.addItem(settingsItem)
         
         menu.addItem(NSMenuItem.separator())
         
-        // 2. Open Dashboard
-        let dashItem = NSMenuItem(title: "Open Agent Speak Dashboard...", action: #selector(showDashboard), keyEquivalent: "d")
-        dashItem.image = NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: nil)
-        dashItem.target = self
-        menu.addItem(dashItem)
+        // 2. Speak Clipboard (2 words, clipboard icon, ⌘P)
+        let clipboardItem = NSMenuItem(title: "Speak Clipboard", action: #selector(speakClipboard), keyEquivalent: "p")
+        clipboardItem.keyEquivalentModifierMask = [.command]
+        if let icon = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "Clipboard") {
+            icon.isTemplate = true
+            clipboardItem.image = icon
+        }
+        clipboardItem.target = self
+        menu.addItem(clipboardItem)
         
-        menu.addItem(NSMenuItem.separator())
-        
-        // 3. Quick Actions
-        let pbItem = NSMenuItem(title: "Speak Clipboard Text (ChatGPT / Web)", action: #selector(speakClipboard), keyEquivalent: "p")
-        pbItem.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil)
-        pbItem.target = self
-        menu.addItem(pbItem)
-        
-        let testItem = NSMenuItem(title: "Test System Voice", action: #selector(testVoice), keyEquivalent: "t")
-        testItem.image = NSImage(systemSymbolName: "speaker.wave.2", accessibilityDescription: nil)
-        testItem.target = self
-        menu.addItem(testItem)
-        
-        let stopItem = NSMenuItem(title: "Stop Speech (or press Esc)", action: #selector(stopSpeech), keyEquivalent: "s")
-        stopItem.image = NSImage(systemSymbolName: "stop.circle", accessibilityDescription: nil)
+        // 3. Stop (1 word, stop icon, ⌘S)
+        let stopItem = NSMenuItem(title: "Stop", action: #selector(stopSpeech), keyEquivalent: "s")
+        stopItem.keyEquivalentModifierMask = [.command]
+        if let icon = NSImage(systemSymbolName: "stop.circle", accessibilityDescription: "Stop") {
+            icon.isTemplate = true
+            stopItem.image = icon
+        }
         stopItem.target = self
         stopItem.isEnabled = isSpeaking
         menu.addItem(stopItem)
         
-        // Voice Quick Selection Submenu
-        let voiceMenu = NSMenu()
-        let currentVoice = loadCurrentMacosVoice()
-        let topVoices = [
-            ("default", "Default (System Default)"),
-            ("Samantha", "Samantha (US English)"),
-            ("Daniel", "Daniel (British English)"),
-            ("Karen", "Karen (Australian English)"),
-            ("Moira", "Moira (Irish English)"),
-            ("Rishi", "Rishi (Indian English)"),
-            ("Tessa", "Tessa (South African English)"),
-            ("Fred", "Fred (Classic macOS)"),
-            ("Piya", "Piya (Bengali)")
-        ]
-        for (vTag, vName) in topVoices {
-            let vItem = NSMenuItem(title: vName, action: #selector(selectVoiceFromMenu(_:)), keyEquivalent: "")
-            vItem.target = self
-            vItem.representedObject = vTag
-            vItem.state = ((vTag == currentVoice) || (currentVoice.isEmpty && vTag == "default")) ? .on : .off
-            voiceMenu.addItem(vItem)
+        menu.addItem(NSMenuItem.separator())
+        
+        // 4. Quit (1 word, power icon, ⌘Q)
+        let quitItem = NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q")
+        quitItem.keyEquivalentModifierMask = [.command]
+        if let icon = NSImage(systemSymbolName: "power", accessibilityDescription: "Quit") {
+            icon.isTemplate = true
+            quitItem.image = icon
         }
-        let voiceSelectorItem = NSMenuItem(title: "Select MacBook Voice", action: nil, keyEquivalent: "")
-        voiceSelectorItem.image = NSImage(systemSymbolName: "person.wave.2", accessibilityDescription: nil)
-        voiceSelectorItem.submenu = voiceMenu
-        menu.addItem(voiceSelectorItem)
-        
-        menu.addItem(NSMenuItem.separator())
-        
-        // 4. Monitored Workspaces Status
-        let agentsHeader = NSMenuItem(title: "Monitored Workspaces:", action: nil, keyEquivalent: "")
-        agentsHeader.isEnabled = false
-        menu.addItem(agentsHeader)
-        
-        let antigravityItem = NSMenuItem(title: "  ✓ Antigravity AI Workspaces", action: nil, keyEquivalent: "")
-        antigravityItem.isEnabled = false
-        menu.addItem(antigravityItem)
-        
-        let claudeItem = NSMenuItem(title: "  ✓ Claude Code & Desktop", action: nil, keyEquivalent: "")
-        claudeItem.isEnabled = false
-        menu.addItem(claudeItem)
-        
-        let openCodeItem = NSMenuItem(title: "  ✓ OpenCode & Terminal Socket", action: nil, keyEquivalent: "")
-        openCodeItem.isEnabled = false
-        menu.addItem(openCodeItem)
-        
-        menu.addItem(NSMenuItem.separator())
-        
-        // 5. Hide from Menu Bar
-        let hideItem = NSMenuItem(title: "Hide Menu Bar Icon...", action: #selector(confirmHideTrayIcon), keyEquivalent: "")
-        hideItem.image = NSImage(systemSymbolName: "eye.slash", accessibilityDescription: nil)
-        hideItem.target = self
-        menu.addItem(hideItem)
-        
-        menu.addItem(NSMenuItem.separator())
-        
-        // 6. Quit
-        let quitItem = NSMenuItem(title: "Quit Agent Speak", action: #selector(quitApp), keyEquivalent: "q")
-        quitItem.image = NSImage(systemSymbolName: "power", accessibilityDescription: nil)
         quitItem.target = self
         menu.addItem(quitItem)
     }

@@ -722,7 +722,7 @@ public struct DashboardView: View {
                 
                 shortcutRow(keys: "Esc", title: "Instant Silence", desc: "Dismisses notch player and halts active speech immediately")
                 shortcutRow(keys: "⌘ P", title: "Read Clipboard", desc: "Available in menu bar tray menu to read copied browser/ChatGPT text")
-                shortcutRow(keys: "⌘ D", title: "Dashboard", desc: "Quick toggle for this Settings Dashboard from the tray menu")
+                shortcutRow(keys: "⌘ ,", title: "Settings", desc: "Open this Settings window from the menu bar icon")
             }
             .padding(12)
             .background(Color.white.opacity(0.04))

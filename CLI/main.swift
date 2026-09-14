@@ -41,7 +41,7 @@ func printHelp() {
       status      Check if Agent Speak is running
       say <text>  Speak text through the Liquid Glass notch player (Default System Voice)
       pb          Speak copied clipboard text (perfect for ChatGPT, web, or any app)
-      dashboard   Open the CleanMyMac-style 3D Visualizer Dashboard
+      settings    Open the Agent Speak Settings window (alias: dashboard)
       tray        Toggle or set menu bar tray icon (tray on | off | toggle)
       test-jarvis Test playback of the Jarvis voice sample in the Notch Player
       stop        Stop current speech and dismiss the notch player
@@ -132,11 +132,11 @@ case "say":
         print("Error: Could not connect to Agent Speak socket.")
     }
 
-case "dashboard":
+case "dashboard", "settings":
     if ensureAppRunningAndSend("__CMD_SHOW_DASHBOARD__") {
-        print("[Agent Speak] Showing Agent Speak Dashboard...")
+        print("[Agent Speak] Showing Agent Speak Settings...")
     } else {
-        print("Error: Could not launch Agent Speak Dashboard.")
+        print("Error: Could not launch Agent Speak Settings.")
     }
 
 case "test-jarvis":
