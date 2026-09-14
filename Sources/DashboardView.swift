@@ -46,6 +46,7 @@ public struct DashboardView: View {
     @State private var skipSeconds: Int = 5
     @State private var showTrayIcon: Bool = true
     @State private var availableSystemVoices: [SystemVoiceItem] = []
+    @State private var customTestText: String = "Hello Johon! Agent Speak is live with multilingual speech."
     
     // Workspace States
     @State private var watchAntigravity: Bool = true
@@ -455,29 +456,52 @@ public struct DashboardView: View {
             .cornerRadius(10)
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
             
-            // Action Buttons
-            HStack(spacing: 12) {
-                Button(action: {
-                    let sampleVoice = voiceEngine == "macos_default" ? selectedVoiceDisplayName : pocketVoice
-                    SpeechQueueManager.shared.enqueue(
-                        source: "Agent Speak",
-                        text: "Testing \(sampleVoice). Agent Speak voice playback is clear and responsive."
-                    )
-                }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 10))
-                        Text("Test Voice in Notch Player")
-                            .font(.system(size: 11, weight: .semibold))
+            // Interactive Voice & Multilingual Test Card
+            VStack(alignment: .leading, spacing: 8) {
+                Text("TEST VOICE & MULTILINGUAL SPEECH")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.secondary)
+                
+                HStack(spacing: 8) {
+                    TextField("Enter text to speak (e.g. English, বাংলা, हिंदी, Español)...", text: $customTestText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 11.5))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(Color.white.opacity(0.06))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                        )
+                    
+                    Button(action: {
+                        let textToSpeak = customTestText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let prompt = textToSpeak.isEmpty ? "Testing Agent Speak voice playback." : textToSpeak
+                        SpeechQueueManager.shared.enqueue(
+                            source: "Voice Test",
+                            text: prompt
+                        )
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 10))
+                            Text("Test Voice")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(7)
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
+            .padding(11)
+            .background(Color.white.opacity(0.04))
+            .cornerRadius(10)
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
     }
     
