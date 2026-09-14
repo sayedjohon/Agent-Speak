@@ -151,4 +151,4 @@ echo -e "${BLUE}• Background:${NC}      Launchd KeepAlive 24/7 (com.agentspeak
 
 sleep 1.5
 "$BIN_DIR/agentspeak" status
-"$BIN_DIR/agentspeak" say "Agent Speak is installed and running with your natural system voice."
+"$BIN_DIR/agentspeak" greet

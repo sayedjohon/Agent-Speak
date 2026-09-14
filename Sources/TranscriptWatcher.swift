@@ -556,6 +556,11 @@ public class TranscriptWatcher {
                                 VoiceVolumeManager.shared.setVolume(intVal)
                             }
                         }
+                    } else if raw == "__CMD_GREET__" {
+                        let greeting = PersonaGreetingManager.shared.resolveGreeting()
+                        DispatchQueue.main.async {
+                            SpeechQueueManager.shared.enqueue(source: greeting.character, text: greeting.text)
+                        }
                     } else {
                         let clean = TextSanitizer.sanitizeForSpeech(raw)
                         if !clean.isEmpty {

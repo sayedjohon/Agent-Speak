@@ -416,7 +416,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         let voiceName = vTag == "default" ? "System Default" : vTag
         SpeechQueueManager.shared.enqueue(
             source: "Agent Speak",
-            text: "Voice switched to \(voiceName)."
+            text: "Agent Speak is online and ready with \(voiceName), your Mac System Voice."
         )
     }
     

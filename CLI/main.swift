@@ -47,6 +47,7 @@ func printHelp() {
       tray        Toggle or set menu bar tray icon (tray on | off | toggle)
       voice       Manage voices and volume (status | list | set | vol <1-200> | install | clone)
       bgm         Manage Iron Man background soundtrack (on | off | vol | test | open | status)
+      greet       Speak active persona's signature greeting (alias: intro)
       test-jarvis Test playback of the Jarvis voice sample in the Notch Player
       stop        Stop current speech and dismiss the notch player
       quit        Terminate the Agent Speak application
@@ -410,6 +411,13 @@ case "bgm":
     } else {
         print("Unknown bgm subcommand: \(sub)")
         print("Available subcommands: on, off, toggle, vol <0-100>, test, open, status")
+    }
+
+case "greet", "welcome", "intro":
+    if ensureAppRunningAndSend("__CMD_GREET__") {
+        print("[Agent Speak] Triggered persona signature greeting.")
+    } else {
+        print("Error: Could not connect to Agent Speak socket.")
     }
 
 case "stop":

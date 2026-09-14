@@ -70,39 +70,34 @@ public class PocketTTSManager: ObservableObject {
         var items: [PocketVoiceItem] = []
         var seenTags = Set<String>()
         
-        // Standard curated personas
-        let curated: [(tag: String, name: String, desc: String)] = [
-            ("Jarvis_Best", "Jarvis (Best)", "AI Butler (Authoritative British - Primary)"),
-            ("Sayed_Johon_Primary", "Sayed Johon", "Creator Clone (Studio Clarity)"),
-            ("Jarvis", "Jarvis (Classic)", "AI Butler (Authoritative British)"),
-            ("Male_Peace", "Male Peace", "Calm & Meditative Voice"),
-            ("Male_News_Caster", "Male News Caster", "Deep Social Media News Anchor"),
-            ("Female_Soft_Intimate", "Female Soft & Intimate", "Gentle & Warm Conversationalist"),
-            ("Female_Podcast_Host", "Female Podcast Host", "Engaging Conversational Host"),
-            ("Male_American_Narrator", "Male American Narrator", "Casual Conversational Narrator"),
-            ("Male_Shorts_Creator", "Male Shorts Creator", "High-Energy YouTube Shorts Creator"),
-            ("Male_Viral_Actor", "Male Viral Actor", "Viral Dynamic Content Creator"),
-            ("Female_Confident_Sultry", "Female Confident & Sly", "Confident, Sly & Expressive"),
-            ("Male_Energetic_Creator", "Male Energetic Creator", "Upbeat Social Media Storyteller"),
-            ("Male_Social_Media", "Male Social Media", "Modern Social Media Presenter"),
-            ("Male_New", "Male New", "Crisp Modern Tone"),
-            ("Female_New", "Female New", "Fresh Modern Tone"),
-            ("Male_Old_Storyteller", "Male Old Storyteller", "Seasoned Warm Storyteller"),
-            ("Female_Aah", "Female Expressive", "Expressive & Soulful"),
-            ("Female_Pro_2", "Female Pro", "Polished Professional Narrator"),
-            ("Male_Adam_v2", "Male Adam v2", "Natural Studio Clarity"),
-            ("alba", "Alba", "Storyteller (Natural Scottish/British)"),
-            ("george", "George", "Narrator (Deep British Male)"),
-            ("cosette", "Cosette", "Expressive (Warm & Engaging)"),
-            ("marius", "Marius", "Conversational (Casual Male)")
+        // Standard curated personas from PersonaGreetingManager
+        let profiles = PersonaGreetingManager.shared.profiles
+        let order = [
+            "Jarvis_Best", "Sayed_Johon_Primary", "Jarvis", "Male_Peace", "Male_News_Caster",
+            "Female_Soft_Intimate", "Female_Podcast_Host", "Male_American_Narrator", "Male_Shorts_Creator",
+            "Male_Viral_Actor", "Female_Confident_Sultry", "Male_Energetic_Creator", "Male_Social_Media",
+            "Male_New", "Female_New", "Male_Old_Storyteller", "Female_Aah", "Female_Pro_2",
+            "Male_Adam_v2", "alba", "george", "cosette", "marius"
         ]
         
         var curatedMap: [String: (name: String, desc: String)] = [:]
-        for c in curated {
-            items.append(PocketVoiceItem(tag: c.tag, displayName: c.name, subtitle: c.desc))
-            seenTags.insert(c.tag)
-            curatedMap[c.tag] = (c.name, c.desc)
-            curatedMap[c.tag.replacingOccurrences(of: "_", with: "-")] = (c.name, c.desc)
+        for tag in order {
+            if let p = profiles[tag] {
+                let displayName: String
+                if p.tag == "Jarvis_Best" {
+                    displayName = "Jarvis (Best)"
+                } else if p.tag == "Sayed_Johon_Primary" {
+                    displayName = "Johon (Sayed Johon)"
+                } else if p.tag == "Jarvis" {
+                    displayName = "Jarvis (Classic)"
+                } else {
+                    displayName = "\(p.characterName) (\(p.gender))"
+                }
+                items.append(PocketVoiceItem(tag: p.tag, displayName: displayName, subtitle: p.subtitle))
+                seenTags.insert(p.tag)
+                curatedMap[p.tag] = (displayName, p.subtitle)
+                curatedMap[p.tag.replacingOccurrences(of: "_", with: "-")] = (displayName, p.subtitle)
+            }
         }
         
         // Search custom voice files in voices directories

@@ -183,6 +183,9 @@ public struct PocketTTSExtensionCardView: View {
                                 Button(action: {
                                     pocketVoice = item.tag
                                     onSave()
+                                    if let p = PersonaGreetingManager.shared.getProfile(for: item.tag) {
+                                        SpeechQueueManager.shared.enqueue(source: p.characterName, text: p.greeting, immediate: true)
+                                    }
                                 }) {
                                     HStack {
                                         Text("\(item.displayName) — \(item.subtitle)")
