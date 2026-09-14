@@ -313,22 +313,22 @@ public struct DashboardView: View {
             
             Divider().background(Color.white.opacity(0.08))
             
-            // Tab Specific Content (Zero Scrolling)
-            VStack(alignment: .leading, spacing: 14) {
-                switch selectedTab {
-                case .voice:
-                    voiceSettingsTab
-                case .workspaces:
-                    workspacesTab
-                case .hardware:
-                    hardwareTab
-                case .shortcuts:
-                    shortcutsTab
+            // Tab Specific Content (Smooth Scrolling)
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 14) {
+                    switch selectedTab {
+                    case .voice:
+                        voiceSettingsTab
+                    case .workspaces:
+                        workspacesTab
+                    case .hardware:
+                        hardwareTab
+                    case .shortcuts:
+                        shortcutsTab
+                    }
                 }
+                .padding(22)
             }
-            .padding(22)
-            
-            Spacer()
         }
     }
     
@@ -478,6 +478,7 @@ public struct DashboardView: View {
                     Button(action: {
                         let textToSpeak = customTestText.trimmingCharacters(in: .whitespacesAndNewlines)
                         let prompt = textToSpeak.isEmpty ? "Testing Agent Speak voice playback." : textToSpeak
+                        LastVoiceManager.shared.prepareForNewVoice(text: prompt)
                         SpeechQueueManager.shared.enqueue(
                             source: "Voice Test",
                             text: prompt
@@ -497,6 +498,10 @@ public struct DashboardView: View {
                     }
                     .buttonStyle(.plain)
                 }
+                
+                // Downward: Last Voice Player, Scrubber & Download
+                LastVoiceCardView()
+                    .padding(.top, 4)
             }
             .padding(11)
             .background(Color.white.opacity(0.04))

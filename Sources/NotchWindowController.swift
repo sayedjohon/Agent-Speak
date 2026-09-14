@@ -158,7 +158,11 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         }
         
         if self.chunks.count > 1 {
-            self.startBackgroundRenderingPipeline()
+            self.startBackgroundRenderingPipeline(fullText: text)
+        } else if self.chunks.count == 1 {
+            if FileManager.default.fileExists(atPath: self.chunks[0].filePath) {
+                LastVoiceManager.shared.recordVoice(text: text, chunkFilePaths: [self.chunks[0].filePath])
+            }
         }
     }
     
@@ -300,12 +304,16 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         }
     }
     
-    private func startBackgroundRenderingPipeline() {
+    private func startBackgroundRenderingPipeline(fullText: String) {
         renderQueue.async { [weak self] in
             guard let self = self else { return }
             for idx in 1..<self.chunks.count {
                 if self.isCancelled { break }
                 self.renderChunk(index: idx)
+            }
+            if !self.isCancelled {
+                let paths = self.chunks.map { $0.filePath }
+                LastVoiceManager.shared.recordVoice(text: fullText, chunkFilePaths: paths)
             }
         }
     }
@@ -360,12 +368,6 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
     
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         let finishedIndex = currentChunkIndex
-        if finishedIndex < chunks.count {
-            if chunks[finishedIndex].filePath.hasPrefix("/tmp/") {
-                try? FileManager.default.removeItem(atPath: chunks[finishedIndex].filePath)
-            }
-        }
-        
         let nextIndex = finishedIndex + 1
         if nextIndex < chunks.count {
             currentChunkIndex = nextIndex
@@ -435,9 +437,6 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         activeRenderProcess?.terminate()
         for c in chunks {
             c.player?.stop()
-            if c.filePath.hasPrefix("/tmp/") {
-                try? FileManager.default.removeItem(atPath: c.filePath)
-            }
         }
         timer?.invalidate()
         timer = nil
@@ -447,6 +446,16 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         let cb = onClose
         onClose = nil
         cb?()
+        
+        // Clean up temporary chunks after giving LastVoiceManager time to read and merge
+        let chunksToClean = self.chunks
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 2.0) {
+            for c in chunksToClean {
+                if c.filePath.hasPrefix("/tmp/") {
+                    try? FileManager.default.removeItem(atPath: c.filePath)
+                }
+            }
+        }
     }
 }
 

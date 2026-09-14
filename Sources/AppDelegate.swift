@@ -347,13 +347,13 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     
     func setupDashboardWindow() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 740, height: 490),
-            styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
+            contentRect: NSRect(x: 0, y: 0, width: 750, height: 570),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.minSize = NSSize(width: 740, height: 490)
-        window.maxSize = NSSize(width: 740, height: 490)
+        window.maxSize = NSSize(width: 900, height: 900)
         window.center()
         window.isReleasedWhenClosed = false
         window.title = "Agent Speak"
