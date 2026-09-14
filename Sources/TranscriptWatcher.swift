@@ -11,6 +11,24 @@ public class TranscriptWatcher {
     private let socketPath = "/tmp/agentspeak.sock"
     private var socketSource: DispatchSourceRead?
     private var fileMetadataCache: [String: (mtime: TimeInterval, size: UInt64)] = [:]
+    private let appStartTime = Date().timeIntervalSince1970
+    
+    private static let isoFormatterWithMillis: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    private static let isoFormatterStandard: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
+    private func parseISO8601Date(_ str: String) -> Date? {
+        if let d = Self.isoFormatterWithMillis.date(from: str) { return d }
+        return Self.isoFormatterStandard.date(from: str)
+    }
     
     private var activeAntigravityTranscripts: [(url: URL, convId: String)] = []
     private var lastAntigravityRefresh: TimeInterval = 0
@@ -155,13 +173,31 @@ public class TranscriptWatcher {
             if let text = latestModelText {
                 let rawId = "\(latestCreatedAt)_\(latestStep)_\(text.prefix(60))"
                 
+                var isFresh = false
+                if let msgDate = parseISO8601Date(latestCreatedAt) {
+                    let age = now - msgDate.timeIntervalSince1970
+                    let isAfterAppLaunch = (msgDate.timeIntervalSince1970 >= (appStartTime - 5.0))
+                    isFresh = (age >= -5.0 && age <= 30.0 && isAfterAppLaunch)
+                } else {
+                    isFresh = (timeSinceMod <= 30.0)
+                }
+                
                 stateLock.lock()
                 let lastId = state[convKey]
                 
-                if lastId == nil && timeSinceMod > 90 {
+                if lastId == nil {
                     state[convKey] = rawId
                     saveState()
                     stateLock.unlock()
+                    
+                    if isFresh {
+                        let clean = TextSanitizer.sanitizeForSpeech(text)
+                        if !clean.isEmpty {
+                            DispatchQueue.main.async { [weak self] in
+                                self?.onSpeechRequest?("Antigravity", clean)
+                            }
+                        }
+                    }
                     continue
                 }
                 
@@ -170,10 +206,12 @@ public class TranscriptWatcher {
                     saveState()
                     stateLock.unlock()
                     
-                    let clean = TextSanitizer.sanitizeForSpeech(text)
-                    if !clean.isEmpty {
-                        DispatchQueue.main.async { [weak self] in
-                            self?.onSpeechRequest?("Antigravity", clean)
+                    if isFresh {
+                        let clean = TextSanitizer.sanitizeForSpeech(text)
+                        if !clean.isEmpty {
+                            DispatchQueue.main.async { [weak self] in
+                                self?.onSpeechRequest?("Antigravity", clean)
+                            }
                         }
                     }
                 } else {
@@ -220,16 +258,29 @@ public class TranscriptWatcher {
                 let subset = lines.suffix(150)
                 var latestAssistantText: String? = nil
                 var latestMsgId: String = ""
+                var latestMsgCreatedAt: String = ""
                 
                 for line in subset.reversed() {
                     guard let data = line.data(using: .utf8),
                           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+                    
+                    // Filter out synthetic error notifications and API errors
+                    if json["isApiErrorMessage"] as? Bool == true { continue }
+                    if json["error"] != nil { continue }
                     
                     let type = json["type"] as? String
                     let role = json["role"] as? String
                     
                     if type == "assistant" || role == "assistant" {
                         guard let msg = json["message"] as? [String: Any] else { continue }
+                        
+                        // Filter out synthetic models (e.g. "<synthetic>")
+                        if let model = msg["model"] as? String {
+                            if model == "<synthetic>" || model.lowercased().contains("synthetic") {
+                                continue
+                            }
+                        }
+                        
                         if let stopReason = msg["stop_reason"] as? String, stopReason == "tool_use" { continue }
                         
                         var pieces: [String] = []
@@ -244,24 +295,45 @@ public class TranscriptWatcher {
                         }
                         
                         let combined = pieces.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
-                        if !combined.isEmpty {
-                            latestAssistantText = combined
-                            latestMsgId = (json["uuid"] as? String) ?? (msg["id"] as? String) ?? ""
-                            break
+                        if combined.isEmpty || combined == "No response requested." || combined.hasPrefix("API Error:") {
+                            continue
                         }
+                        
+                        latestAssistantText = combined
+                        latestMsgId = (json["uuid"] as? String) ?? (msg["id"] as? String) ?? ""
+                        latestMsgCreatedAt = json["timestamp"] as? String ?? ""
+                        break
                     }
                 }
                 
                 if let text = latestAssistantText, !latestMsgId.isEmpty {
                     let rawId = "\(latestMsgId)_\(text.prefix(60))"
                     
+                    var isFresh = false
+                    if let msgDate = parseISO8601Date(latestMsgCreatedAt) {
+                        let age = now - msgDate.timeIntervalSince1970
+                        let isAfterAppLaunch = (msgDate.timeIntervalSince1970 >= (appStartTime - 5.0))
+                        isFresh = (age >= -5.0 && age <= 30.0 && isAfterAppLaunch)
+                    } else {
+                        isFresh = (timeSinceMod <= 30.0)
+                    }
+                    
                     stateLock.lock()
                     let lastId = state[convKey]
                     
-                    if lastId == nil && timeSinceMod > 90 {
+                    if lastId == nil {
                         state[convKey] = rawId
                         saveState()
                         stateLock.unlock()
+                        
+                        if isFresh {
+                            let clean = TextSanitizer.sanitizeForSpeech(text)
+                            if !clean.isEmpty {
+                                DispatchQueue.main.async { [weak self] in
+                                    self?.onSpeechRequest?("Claude", clean)
+                                }
+                            }
+                        }
                         continue
                     }
                     
@@ -270,10 +342,12 @@ public class TranscriptWatcher {
                         saveState()
                         stateLock.unlock()
                         
-                        let clean = TextSanitizer.sanitizeForSpeech(text)
-                        if !clean.isEmpty {
-                            DispatchQueue.main.async { [weak self] in
-                                self?.onSpeechRequest?("Claude", clean)
+                        if isFresh {
+                            let clean = TextSanitizer.sanitizeForSpeech(text)
+                            if !clean.isEmpty {
+                                DispatchQueue.main.async { [weak self] in
+                                    self?.onSpeechRequest?("Claude", clean)
+                                }
                             }
                         }
                     } else {
@@ -319,7 +393,7 @@ public class TranscriptWatcher {
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
         proc.arguments = [
             dbPath,
-            "SELECT part.id, json_extract(part.data, '$.text') FROM part JOIN message ON part.message_id = message.id WHERE json_extract(message.data, '$.role') = 'assistant' AND json_extract(part.data, '$.type') = 'text' ORDER BY part.time_created DESC LIMIT 1;"
+            "SELECT part.id, json_extract(part.data, '$.text'), part.time_created FROM part JOIN message ON part.message_id = message.id WHERE json_extract(message.data, '$.role') = 'assistant' AND json_extract(part.data, '$.type') = 'text' ORDER BY part.time_created DESC LIMIT 1;"
         ]
         let pipe = Pipe()
         proc.standardOutput = pipe
@@ -332,16 +406,37 @@ public class TranscriptWatcher {
         let parts = str.components(separatedBy: "|")
         guard parts.count >= 2 else { return }
         let partId = parts[0]
-        let text = parts.dropFirst().joined(separator: "|")
+        let timeMillis = (parts.count >= 3 ? Double(parts[parts.count - 1]) : nil) ?? 0
+        let textParts = parts.count >= 3 ? parts[1..<(parts.count - 1)] : parts[1...]
+        let text = textParts.joined(separator: "|")
+        
+        let createdSec = timeMillis > 100000000000 ? (timeMillis / 1000.0) : timeMillis
+        var isFresh = false
+        if createdSec > 0 {
+            let age = now - createdSec
+            let isAfterLaunch = (createdSec >= (appStartTime - 5.0))
+            isFresh = (age >= -5.0 && age <= 30.0 && isAfterLaunch)
+        } else {
+            isFresh = (timeSinceMod <= 30.0)
+        }
         
         let convKey = "opencode_sqlite_latest"
         stateLock.lock()
         let lastId = state[convKey]
         
-        if lastId == nil && timeSinceMod > 90 {
+        if lastId == nil {
             state[convKey] = partId
             saveState()
             stateLock.unlock()
+            
+            if isFresh {
+                let clean = TextSanitizer.sanitizeForSpeech(text)
+                if !clean.isEmpty {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.onSpeechRequest?("OpenCode", clean)
+                    }
+                }
+            }
             return
         }
         
@@ -350,10 +445,12 @@ public class TranscriptWatcher {
             saveState()
             stateLock.unlock()
             
-            let clean = TextSanitizer.sanitizeForSpeech(text)
-            if !clean.isEmpty {
-                DispatchQueue.main.async { [weak self] in
-                    self?.onSpeechRequest?("OpenCode", clean)
+            if isFresh {
+                let clean = TextSanitizer.sanitizeForSpeech(text)
+                if !clean.isEmpty {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.onSpeechRequest?("OpenCode", clean)
+                    }
                 }
             }
         } else {
@@ -397,12 +494,31 @@ public class TranscriptWatcher {
                let text = json["content"] as? String, !text.isEmpty {
                 let rawId = "\(file.path)_\(text.prefix(60))"
                 
+                var isFresh = false
+                if let tsStr = json["timestamp"] as? String ?? json["created_at"] as? String,
+                   let msgDate = parseISO8601Date(tsStr) {
+                    let age = now - msgDate.timeIntervalSince1970
+                    let isAfterAppLaunch = (msgDate.timeIntervalSince1970 >= (appStartTime - 5.0))
+                    isFresh = (age >= -5.0 && age <= 30.0 && isAfterAppLaunch)
+                } else {
+                    isFresh = (timeSinceMod <= 30.0)
+                }
+                
                 stateLock.lock()
                 let lastId = state[convKey]
-                if lastId == nil && timeSinceMod > 90 {
+                if lastId == nil {
                     state[convKey] = rawId
                     saveState()
                     stateLock.unlock()
+                    
+                    if isFresh {
+                        let clean = TextSanitizer.sanitizeForSpeech(text)
+                        if !clean.isEmpty {
+                            DispatchQueue.main.async { [weak self] in
+                                self?.onSpeechRequest?("OpenCode", clean)
+                            }
+                        }
+                    }
                     continue
                 }
                 
@@ -410,10 +526,12 @@ public class TranscriptWatcher {
                     state[convKey] = rawId
                     saveState()
                     stateLock.unlock()
-                    let clean = TextSanitizer.sanitizeForSpeech(text)
-                    if !clean.isEmpty {
-                        DispatchQueue.main.async { [weak self] in
-                            self?.onSpeechRequest?("OpenCode", clean)
+                    if isFresh {
+                        let clean = TextSanitizer.sanitizeForSpeech(text)
+                        if !clean.isEmpty {
+                            DispatchQueue.main.async { [weak self] in
+                                self?.onSpeechRequest?("OpenCode", clean)
+                            }
                         }
                     }
                 } else {
