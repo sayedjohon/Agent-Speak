@@ -56,6 +56,12 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         let trusted = AXIsProcessTrustedWithOptions(options)
         NSLog("[AgentSpeak] Accessibility permission on launch: \(trusted ? "TRUSTED" : "NOT TRUSTED")")
+        
+        // Announce persona signature greeting once at application startup
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            let greeting = PersonaGreetingManager.shared.resolveGreeting()
+            SpeechQueueManager.shared.enqueue(source: greeting.character, text: greeting.text)
+        }
     }
     
     public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
