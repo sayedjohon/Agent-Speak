@@ -246,20 +246,9 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         menu.removeAllItems()
         
         let isSpeaking = SpeechQueueManager.shared.isSpeaking
+        let bgmEnabled = BackgroundMusicManager.shared.isEnabled
         
-        // 1. Settings (gear icon, ⌃,)
-        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(showDashboard), keyEquivalent: ",")
-        settingsItem.keyEquivalentModifierMask = [.control]
-        if let icon = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Settings") {
-            icon.isTemplate = true
-            settingsItem.image = icon
-        }
-        settingsItem.target = self
-        menu.addItem(settingsItem)
-        
-        menu.addItem(NSMenuItem.separator())
-        
-        // 2. Speak Selection (text viewfinder icon, ⌃S)
+        // 1. Speak Selection (text viewfinder icon, ⌃S)
         let selectedItem = NSMenuItem(title: "Speak Selection", action: #selector(speakSelected), keyEquivalent: "s")
         selectedItem.keyEquivalentModifierMask = [.control]
         if let icon = NSImage(systemSymbolName: "text.viewfinder", accessibilityDescription: "Speak Selection") {
@@ -269,7 +258,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         selectedItem.target = self
         menu.addItem(selectedItem)
         
-        // 3. Speak Clipboard (clipboard icon, ⌃P)
+        // 2. Speak Clipboard (clipboard icon, ⌃P)
         let clipboardItem = NSMenuItem(title: "Speak Clipboard", action: #selector(speakClipboard), keyEquivalent: "p")
         clipboardItem.keyEquivalentModifierMask = [.control]
         if let icon = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "Speak Clipboard") {
@@ -279,7 +268,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         clipboardItem.target = self
         menu.addItem(clipboardItem)
         
-        // 4. Stop Speech (stop icon, ⌃X)
+        // 3. Stop Speech (stop icon, ⌃X)
         let stopItem = NSMenuItem(title: "Stop Speech", action: #selector(stopSpeech), keyEquivalent: "x")
         stopItem.keyEquivalentModifierMask = [.control]
         if let icon = NSImage(systemSymbolName: "stop.circle", accessibilityDescription: "Stop Speech") {
@@ -292,7 +281,35 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         
         menu.addItem(NSMenuItem.separator())
         
-        // 5. Quit Agent Speak (power icon, ⌘Q)
+        // 4. Background Music Direct 1-Click Toggle (music icon, checkmark state)
+        let bgmItem = NSMenuItem(
+            title: bgmEnabled ? "Background Music" : "Background Music",
+            action: #selector(toggleBackgroundMusic),
+            keyEquivalent: ""
+        )
+        bgmItem.state = bgmEnabled ? .on : .off
+        if let icon = NSImage(systemSymbolName: "music.note", accessibilityDescription: "Background Music") {
+            icon.isTemplate = true
+            bgmItem.image = icon
+        }
+        bgmItem.target = self
+        menu.addItem(bgmItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        // 5. Settings (gear icon, ⌃,)
+        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(showDashboard), keyEquivalent: ",")
+        settingsItem.keyEquivalentModifierMask = [.control]
+        if let icon = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Settings") {
+            icon.isTemplate = true
+            settingsItem.image = icon
+        }
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        // 6. Quit Agent Speak (power icon, ⌘Q)
         let quitItem = NSMenuItem(title: "Quit Agent Speak", action: #selector(quitApp), keyEquivalent: "q")
         quitItem.keyEquivalentModifierMask = [.command]
         if let icon = NSImage(systemSymbolName: "power", accessibilityDescription: "Quit Agent Speak") {
@@ -320,7 +337,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
-        window.level = .floating
+        window.level = .normal
         window.isOpaque = true
         window.backgroundColor = NSColor(red: 0.07, green: 0.08, blue: 0.10, alpha: 1.0)
         
@@ -364,6 +381,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
     public func windowWillClose(_ notification: Notification) {
         if notification.object as? NSWindow == dashboardWindow {
             stopDashboardDisplayLink()
+            NSApp.setActivationPolicy(.accessory)
         }
     }
     
@@ -404,6 +422,11 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
     
     @objc public func showDashboard() {
         guard let window = dashboardWindow else { return }
+        NSApp.setActivationPolicy(.regular)
+        if let iconUrl = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+           let icon = NSImage(contentsOf: iconUrl) {
+            NSApp.applicationIconImage = icon
+        }
         window.center()
         window.makeKeyAndOrderFront(nil)
         startDashboardDisplayLink()
@@ -415,6 +438,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         if window.isVisible {
             stopDashboardDisplayLink()
             window.orderOut(nil)
+            NSApp.setActivationPolicy(.accessory)
         } else {
             showDashboard()
         }
@@ -518,6 +542,19 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
     
     @objc func stopSpeech() {
         SpeechQueueManager.shared.stopCurrent()
+    }
+    
+    @objc func toggleBackgroundMusic() {
+        let current = BackgroundMusicManager.shared.isEnabled
+        BackgroundMusicManager.shared.isEnabled = !current
+        BackgroundMusicManager.shared.saveConfig()
+        if current {
+            BackgroundMusicManager.shared.stopWithFadeAndReverb()
+        } else {
+            if SpeechQueueManager.shared.isSpeaking {
+                BackgroundMusicManager.shared.start()
+            }
+        }
     }
     
     // MARK: - Global HotKeys (Carbon)
