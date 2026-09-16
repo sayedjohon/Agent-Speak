@@ -81,12 +81,12 @@ extension JARVISRenderer {
                     + u * (2.0 + CGFloat(ribbon) * 0.17)
 
                 let radius = 0.25 + 0.48 * u
-                let vertical = 0.43 + 0.10 * sin(Double(ribbon) * 1.7)
-                let depth = 0.44 * sin(a * 1.8 + seed)
+                let vertical = CGFloat(0.43 + 0.10 * Darwin.sin(Double(ribbon) * 1.7))
+                let depth = CGFloat(0.44 * Darwin.sin(Double(a) * 1.8 + seed))
 
                 let p = JPoint3(
-                    x: cos(a) * radius,
-                    y: sin(a) * radius * vertical,
+                    x: CGFloat(Darwin.cos(Double(a))) * radius,
+                    y: CGFloat(Darwin.sin(Double(a))) * radius * vertical,
                     z: depth
                 )
                 let q = JARVISMath.project(p, radius: f.radius, center: f.center).point
@@ -194,10 +194,10 @@ extension JARVISRenderer {
             for i in 0...32 {
                 let u = CGFloat(i) / 32
                 let a = u * JARVISMath.tau + rotation
-                let rr = radius * (0.74 + 0.18 * sin(Double(i * 3 + axis) + f.time * 2.0))
+                let rr = radius * CGFloat(0.74 + 0.18 * Darwin.sin(Double(i * 3 + axis) + f.time * 2.0))
                 let p = CGPoint(
-                    x: f.center.x + cos(a) * rr,
-                    y: f.center.y + sin(a) * rr * 0.45
+                    x: f.center.x + CGFloat(Darwin.cos(Double(a))) * rr,
+                    y: f.center.y + CGFloat(Darwin.sin(Double(a))) * rr * 0.45
                 )
                 if i == 0 { path.move(to: p) }
                 else { path.addLine(to: p) }
