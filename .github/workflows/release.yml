@@ -1,0 +1,83 @@
+name: Build & Release DMG
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (e.g. v1.0.0)'
+        required: false
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build DMG & Publish Release
+    runs-on: macos-14
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify Xcode & Swift Environment
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Build Application & Package DMG
+        env:
+          CI: "true"
+        run: |
+          chmod +x install.sh scripts/build_dmg.sh
+          ./scripts/build_dmg.sh --rebuild
+
+      - name: Generate Release Notes
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [ -z "$TAG" ] || [ "$TAG" = "main" ]; then
+            TAG="${{ github.event.inputs.tag_name || 'v1.0.0' }}"
+          fi
+          cat << 'NOTES' > dist/RELEASE_NOTES.md
+          # ✦ Agent Speak Release
+
+          The Liquid Glass Voice Companion for AI Coding Agents on macOS.
+
+          ### 📦 Installation Assets
+          - **`Agent-Speak.dmg`**: Universal disk image with 1-click Gatekeeper bypass helper and Applications shortcut.
+          - **`Agent-Speak.dmg.sha256`**: Verification checksum.
+
+          ### 🚀 Quick Start
+          1. Download `Agent-Speak.dmg` and open it.
+          2. Drag **`Agent Speak.app`** into **`Applications`**.
+          3. Double-click **`Setup & Bypass Gatekeeper.command`** inside the DMG to bypass macOS Gatekeeper and link the CLI.
+          4. Alternatively, run in your terminal:
+             ```bash
+             xattr -cr "/Applications/Agent Speak.app"
+             ```
+          5. In macOS System Settings > Privacy & Security, grant **Accessibility** permissions (for global hotkeys).
+
+          ### ✨ Highlights & Features
+          - **120 FPS Liquid Glass Notch Player**: Hardware-synced ProMotion notch audio visualizer with JIT lookahead streaming (95% CPU savings).
+          - **Full-Screen Holographic Arc Reactor**: 6 color palettes, 7 blending modes (Screen, Multiply, Additive, Overlay, Color Dodge, Luminosity, Normal), and click-through transparency.
+          - **Dual-Hand 10-Finger Camera Gesture Control**: Vision Neural Engine tracking, cursor flight, pinch click, drag, and two-finger vertical scrolling.
+          - **Pocket-TTS Offline Neural Engine**: 24 on-device voice personas with real-time zero-shot voice cloning studio.
+          - **Push-to-Talk Fn Dictation**: Groq Whisper API integration with instant speech transcription.
+          - **Ambient Focus Soundtrack**: Dynamic Iron Man background music with auto-ducking during speech.
+          - **Multi-Agent Connectors**: Seamless real-time watching for Antigravity, Claude Code, Cursor, Windsurf, Roo Code, Cline, and terminal scripts.
+          - **Master CLI**: Comprehensive `agentspeak` / `aspk` commands.
+          NOTES
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name != 'main' && github.ref_name || github.event.inputs.tag_name }}
+          name: "Agent Speak ${{ github.ref_name != 'main' && github.ref_name || github.event.inputs.tag_name }}"
+          body_path: dist/RELEASE_NOTES.md
+          files: |
+            dist/Agent-Speak.dmg
+            dist/Agent-Speak.dmg.sha256
+          draft: false
+          prerelease: false

@@ -104,13 +104,14 @@ public class KeyboardShortcutController {
     
     // MARK: - Single Key Pulse
     public func sendKeyPulse(keyCode: UInt16, flags: CGEventFlags = []) {
-        let down = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: true)
+        let source = CGEventSource(stateID: .combinedSessionState)
+        let down = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true)
         down?.flags = flags
         down?.post(tap: .cghidEventTap)
         
-        usleep(20000) // 20ms hold
+        usleep(25000) // 25ms hold
         
-        let up = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: false)
+        let up = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
         up?.flags = flags
         up?.post(tap: .cghidEventTap)
     }
@@ -148,6 +149,7 @@ public class KeyboardShortcutController {
     }
     
     public func sendPaste() {
+        releaseAllHeldModifiers()
         sendKeyPulse(keyCode: Self.keyV, flags: .maskCommand)
         NSLog("[KeyboardController] Sent PASTE (Cmd + V)")
     }

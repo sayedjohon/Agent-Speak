@@ -34,6 +34,10 @@ public class TranscriptWatcher {
     private var lastAntigravityRefresh: TimeInterval = 0
     
     public var onSpeechRequest: ((_ source: String, _ text: String) -> Void)?
+    public var isAntigravityEnabled: Bool = true
+    public var isClaudeEnabled: Bool = true
+    public var isOpenCodeEnabled: Bool = true
+    public var isTerminalEnabled: Bool = true
     
     private init() {
         let home = FileManager.default.homeDirectoryForCurrentUser
@@ -41,7 +45,20 @@ public class TranscriptWatcher {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         stateURL = dir.appendingPathComponent("state.json")
         loadState()
+        loadWorkspacesConfig()
         startSocketListener()
+    }
+    
+    public func loadWorkspacesConfig() {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let configPath = home.appendingPathComponent(".agentspeak/config.json")
+        guard let data = try? Data(contentsOf: configPath),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let workspaces = json["workspaces"] as? [String: Any] else { return }
+        if let ag = workspaces["antigravity"] as? Bool { isAntigravityEnabled = ag }
+        if let cl = workspaces["claude"] as? Bool { isClaudeEnabled = cl }
+        if let oc = workspaces["opencode"] as? Bool { isOpenCodeEnabled = oc }
+        if let tm = workspaces["terminal"] as? Bool { isTerminalEnabled = tm }
     }
     
     public func start() {
@@ -92,9 +109,12 @@ public class TranscriptWatcher {
 
     
     public func scan() {
-        scanAntigravity()
-        scanClaude()
-        scanOpenCode()
+        if isAntigravityEnabled { scanAntigravity() }
+        if isClaudeEnabled { scanClaude() }
+        if isOpenCodeEnabled { scanOpenCode() }
+        UniversalConnectorWatcher.shared.scan { [weak self] source, text in
+            self?.onSpeechRequest?(source, text)
+        }
     }
     
     // MARK: - Antigravity Scanner
@@ -110,7 +130,9 @@ public class TranscriptWatcher {
             if let convDirs = try? FileManager.default.contentsOfDirectory(at: brainDir, includingPropertiesForKeys: nil, options: .skipsHiddenFiles) {
                 var candidates: [(url: URL, convId: String)] = []
                 for convDir in convDirs {
-                    let transcriptURL = convDir.appendingPathComponent(".system_generated/logs/transcript.jsonl")
+                    let fullURL = convDir.appendingPathComponent(".system_generated/logs/transcript_full.jsonl")
+                    let compactURL = convDir.appendingPathComponent(".system_generated/logs/transcript.jsonl")
+                    let transcriptURL = FileManager.default.fileExists(atPath: fullURL.path) ? fullURL : compactURL
                     if let attrs = try? FileManager.default.attributesOfItem(atPath: transcriptURL.path),
                        let modDate = attrs[.modificationDate] as? Date {
                         let age = now - modDate.timeIntervalSince1970
@@ -142,7 +164,7 @@ public class TranscriptWatcher {
             
             let convKey = "antigravity_\(convId)"
             
-            guard let content = readTailOfFile(at: transcriptURL) else { continue }
+            guard let content = readTailOfFile(at: transcriptURL, maxBytes: 1048576) else { continue }
             let lines = content.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
             guard !lines.isEmpty else { continue }
             
@@ -170,7 +192,8 @@ public class TranscriptWatcher {
                 }
             }
             
-            if let text = latestModelText {
+            if let rawText = latestModelText {
+                let text = resolveUntruncatedAntigravityText(convId: convId, stepIndex: latestStep, fallbackText: rawText)
                 let rawId = "\(latestCreatedAt)_\(latestStep)_\(text.prefix(60))"
                 
                 var isFresh = false
@@ -219,6 +242,26 @@ public class TranscriptWatcher {
                 }
             }
         }
+    }
+    
+    private func resolveUntruncatedAntigravityText(convId: String, stepIndex: Int, fallbackText: String) -> String {
+        guard fallbackText.contains("<truncated") else { return fallbackText }
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let fullURL = home.appendingPathComponent(".gemini/antigravity/brain/\(convId)/.system_generated/logs/transcript_full.jsonl")
+        guard FileManager.default.fileExists(atPath: fullURL.path),
+              let content = readTailOfFile(at: fullURL, maxBytes: 2097152) else {
+            return fallbackText
+        }
+        let lines = content.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        for line in lines.suffix(150).reversed() {
+            guard let data = line.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let step = json["step_index"] as? Int, step == stepIndex,
+                  let full = (json["content"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !full.isEmpty else { continue }
+            return full
+        }
+        return fallbackText
     }
     
     // MARK: - Claude Scanner
@@ -628,6 +671,18 @@ public class TranscriptWatcher {
                         DispatchQueue.main.async {
                             SpeechQueueManager.shared.stopCurrent()
                         }
+                    } else if raw == "__CMD_SPEAK_CODE_ON__" {
+                        DispatchQueue.main.async {
+                            CodeSpeechManager.shared.setSpeakCodeBlocks(true)
+                        }
+                    } else if raw == "__CMD_SPEAK_CODE_OFF__" {
+                        DispatchQueue.main.async {
+                            CodeSpeechManager.shared.setSpeakCodeBlocks(false)
+                        }
+                    } else if raw == "__CMD_TOGGLE_SPEAK_CODE__" {
+                        DispatchQueue.main.async {
+                            CodeSpeechManager.shared.toggle()
+                        }
                     } else if raw == "__CMD_TEST_JARVIS__" {
                         let jarvisPaths = [
                             Bundle.main.bundlePath + "/Contents/Resources/voices/Jarvis.wav",
@@ -710,6 +765,23 @@ public class TranscriptWatcher {
                         DispatchQueue.main.async {
                             HologramManager.shared.setTheme(id: colorId)
                         }
+                    } else if raw.hasPrefix("__CMD_HOLOGRAM_SKIN_") && raw.hasSuffix("__") {
+                        let skinId = raw.replacingOccurrences(of: "__CMD_HOLOGRAM_SKIN_", with: "").replacingOccurrences(of: "__", with: "")
+                        DispatchQueue.main.async {
+                            HologramManager.shared.setSkin(id: skinId)
+                        }
+                    } else if raw.hasPrefix("__CMD_HOLOGRAM_BLEND_") && raw.hasSuffix("__") {
+                        let blendId = raw.replacingOccurrences(of: "__CMD_HOLOGRAM_BLEND_", with: "").replacingOccurrences(of: "__", with: "")
+                        DispatchQueue.main.async {
+                            HologramManager.shared.setBlendMode(id: blendId)
+                        }
+                    } else if raw.hasPrefix("__CMD_HOLOGRAM_OPACITY_") && raw.hasSuffix("__") {
+                        let opStr = raw.replacingOccurrences(of: "__CMD_HOLOGRAM_OPACITY_", with: "").replacingOccurrences(of: "__", with: "")
+                        if let val = Double(opStr) {
+                            DispatchQueue.main.async {
+                                HologramManager.shared.setOpacity(val > 1.0 ? val / 100.0 : val)
+                            }
+                        }
                     } else if raw == "__CMD_GESTURE_ON__" {
                         DispatchQueue.main.async {
                             CameraGestureManager.shared.start()
@@ -732,7 +804,49 @@ public class TranscriptWatcher {
                             CameraGestureManager.shared.isHUDEnabled = false
                             GestureHUDController.shared.hide()
                         }
+                    } else if raw == "__CMD_GESTURE_PREVIEW_ON__" {
+                        DispatchQueue.main.async {
+                            CameraGestureManager.shared.isSkeletonPreviewEnabled = true
+                            TraySkeletonHUDController.shared.show()
+                        }
+                    } else if raw == "__CMD_GESTURE_PREVIEW_OFF__" {
+                        DispatchQueue.main.async {
+                            CameraGestureManager.shared.isSkeletonPreviewEnabled = false
+                            TraySkeletonHUDController.shared.hide()
+                        }
+                    } else if raw == "__CMD_GESTURE_PREVIEW_TOGGLE__" {
+                        DispatchQueue.main.async {
+                            let cur = CameraGestureManager.shared.isSkeletonPreviewEnabled
+                            CameraGestureManager.shared.isSkeletonPreviewEnabled = !cur
+                            if !cur {
+                                TraySkeletonHUDController.shared.show()
+                            } else {
+                                TraySkeletonHUDController.shared.hide()
+                            }
+                        }
+                    } else if raw == "__CMD_FN_DICTATION_ON__" {
+                        DispatchQueue.main.async {
+                            GroqWhisperManager.shared.fnHoldDictationEnabled = true
+                            GroqWhisperManager.shared.saveConfig()
+                            FnDictationController.shared.start()
+                        }
+                    } else if raw == "__CMD_FN_DICTATION_OFF__" {
+                        DispatchQueue.main.async {
+                            GroqWhisperManager.shared.fnHoldDictationEnabled = false
+                            GroqWhisperManager.shared.saveConfig()
+                        }
+                    } else if raw == "__CMD_FN_DICTATION_TOGGLE__" {
+                        DispatchQueue.main.async {
+                            let cur = GroqWhisperManager.shared.fnHoldDictationEnabled
+                            GroqWhisperManager.shared.fnHoldDictationEnabled = !cur
+                            GroqWhisperManager.shared.saveConfig()
+                        }
+                    } else if raw == "__CMD_RELOAD_CONNECTORS__" {
+                        DispatchQueue.main.async {
+                            UniversalConnectorManager.shared.loadConnectors()
+                        }
                     } else {
+                        guard self?.isTerminalEnabled == true else { return }
                         let clean = TextSanitizer.sanitizeForSpeech(raw)
                         if !clean.isEmpty {
                             self?.onSpeechRequest?("Terminal", clean)

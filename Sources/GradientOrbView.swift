@@ -275,7 +275,9 @@ public struct CompactVisualizerOrbView: View {
     
     public var body: some View {
         HStack(spacing: 16) {
-            JarvisOrbVisualizerView(
+            HologramSkinContainerView(
+                skin: HologramManager.shared.currentSkin,
+                theme: HologramManager.shared.currentTheme,
                 isSpeaking: isSpeaking,
                 isPlayingMusic: BackgroundMusicManager.shared.isPlaying,
                 size: 64

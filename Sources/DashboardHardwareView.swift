@@ -66,6 +66,227 @@ public struct DashboardHardwareView: View {
                 if hologram.isEnabled {
                     Divider().background(Color.white.opacity(0.06))
                     
+                    // MARK: - Live Interactive Holographic Stage Viewport
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color(red: 0.03, green: 0.03, blue: 0.04))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(hologram.currentTheme.previewColor.opacity(0.35), lineWidth: 1)
+                            )
+                        
+                        // Subtle radial ambient glow inside stage
+                        RadialGradient(
+                            colors: [
+                                hologram.currentTheme.previewColor.opacity(0.20),
+                                hologram.currentTheme.previewColor.opacity(0.05),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 30,
+                            endRadius: 220
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        
+                        // Live rendering of the currently selected skin spanning full stage width
+                        GeometryReader { stageGeo in
+                            HologramSkinContainerView(
+                                skin: hologram.currentSkin,
+                                theme: hologram.currentTheme,
+                                blendMode: hologram.currentBlendMode,
+                                isSpeaking: true,
+                                isPlayingMusic: false,
+                                size: 216,
+                                customWidth: stageGeo.size.width,
+                                simulateAudio: true
+                            )
+                            .frame(width: stageGeo.size.width, height: 216)
+                            .position(x: stageGeo.size.width / 2.0, y: 108)
+                        }
+                        
+                        // Overlay HUD Badges
+                        VStack {
+                            HStack {
+                                HStack(spacing: 5) {
+                                    Circle()
+                                        .fill(hologram.currentTheme.previewColor)
+                                        .frame(width: 6, height: 6)
+                                        .shadow(color: hologram.currentTheme.previewColor, radius: 4)
+                                    Text("LIVE VIEWPORT")
+                                        .font(.system(size: 8.5, weight: .black, design: .monospaced))
+                                        .foregroundColor(.white)
+                                }
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(Color.black.opacity(0.65))
+                                .cornerRadius(5)
+                                
+                                Spacer()
+                                
+                                Button(action: {
+                                    hologram.triggerPreview()
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "macwindow.on.rectangle")
+                                            .font(.system(size: 8.5, weight: .bold))
+                                        Text(hologram.isPreviewActive ? "PREVIEWING..." : "TEST FULL SCREEN")
+                                            .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                    }
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .background(hologram.currentTheme.previewColor.opacity(0.20))
+                                    .foregroundColor(hologram.currentTheme.previewColor)
+                                    .cornerRadius(5)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 5)
+                                            .stroke(hologram.currentTheme.previewColor.opacity(0.6), lineWidth: 1)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                
+                                HStack(spacing: 4) {
+                                    Text(hologram.currentSkin.name.uppercased())
+                                        .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                                        .foregroundColor(hologram.currentTheme.previewColor)
+                                    Text("•")
+                                        .font(.system(size: 8.5))
+                                        .foregroundColor(.secondary)
+                                    Text(hologram.currentBlendMode.displayName.uppercased())
+                                        .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                                        .foregroundColor(.white)
+                                }
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(Color.black.opacity(0.65))
+                                .cornerRadius(5)
+                            }
+                            Spacer()
+                            HStack {
+                                Text("120Hz Metal Native • Live Color Sync")
+                                    .font(.system(size: 8, weight: .medium))
+                                    .foregroundColor(Color(white: 0.5))
+                                Spacer()
+                                Text(hologram.currentSkin.creator)
+                                    .font(.system(size: 8, weight: .medium, design: .monospaced))
+                                    .foregroundColor(Color(white: 0.5))
+                            }
+                        }
+                        .padding(10)
+                    }
+                    .frame(height: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    
+                    Divider().background(Color.white.opacity(0.06))
+                    
+                    // MARK: - Holographic Core Skin Selector
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("HOLOGRAPHIC REACTOR CORE SKIN")
+                                .font(.system(size: 9.5, weight: .bold))
+                                .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                            Spacer()
+                            Text(hologram.currentSkin.creator)
+                                .font(.system(size: 8.5, weight: .medium, design: .monospaced))
+                                .foregroundColor(hologram.currentTheme.previewColor.opacity(0.85))
+                        }
+                        
+                        // 1. Pinned Default Master Skin (Tony Stark Mark 42)
+                        let isDefaultSelected = (hologram.currentSkin == .classicArc)
+                        Button(action: {
+                            hologram.setSkin(.classicArc)
+                        }) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(hologram.currentTheme.previewColor)
+                                    .frame(width: 24, height: 24)
+                                    .background(hologram.currentTheme.previewColor.opacity(0.15))
+                                    .clipShape(Circle())
+                                
+                                VStack(alignment: .leading, spacing: 1) {
+                                    HStack(spacing: 6) {
+                                        Text(HologramSkinType.classicArc.name)
+                                            .font(.system(size: 11.5, weight: .bold))
+                                            .foregroundColor(isDefaultSelected ? .white : Color(red: 0.88, green: 0.89, blue: 0.94))
+                                        
+                                        Text("MASTER DEFAULT")
+                                            .font(.system(size: 8, weight: .black, design: .monospaced))
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 1)
+                                            .background(hologram.currentTheme.previewColor.opacity(0.25))
+                                            .foregroundColor(hologram.currentTheme.previewColor)
+                                            .cornerRadius(3)
+                                    }
+                                    Text(HologramSkinType.classicArc.subtitle)
+                                        .font(.system(size: 8.5))
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(1)
+                                }
+                                Spacer()
+                                if isDefaultSelected {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundColor(hologram.currentTheme.previewColor)
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(isDefaultSelected ? hologram.currentTheme.previewColor.opacity(0.14) : Color.white.opacity(0.03))
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(isDefaultSelected ? hologram.currentTheme.previewColor.opacity(0.8) : Color.white.opacity(0.08), lineWidth: isDefaultSelected ? 1.5 : 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        
+                        // 2. Additional Repaired Skins Grid
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                            ForEach(HologramSkinType.allCases.filter { !$0.isDefault }) { skin in
+                                let isSelected = (hologram.currentSkin == skin)
+                                Button(action: {
+                                    hologram.setSkin(skin)
+                                }) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: skin.systemIcon)
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundColor(isSelected ? hologram.currentTheme.previewColor : .secondary)
+                                            .frame(width: 20, height: 20)
+                                            .background(isSelected ? hologram.currentTheme.previewColor.opacity(0.2) : Color.white.opacity(0.04))
+                                            .clipShape(Circle())
+                                        
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(skin.name)
+                                                .font(.system(size: 10, weight: isSelected ? .bold : .medium))
+                                                .foregroundColor(isSelected ? .white : Color(red: 0.82, green: 0.83, blue: 0.88))
+                                                .lineLimit(1)
+                                            Text(skin.creator)
+                                                .font(.system(size: 8, design: .monospaced))
+                                                .foregroundColor(.secondary)
+                                        }
+                                        Spacer()
+                                        if isSelected {
+                                            Image(systemName: "checkmark")
+                                                .font(.system(size: 8.5, weight: .bold))
+                                                .foregroundColor(hologram.currentTheme.previewColor)
+                                        }
+                                    }
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 6)
+                                    .background(isSelected ? hologram.currentTheme.previewColor.opacity(0.12) : Color.white.opacity(0.03))
+                                    .cornerRadius(7)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 7)
+                                            .stroke(isSelected ? hologram.currentTheme.previewColor.opacity(0.7) : Color.white.opacity(0.06), lineWidth: isSelected ? 1.2 : 0.8)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    
+                    Divider().background(Color.white.opacity(0.06))
+                    
                     // Theme Color Selector
                     VStack(alignment: .leading, spacing: 8) {
                         Text("REACTOR CORE COLOR PALETTE")
@@ -116,6 +337,159 @@ public struct DashboardHardwareView: View {
                     
                     Divider().background(Color.white.opacity(0.06))
                     
+                    // MARK: - Holographic Blending Mode Selector (Photoshop-Grade)
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("HOLOGRAPHIC BLENDING MODE")
+                                    .font(.system(size: 9.5, weight: .bold))
+                                    .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                                Text("Composites visualizer over desktop windows, code & browser text")
+                                    .font(.system(size: 8.5))
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            
+                            // Photoshop Blending Mode Dropdown Menu
+                            Menu {
+                                ForEach(HologramBlendMode.allCases) { mode in
+                                    Button(action: {
+                                        hologram.setBlendMode(mode)
+                                    }) {
+                                        HStack {
+                                            Image(systemName: mode.systemIcon)
+                                            Text(mode.displayName)
+                                            if hologram.currentBlendMode == mode {
+                                                Spacer()
+                                                Text("✓")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: hologram.currentBlendMode.systemIcon)
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(hologram.currentTheme.previewColor)
+                                    Text(hologram.currentBlendMode.displayName)
+                                        .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                                        .foregroundColor(.white)
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.system(size: 8, weight: .semibold))
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 5)
+                                .background(hologram.currentTheme.previewColor.opacity(0.18))
+                                .cornerRadius(6)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(hologram.currentTheme.previewColor.opacity(0.5), lineWidth: 1)
+                                )
+                            }
+                            .menuStyle(.borderlessButton)
+                            .fixedSize()
+                        }
+                        
+                        // Quick Mode Pill Selector (Fast 1-click presets)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(HologramBlendMode.allCases) { mode in
+                                    let isSelected = (hologram.currentBlendMode == mode)
+                                    Button(action: {
+                                        hologram.setBlendMode(mode)
+                                    }) {
+                                        HStack(spacing: 5) {
+                                            Image(systemName: mode.systemIcon)
+                                                .font(.system(size: 9, weight: isSelected ? .bold : .regular))
+                                                .foregroundColor(isSelected ? hologram.currentTheme.previewColor : .secondary)
+                                            Text(mode.displayName)
+                                                .font(.system(size: 9.5, weight: isSelected ? .bold : .medium))
+                                                .foregroundColor(isSelected ? .white : Color(white: 0.72))
+                                        }
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 5)
+                                        .background(isSelected ? hologram.currentTheme.previewColor.opacity(0.18) : Color.white.opacity(0.04))
+                                        .cornerRadius(6)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .stroke(isSelected ? hologram.currentTheme.previewColor.opacity(0.75) : Color.white.opacity(0.08), lineWidth: isSelected ? 1.2 : 0.8)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        
+                        // Active Blend Mode Visual Explainer Card
+                        HStack(spacing: 8) {
+                            Image(systemName: hologram.currentBlendMode.systemIcon)
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(hologram.currentTheme.previewColor)
+                                .frame(width: 22, height: 22)
+                                .background(hologram.currentTheme.previewColor.opacity(0.12))
+                                .clipShape(Circle())
+                            
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(hologram.currentBlendMode.displayName.uppercased())
+                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                    .foregroundColor(hologram.currentTheme.previewColor)
+                                Text(hologram.currentBlendMode.subtitle)
+                                    .font(.system(size: 8.5))
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(2)
+                            }
+                            Spacer()
+                        }
+                        .padding(8)
+                        .background(Color.white.opacity(0.025))
+                        .cornerRadius(6)
+                        
+                        // Overlay Opacity / Translucency Slider
+                        VStack(alignment: .leading, spacing: 5) {
+                            HStack {
+                                Text("OVERLAY TRANSLUCENCY / INTENSITY")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                                Spacer()
+                                Text("\(Int(round(hologram.opacity * 100)))%")
+                                    .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                                    .foregroundColor(hologram.currentTheme.previewColor)
+                            }
+                            
+                            HStack(spacing: 10) {
+                                Slider(
+                                    value: Binding(
+                                        get: { hologram.opacity },
+                                        set: { hologram.setOpacity($0) }
+                                    ),
+                                    in: 0.15...1.0
+                                )
+                                .accentColor(hologram.currentTheme.previewColor)
+                                
+                                // Preset Buttons
+                                HStack(spacing: 4) {
+                                    ForEach([("100%", 1.0), ("75%", 0.75), ("50%", 0.50), ("30%", 0.30)], id: \.0) { label, val in
+                                        Button(action: {
+                                            hologram.setOpacity(val)
+                                        }) {
+                                            Text(label)
+                                                .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                                                .padding(.horizontal, 5)
+                                                .padding(.vertical, 3)
+                                                .background(abs(hologram.opacity - val) < 0.05 ? hologram.currentTheme.previewColor.opacity(0.25) : Color.white.opacity(0.04))
+                                                .foregroundColor(abs(hologram.opacity - val) < 0.05 ? hologram.currentTheme.previewColor : .secondary)
+                                                .cornerRadius(4)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    Divider().background(Color.white.opacity(0.06))
+                    
                     // Live Preview Button
                     HStack {
                         VStack(alignment: .leading, spacing: 1) {
@@ -144,6 +518,40 @@ public struct DashboardHardwareView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                } else {
+                    // Deactivated Hologram Notice with 1-Click Activate Button
+                    HStack(spacing: 10) {
+                        Image(systemName: "circle.slash")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.secondary)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Hologram Overlay is Deactivated")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.white)
+                            Text("Audio output and Notch HUD play normally without full-screen graphics.")
+                                .font(.system(size: 9.5))
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Button(action: {
+                            hologram.setEnabled(true)
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "sparkles")
+                                Text("Activate Hologram")
+                            }
+                            .font(.system(size: 10.5, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(hologram.currentTheme.previewColor)
+                            .cornerRadius(6)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(8)
+                    .background(Color.white.opacity(0.025))
+                    .cornerRadius(8)
                 }
             }
             .padding(14)

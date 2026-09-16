@@ -113,6 +113,7 @@ struct FloatingJarvisHologramOverlayView: View {
     @ObservedObject var meter = JarvisAudioLevelMeter.shared
     @ObservedObject var bgm = BackgroundMusicManager.shared
     @ObservedObject var hologram = HologramManager.shared
+    @ObservedObject var queue = SpeechQueueManager.shared
     
     let reactorSize: CGFloat = 820.0
     
@@ -129,18 +130,22 @@ struct FloatingJarvisHologramOverlayView: View {
                     let w = geo.size.width
                     let h = geo.size.height
                     
-                    let isSpeechActive = state.isPlaying
+                    let isSpeechActive = state.isPlaying || queue.isSpeaking
                     let isMusicActive = bgm.isPlaying || bgm.isFadingOut
-                    let isAnyActive = isSpeechActive || isMusicActive
+                    let isFading = bgm.isFadingOut || hologram.isFadingOut
+                    let isAnyActive = isSpeechActive || isMusicActive || hologram.isFadingOut
                     
-                    // Smooth opacity: fades out in lockstep with background music fade
+                    // Smooth opacity: fades gracefully with background music or fade timer
                     let dynamicOpacity: Double = {
-                        if isSpeechActive { return 1.0 }
                         if bgm.isFadingOut {
                             return max(0.0, min(1.0, 1.0 - bgm.fadeProgress))
                         }
+                        if hologram.isFadingOut {
+                            return max(0.0, min(1.0, 1.0 - hologram.fadeProgress))
+                        }
+                        if isSpeechActive { return 1.0 }
                         if isMusicActive { return 0.88 }
-                        return 0.85
+                        return 1.0
                     }()
                     
                     let theme = hologram.currentTheme
@@ -158,14 +163,16 @@ struct FloatingJarvisHologramOverlayView: View {
                                 let waveRadius: CGFloat = 520.0 + CGFloat(pulse) * 50.0 + CGFloat(energy) * 80.0
                                 let rippleProgress = CGFloat((now.truncatingRemainder(dividingBy: 2.5)) / 2.5)
                                 
+                                let ambientBlend = (hologram.currentBlendMode == .normal) ? BlendMode.plusLighter : hologram.currentBlendMode.swiftUIBlendMode
+                                
                                 ZStack {
                                     // Atmospheric room illumination in selected theme color
                                     Circle()
                                         .fill(
                                             RadialGradient(
                                                 colors: [
-                                                    theme.amber.opacity((0.13 + Double(energy) * 0.12) * dynamicOpacity),
-                                                    theme.deepAmber.opacity((0.05 + Double(energy) * 0.05) * dynamicOpacity),
+                                                    theme.amber.opacity((0.13 + Double(energy) * 0.12) * dynamicOpacity * hologram.opacity),
+                                                    theme.deepAmber.opacity((0.05 + Double(energy) * 0.05) * dynamicOpacity * hologram.opacity),
                                                     Color.clear
                                                 ],
                                                 center: .center,
@@ -173,35 +180,41 @@ struct FloatingJarvisHologramOverlayView: View {
                                                 endRadius: waveRadius
                                             )
                                         )
-                                        .frame(width: waveRadius * 2, height: waveRadius * 2)
+                                        .frame(width: max(10, waveRadius * 2), height: max(10, waveRadius * 2))
                                         .blur(radius: 28)
-                                        .blendMode(.plusLighter)
+                                        .blendMode(ambientBlend)
                                     
                                     // Outward propagating harmonic ripple wave ring
-                                    Circle()
-                                        .stroke(
-                                            theme.lensAmber.opacity((1.0 - Double(rippleProgress)) * (0.22 + Double(energy) * 0.20) * dynamicOpacity),
-                                            lineWidth: 2.0
-                                        )
-                                        .frame(width: 300 + rippleProgress * 500, height: 300 + rippleProgress * 500)
-                                        .blur(radius: 3)
-                                        .blendMode(.plusLighter)
+                                    if !isFading {
+                                        Circle()
+                                            .stroke(
+                                                theme.lensAmber.opacity((1.0 - Double(rippleProgress)) * (0.22 + Double(energy) * 0.20) * dynamicOpacity * hologram.opacity),
+                                                lineWidth: 2.0
+                                            )
+                                            .frame(width: 300 + rippleProgress * 500, height: 300 + rippleProgress * 500)
+                                            .blur(radius: 3)
+                                            .blendMode(ambientBlend)
+                                    }
                                 }
                                 // Center ambient glow in the perfect middle of the screen
                                 .position(x: w / 2.0, y: h / 2.0)
                             }
                         }
                         
-                        // 2. Large Tony Stark Holographic Arc Reactor (Double size, crisp 100% opacity, theme colored)
+                        // 2. Full-Screen Dynamic Holographic Core (Double size, crisp 100% opacity, theme colored)
                         if dynamicOpacity > 0.02 {
-                            JarvisOrbVisualizerView(
+                            let coreHeight = min(h * 0.88, reactorSize)
+                            HologramSkinContainerView(
+                                skin: hologram.currentSkin,
+                                theme: theme,
+                                blendMode: hologram.currentBlendMode,
                                 isSpeaking: isSpeechActive,
                                 isPlayingMusic: isMusicActive,
-                                size: reactorSize,
-                                theme: theme
+                                size: coreHeight,
+                                customWidth: w
                             )
-                            .frame(width: reactorSize, height: reactorSize)
-                            .opacity(dynamicOpacity)
+                            .frame(width: w, height: coreHeight)
+                            .opacity(dynamicOpacity * hologram.opacity)
                             // Position in the PERFECT MIDDLE of the screen
                             .position(x: w / 2.0, y: h / 2.0)
                         }

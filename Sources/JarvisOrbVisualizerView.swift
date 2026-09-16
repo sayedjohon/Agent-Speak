@@ -75,12 +75,14 @@ public struct JarvisOrbVisualizerView: View {
     public var isSpeaking: Bool
     public var isPlayingMusic: Bool
     public var size: CGFloat
+    public var customWidth: CGFloat?
     public var theme: HologramTheme?
 
-    public init(isSpeaking: Bool = false, isPlayingMusic: Bool = false, size: CGFloat = 68, theme: HologramTheme? = nil) {
+    public init(isSpeaking: Bool = false, isPlayingMusic: Bool = false, size: CGFloat = 68, customWidth: CGFloat? = nil, theme: HologramTheme? = nil) {
         self.isSpeaking = isSpeaking
         self.isPlayingMusic = isPlayingMusic
         self.size = size
+        self.customWidth = customWidth
         self.theme = theme
     }
 
@@ -95,7 +97,7 @@ public struct JarvisOrbVisualizerView: View {
             }
             .drawingGroup(opaque: false, colorMode: .extendedLinear)
         }
-        .frame(width: size, height: size)
+        .frame(width: customWidth ?? size, height: size)
         .accessibilityLabel(isSpeaking ? "Jarvis hologram speaking" : "Jarvis hologram ready")
     }
 
@@ -113,7 +115,7 @@ public struct JarvisOrbVisualizerView: View {
             y: center.y - radius * 0.018
         )
 
-        context.blendMode = .plusLighter
+        context.blendMode = hologram.currentBlendMode.graphicsBlendMode
         drawGlassVolume(&context, center: hologramCenter, radius: radius, energy: energy, time: time)
         drawLeftHologramLayer(&context, center: hologramCenter, radius: radius, energy: energy, time: time, scale: scale)
         drawBrokenReactorRings(&context, center: hologramCenter, radius: radius, energy: energy, bass: bass, time: time, scale: scale)

@@ -23,7 +23,9 @@ public class PocketTTSManager: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     
     private init() {
-        refreshState()
+        let installed = (activePythonPath != nil && activeScriptPath != nil)
+        self.isInstalled = installed
+        loadVoices()
     }
     
     public var extensionDir: String {
@@ -66,9 +68,14 @@ public class PocketTTSManager: ObservableObject {
     
     public func refreshState() {
         let installed = (activePythonPath != nil && activeScriptPath != nil)
-        DispatchQueue.main.async {
+        if Thread.isMainThread {
             self.isInstalled = installed
             self.loadVoices()
+        } else {
+            DispatchQueue.main.async {
+                self.isInstalled = installed
+                self.loadVoices()
+            }
         }
     }
     
@@ -152,11 +159,16 @@ public class PocketTTSManager: ObservableObject {
         
         DispatchQueue.global(qos: .userInitiated).async {
             var trustedScript: String? = nil
-            let localInstall = self.extensionDir + "/install.sh"
-            if FileManager.default.fileExists(atPath: localInstall) {
-                trustedScript = localInstall
-            } else if let bundleScript = Bundle.main.path(forResource: "install_pocket_tts", ofType: "sh") {
+            if let bundleScript = Bundle.main.path(forResource: "install_pocket_tts", ofType: "sh"), FileManager.default.fileExists(atPath: bundleScript) {
                 trustedScript = bundleScript
+            } else {
+                let cwdScript = FileManager.default.currentDirectoryPath + "/Resources/install_pocket_tts.sh"
+                let localInstall = self.extensionDir + "/install.sh"
+                if FileManager.default.fileExists(atPath: cwdScript) {
+                    trustedScript = cwdScript
+                } else if FileManager.default.fileExists(atPath: localInstall) {
+                    trustedScript = localInstall
+                }
             }
             
             guard let script = trustedScript else {

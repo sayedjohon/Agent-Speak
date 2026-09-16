@@ -12,7 +12,7 @@ public class BackgroundMusicManager: ObservableObject {
     @Published public var randomOffset: Bool = false
     @Published public var shuffle: Bool = true
     @Published public var reverbEnabled: Bool = true
-    @Published public var fadeOutDuration: Double = 2.5
+    @Published public var fadeOutDuration: Double = 3.0
     @Published public var fadeInDuration: Double = 0.8
     @Published public var isPlaying: Bool = false
     @Published public var isFadingOut: Bool = false
@@ -241,11 +241,14 @@ public class BackgroundMusicManager: ObservableObject {
         let startMix: Float = reverb.wetDryMix
         let targetMix: Float = reverbEnabled ? 65.0 : startMix
         
-        let steps = 40
-        let stepInterval = max(0.02, fadeOutDuration / Double(steps))
+        let steps = 60
+        let fadeDuration = self.fadeOutDuration
+        let stepInterval = max(0.02, fadeDuration / Double(steps))
         var currentStep = 0
         
         DispatchQueue.main.async {
+            HologramManager.shared.startWindowFadeOut(duration: fadeDuration)
+            
             let timer = Timer(timeInterval: stepInterval, repeats: true) { [weak self] t in
                 guard let self = self else {
                     t.invalidate()

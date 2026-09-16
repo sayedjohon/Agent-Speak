@@ -45,10 +45,12 @@ func printHelp() {
       pb          Speak copied clipboard text (alias: clipboard)
       settings    Open the Agent Speak Settings window (alias: dashboard)
       tray        Toggle or set menu bar tray icon (tray on | off | toggle)
-      hologram    Manage holographic reactor overlay (on | off | color <name> | preview | status)
+      code        Control code block speech (code on | off | toggle | status)
+      hologram    Manage holographic reactor overlay (on | off | blend <mode> | blends | opacity <val> | color <name> | preview | status)
       voice       Manage voices and volume (status | list | set | vol <1-200> | install | clone)
       bgm         Manage Iron Man background soundtrack (on | off | vol | test | open | status)
-      gesture     Control camera hand tracking (status | on | off | toggle | hud on/off | list)
+      gesture     Control camera hand tracking (status | on | off | toggle | preview on/off | hud on/off | list)
+      dictation   Control Push-to-Talk Fn dictation (status | on | off | toggle)
       greet       Speak active persona's signature greeting (alias: intro)
       test-jarvis Test playback of the Jarvis voice sample in the Notch Player
       stop        Stop current speech and dismiss the notch player
@@ -191,6 +193,50 @@ case "tray":
         } else {
             print("Error: Could not connect to Agent Speak socket.")
         }
+    }
+
+case "code", "speak-code":
+    let sub = args.count > 2 ? args[2].lowercased() : "status"
+    let home = FileManager.default.homeDirectoryForCurrentUser.path
+    let cfgURL = URL(fileURLWithPath: "\(home)/.agentspeak/config.json")
+    
+    func readSpeakCode() -> Bool {
+        guard let data = try? Data(contentsOf: cfgURL),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let audio = json["audio"] as? [String: Any] else { return false }
+        return audio["speak_code_blocks"] as? Bool ?? false
+    }
+    
+    func writeSpeakCode(_ val: Bool) {
+        guard let data = try? Data(contentsOf: cfgURL),
+              var json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+        var audio = json["audio"] as? [String: Any] ?? [:]
+        audio["speak_code_blocks"] = val
+        json["audio"] = audio
+        if let updated = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) {
+            try? updated.write(to: cfgURL)
+        }
+    }
+
+    if sub == "on" || sub == "enable" {
+        writeSpeakCode(true)
+        _ = sendSocketMessage("__CMD_SPEAK_CODE_ON__")
+        print("[Agent Speak] Speak Code Blocks: ENABLED (Code snippets and markdown will be read aloud naturally)")
+    } else if sub == "off" || sub == "disable" {
+        writeSpeakCode(false)
+        _ = sendSocketMessage("__CMD_SPEAK_CODE_OFF__")
+        print("[Agent Speak] Speak Code Blocks: DISABLED (Code blocks stripped for natural conversational speech)")
+    } else if sub == "toggle" {
+        let cur = readSpeakCode()
+        let next = !cur
+        writeSpeakCode(next)
+        _ = sendSocketMessage("__CMD_TOGGLE_SPEAK_CODE__")
+        print("[Agent Speak] Speak Code Blocks: \(next ? "ENABLED" : "DISABLED")")
+    } else {
+        let cur = readSpeakCode()
+        print("─── Code Speech Preference ───")
+        print("Speak Code Blocks: \(cur ? "🟢 ENABLED" : "⚪ DISABLED (Default)")")
+        print("When enabled, code blocks are read aloud with syntax markers, hashtags, and block noise cleaned.")
     }
 
 case "voice":
@@ -430,7 +476,7 @@ case "bgm":
 
 case "hologram", "holo":
     guard args.count > 2 else {
-        print("Usage: agentspeak hologram <on | off | toggle | color <name> | preview | status>")
+        print("Usage: agentspeak hologram <on | off | toggle | blend <name> | blends | opacity <10-100> | skin <name> | skins | color <name> | preview | status>")
         print("Available colors: amber, cyan, green, red, purple, white")
         exit(0)
     }
@@ -447,6 +493,68 @@ case "hologram", "holo":
     } else if sub == "preview" || sub == "test" {
         _ = ensureAppRunningAndSend("__CMD_HOLOGRAM_PREVIEW__")
         print("[Agent Speak] Triggered 4-second hologram preview.")
+    } else if sub == "blends" || sub == "list-blends" {
+        print("─── Photoshop-Grade Holographic Blending Modes ───")
+        print("• normal      : Normal (Default) — standard full-strength holographic projection")
+        print("• screen      : Screen — transparent darks with luminous highlights (screen text visible)")
+        print("• pluslighter : Linear Dodge (Add) — pure additive Stark neon rays")
+        print("• overlay     : Overlay — high contrast highlights and shadows")
+        print("• softlight   : Soft Light — subtle translucent wash (easiest to read screen text)")
+        print("• hardlight   : Hard Light — punchy cinematic contrast")
+        print("• colordodge  : Color Dodge — electrified high-saturation bloom")
+        print("• multiply    : Multiply — absorptive darkening tint, reduces bright desktop glare")
+        print("• difference  : Difference — inverted spectral contrast for sharp text edges")
+    } else if sub == "blend" || sub == "blending" {
+        if args.count > 3 {
+            let blendName = args[3].lowercased()
+            let valid = ["normal", "screen", "pluslighter", "overlay", "softlight", "hardlight", "colordodge", "multiply", "difference", "add", "dodge"]
+            if valid.contains(blendName) {
+                _ = ensureAppRunningAndSend("__CMD_HOLOGRAM_BLEND_\(blendName)__")
+                print("[Agent Speak] Hologram blending mode set to: \(blendName)")
+            } else {
+                print("Unknown blend mode: '\(blendName)'. Run 'agentspeak hologram blends' to view all modes.")
+            }
+        } else {
+            print("Usage: agentspeak hologram blend <mode>")
+            print("Run 'agentspeak hologram blends' to view all available blending modes.")
+        }
+    } else if sub == "opacity" || sub == "transparency" {
+        if args.count > 3 {
+            let opStr = args[3].replacingOccurrences(of: "%", with: "")
+            if let val = Double(opStr), val >= 10 && val <= 100 {
+                _ = ensureAppRunningAndSend("__CMD_HOLOGRAM_OPACITY_\(Int(val))__")
+                print("[Agent Speak] Hologram opacity set to: \(Int(val))%")
+            } else {
+                print("Invalid opacity: '\(args[3])'. Please enter a percentage between 10 and 100.")
+            }
+        } else {
+            print("Usage: agentspeak hologram opacity <10-100>")
+        }
+    } else if sub == "skins" || sub == "list-skins" {
+        print("─── Agent Speak Holographic Skins ───")
+        print("• classicArc    : Tony Stark Arc Reactor [MASTER DEFAULT]")
+        print("• googleJarvis  : Stark Cybernetic Vortex (Google AI Studio)")
+        print("• googleUltron  : Ultron Crimson Geodesic (Google AI Studio)")
+        print("• geminiJarvis  : Spherical Circuit Matrix (Gemini App)")
+        print("• geminiUltron  : Mind Stone Synaptic Brain (Gemini App)")
+        print("• glmJarvis     : 3D Gyroscopic Telemetry HUD (GLM)")
+        print("• glmUltron     : Ultron Tactical Hexagon Core (GLM)")
+        print("• chatgptJarvis : Orbital Particle HUD (ChatGPT)")
+        print("• chatgptUltron : Crimson Ocular Iris (ChatGPT)")
+    } else if sub == "skin" {
+        if args.count > 3 {
+            let skinName = args[3]
+            let valid = ["classicarc", "googlejarvis", "googleultron", "geminijarvis", "geminiultron", "glmjarvis", "glmultron", "chatgptjarvis", "chatgptultron"]
+            if valid.contains(skinName.lowercased()) {
+                _ = ensureAppRunningAndSend("__CMD_HOLOGRAM_SKIN_\(skinName)__")
+                print("[Agent Speak] Hologram skin set to: \(skinName)")
+            } else {
+                print("Unknown skin: '\(skinName)'. Run 'agentspeak hologram skins' to view all skins.")
+            }
+        } else {
+            print("Usage: agentspeak hologram skin <name>")
+            print("Run 'agentspeak hologram skins' to view all available skins.")
+        }
     } else if sub == "color" || sub == "theme" {
         if args.count > 3 {
             let colorName = args[3].lowercased()
@@ -465,17 +573,28 @@ case "hologram", "holo":
         let cfgURL = URL(fileURLWithPath: "\(home)/.agentspeak/config.json")
         var isEnabled = true
         var theme = "amber"
+        var skin = "classicArc"
+        var blendMode = "normal"
+        var opacity = 100
         if let data = try? Data(contentsOf: cfgURL),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let holo = json["hologram"] as? [String: Any] {
             isEnabled = holo["enabled"] as? Bool ?? true
             theme = holo["theme"] as? String ?? "amber"
+            skin = holo["skin"] as? String ?? "classicArc"
+            blendMode = (holo["blend_mode"] as? String) ?? (holo["blendMode"] as? String) ?? "normal"
+            if let op = holo["opacity"] as? Double {
+                opacity = Int(round(op * 100.0))
+            }
         }
         print("Hologram Overlay: \(isEnabled ? "🟢 ENABLED" : "🔴 DISABLED")")
         print("Current Theme:    \(theme.capitalized)")
+        print("Current Skin:     \(skin)")
+        print("Blending Mode:    \(blendMode)")
+        print("Opacity / Glow:   \(opacity)%")
     } else {
         print("Unknown hologram subcommand: \(sub)")
-        print("Available subcommands: on, off, toggle, color <name>, preview, status")
+        print("Available subcommands: on, off, toggle, blend <name>, blends, opacity <10-100>, skin <name>, skins, color <name>, preview, status")
     }
 
 case "gesture", "gestures":
@@ -500,6 +619,18 @@ case "gesture", "gestures":
         } else {
             print("Usage: agentspeak gesture hud on | off")
         }
+    } else if sub == "preview" || sub == "box" || sub == "skeleton" {
+        let prevSub = args.count > 3 ? args[3].lowercased() : "toggle"
+        if prevSub == "on" {
+            _ = ensureAppRunningAndSend("__CMD_GESTURE_PREVIEW_ON__")
+            print("[Agent Speak] Floating skeleton tray preview enabled.")
+        } else if prevSub == "off" {
+            _ = ensureAppRunningAndSend("__CMD_GESTURE_PREVIEW_OFF__")
+            print("[Agent Speak] Floating skeleton tray preview disabled.")
+        } else {
+            _ = ensureAppRunningAndSend("__CMD_GESTURE_PREVIEW_TOGGLE__")
+            print("[Agent Speak] Toggled floating skeleton tray preview.")
+        }
     } else if sub == "status" {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let cfgURL = URL(fileURLWithPath: "\(home)/.agentspeak/config.json")
@@ -507,7 +638,6 @@ case "gesture", "gestures":
         var speed = 1.2
         var smoothing = 0.85
         var anchor = "wrist"
-        var elevGate = 0.26
         var dictMode = "Groq Whisper v3 (Cloud)"
         var dictModel = "whisper-large-v3"
         if let data = try? Data(contentsOf: cfgURL),
@@ -517,7 +647,6 @@ case "gesture", "gestures":
                 speed = g["cursor_speed"] as? Double ?? 1.2
                 smoothing = g["smoothing_factor"] as? Double ?? 0.85
                 anchor = g["tracking_anchor"] as? String ?? "wrist"
-                elevGate = g["elevation_threshold"] as? Double ?? 0.26
             }
             if let d = json["dictation"] as? [String: Any] {
                 dictMode = d["mode"] as? String ?? "Groq Whisper v3 (Cloud)"
@@ -526,7 +655,7 @@ case "gesture", "gestures":
         }
         print("Vision Hand Gestures: \(isEnabled ? "🟢 ACTIVE" : "⚪ STANDBY (Off)")")
         print("Tracking Anchor:     \(anchor.capitalized) Joint (Rock-Solid)")
-        print("Elevation Cutoff:    \(Int(elevGate * 100))% (Typing / Desk Filter)")
+        print("Full-Frame Tracking: 100% Active (Zero Cutoff)")
         print("Cursor Speed:        \(String(format: "%.1fx", speed))")
         print("Jitter Smoothing:    \(Int(smoothing * 100))%")
         print("Dictation Engine:    \(dictMode)")
@@ -536,13 +665,14 @@ case "gesture", "gestures":
         print("""
         Agent Speak — Two-Handed 10-Finger Gesture Map
         
-        RIGHT HAND (Mouse & Pointer):
-          • Index Finger Pointing     -> Move cursor smoothly across screen
-          • Index + Thumb Pinch       -> Left click / focus text field
+        RIGHT HAND (Optical Air Mouse & Pointer):
+          • Index Finger Pointing     -> Optical Air Mouse (moves cursor relatively)
+          • Open / Relax Hand         -> Lifts mouse off desk (cursor freezes in place)
+          • Index + Thumb Pinch       -> Left click / focus text field (zero drift)
           • Pinch & Hold (> 200ms)    -> Click and drag windows, files, or text
           • Middle + Thumb Pinch      -> Right click context menu
           • Double Pinch              -> Double click
-          • 2 Fingers Extended (Up/Dn)-> Smooth vertical and horizontal scroll
+          • 2 Fingers Extended (Up/Dn)-> Smooth scroll (page scrolls with no cursor drop)
         
         LEFT HAND (Shortcuts, Modifiers & Dictation):
           • Closed Fist (Hold)        -> Holds Command key (Whisper Flow dictation)
@@ -561,6 +691,53 @@ case "gesture", "gestures":
     } else {
         print("Unknown gesture subcommand: \(sub)")
         print("Usage: agentspeak gesture <on | off | toggle | hud | status | list>")
+    }
+
+case "dictation", "fn", "ptt":
+    let sub = args.count > 2 ? args[2].lowercased() : "status"
+    if sub == "on" {
+        if ensureAppRunningAndSend("__CMD_FN_DICTATION_ON__") {
+            print("[Agent Speak] MacBook Fn Push-to-Talk Dictation: 🟢 ENABLED")
+            print("Hold left Fn key to record; release to transcribe with Groq Whisper & auto-paste.")
+        } else {
+            print("Error: Could not connect to Agent Speak socket.")
+        }
+    } else if sub == "off" {
+        if ensureAppRunningAndSend("__CMD_FN_DICTATION_OFF__") {
+            print("[Agent Speak] MacBook Fn Push-to-Talk Dictation: ⚪ DISABLED")
+        } else {
+            print("Error: Could not connect to Agent Speak socket.")
+        }
+    } else if sub == "toggle" {
+        if ensureAppRunningAndSend("__CMD_FN_DICTATION_TOGGLE__") {
+            print("[Agent Speak] Toggled MacBook Fn Push-to-Talk Dictation.")
+        } else {
+            print("Error: Could not connect to Agent Speak socket.")
+        }
+    } else if sub == "status" {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let cfgURL = URL(fileURLWithPath: "\(home)/.agentspeak/config.json")
+        var isEnabled = true
+        var dictMode = "Groq Whisper v3 (Cloud)"
+        var dictModel = "whisper-large-v3"
+        var autoSubmit = false
+        if let data = try? Data(contentsOf: cfgURL),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let d = json["dictation"] as? [String: Any] {
+            if let fnEn = d["fn_hold_dictation"] as? Bool { isEnabled = fnEn }
+            dictMode = d["mode"] as? String ?? dictMode
+            dictModel = d["model"] as? String ?? dictModel
+            autoSubmit = d["auto_submit_return"] as? Bool ?? false
+        }
+        print("MacBook Fn Push-to-Talk: \(isEnabled ? "🟢 ACTIVE" : "⚪ DISABLED")")
+        print("Hardware Trigger:       Hold Left Fn (Globe 🌐) Key")
+        print("Dictation Engine:       \(dictMode)")
+        print("Whisper Model:          \(dictModel)")
+        print("Auto-Submit (Return):   \(autoSubmit ? "🟢 ON" : "⚪ OFF")")
+        print("Actions:                Hold to record -> Release to transcribe & auto-paste")
+    } else {
+        print("Unknown dictation subcommand: \(sub)")
+        print("Usage: agentspeak dictation <on | off | toggle | status>")
     }
 
 case "greet", "welcome", "intro":

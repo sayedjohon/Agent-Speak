@@ -5,10 +5,19 @@
     "enabled": true,
     "autostart": true
   },
+  "user_profile": {
+    "user_name": "Johon",
+    "agent_name": "Jarvis",
+    "greeting_mode": "dynamic",
+    "custom_startup_text": "Good day Johon, Jarvis is ready at your service.",
+    "speak_on_startup": true,
+    "greeting_category": "all"
+  },
   "audio": {
     "engine": "macos_default",
     "macos_voice": "default",
     "skip_seconds": 5,
+    "speak_code_blocks": false,
     "pocket_tts": {
       "enabled": false,
       "voice": "Jarvis_Best",
@@ -42,7 +51,7 @@
   },
   "bgm": {
     "enabled": true,
-    "volume": 0.20,
+    "volume": 0.2,
     "random_offset": false,
     "shuffle": true,
     "fade_out_duration": 2.5,
@@ -84,7 +93,24 @@
     "pinch_threshold": 0.05,
     "tracking_anchor": "wrist",
     "whisper_modifier": "command",
-    "hud_enabled": true
+    "hud_enabled": true,
+    "toggles": {
+      "air_mouse": true,
+      "left_click": true,
+      "click_and_drag": false,
+      "right_click": false,
+      "smooth_scroll": false,
+      "left_dictation": false,
+      "left_return": false,
+      "left_shortcuts": false
+    }
+  },
+  "hologram": {
+    "enabled": true,
+    "theme": "amber",
+    "skin": "classicArc",
+    "blend_mode": "normal",
+    "opacity": 1.0
   },
   "dictation": {
     "mode": "Groq Whisper v3 (Cloud)",

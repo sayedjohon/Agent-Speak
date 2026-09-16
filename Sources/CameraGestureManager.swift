@@ -30,6 +30,7 @@ public class CameraGestureManager: NSObject, ObservableObject, AVCaptureVideoDat
     @Published public var lastGestureLabel: String = "Standby"
     @Published public var currentFPS: Double = 0.0
     @Published public var isHUDEnabled: Bool = true
+    @Published public var isSkeletonPreviewEnabled: Bool = true
     
     // AVCapture pipeline
     private var captureSession: AVCaptureSession?
@@ -115,6 +116,9 @@ public class CameraGestureManager: NSObject, ObservableObject, AVCaptureVideoDat
                 if self.isHUDEnabled {
                     GestureHUDController.shared.show()
                 }
+                if self.isSkeletonPreviewEnabled {
+                    TraySkeletonHUDController.shared.show()
+                }
             }
             NSLog("[CameraGestureManager] Started camera gesture tracking session.")
         }
@@ -144,6 +148,7 @@ public class CameraGestureManager: NSObject, ObservableObject, AVCaptureVideoDat
                 self.lastGestureLabel = "Stopped"
                 self.currentFPS = 0.0
                 GestureHUDController.shared.hide()
+                TraySkeletonHUDController.shared.hide()
             }
             NSLog("[CameraGestureManager] Stopped camera gesture tracking.")
         }
@@ -187,7 +192,11 @@ public class CameraGestureManager: NSObject, ObservableObject, AVCaptureVideoDat
     private func setupCaptureSession() {
         let session = AVCaptureSession()
         session.beginConfiguration()
-        session.sessionPreset = .vga640x480 // Ultra-fast 60 FPS, negligible CPU usage
+        if session.canSetSessionPreset(.hd1280x720) {
+            session.sessionPreset = .hd1280x720
+        } else {
+            session.sessionPreset = .vga640x480
+        }
         
         // Find selected device
         let targetDevice: AVCaptureDevice?
@@ -241,6 +250,23 @@ public class CameraGestureManager: NSObject, ObservableObject, AVCaptureVideoDat
                 if var skeleton = parseHandObservation(obs) {
                     skeleton.isIntentional = GestureClassifier.shared.isIntentionalHand(skeleton)
                     skeletons.append(skeleton)
+                }
+            }
+            
+            // Spatial Chirality Disambiguation:
+            // When facing the webcam, the user's Right Hand is on camera-left (lower wrist.x),
+            // and the user's Left Hand is on camera-right (higher wrist.x).
+            if skeletons.count >= 2 {
+                skeletons.sort(by: { $0.wrist.x < $1.wrist.x })
+                skeletons[0].isRightHand = true
+                for i in 1..<skeletons.count {
+                    skeletons[i].isRightHand = false
+                }
+            } else if skeletons.count == 1 {
+                if skeletons[0].wrist.x > 0.52 {
+                    skeletons[0].isRightHand = false
+                } else if skeletons[0].wrist.x < 0.48 {
+                    skeletons[0].isRightHand = true
                 }
             }
             
@@ -322,18 +348,17 @@ public class CameraGestureManager: NSObject, ObservableObject, AVCaptureVideoDat
         let littleMCP = pt(.littleMCP)
         
         // Determine chirality (Left vs Right Hand)
-        var isRight = true
+        var isRight = (wrist.x < 0.50)
         if #available(macOS 14.0, *) {
             if obs.chirality == .left {
                 isRight = false
             } else if obs.chirality == .right {
                 isRight = true
             } else {
-                // Fallback geometry: In mirror view, right hand thumb points to the right of index MCP
-                isRight = (thumbTip.x > indexMCP.x)
+                isRight = (wrist.x < 0.50)
             }
         } else {
-            isRight = (thumbTip.x > indexMCP.x)
+            isRight = (wrist.x < 0.50)
         }
         
         var jointsDict: [String: CGPoint] = [:]

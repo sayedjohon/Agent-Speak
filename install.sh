@@ -40,7 +40,7 @@ rm -f /tmp/agentspeak.sock 2>/dev/null || true
 
 # 2. Compile Unified Application (Sources/*.swift)
 echo -e "${CYAN}→ Compiling Agent Speak application (Swift)...${NC}"
-swiftc -O "$SCRIPT_DIR"/Sources/*.swift -o "/tmp/AgentSpeakBinary"
+swiftc -j 1 "$SCRIPT_DIR"/Sources/*.swift -o "/tmp/AgentSpeakBinary"
 mv "/tmp/AgentSpeakBinary" "$APPS_DIR/Agent Speak.app/Contents/MacOS/AgentSpeak"
 cp "$SCRIPT_DIR/dashboard/Info.plist" "$APPS_DIR/Agent Speak.app/Contents/Info.plist"
 chmod +x "$APPS_DIR/Agent Speak.app/Contents/MacOS/AgentSpeak"
@@ -97,7 +97,8 @@ if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
 fi
 
 # Sync bundled neural personas to Pocket-TTS extension directory if present
-if [[ -d "$CONFIG_DIR/extensions/pocket-tts/voices" && -d "$SCRIPT_DIR/Resources/voices" ]]; then
+if [[ -d "$SCRIPT_DIR/Resources/voices" ]]; then
+    mkdir -p "$CONFIG_DIR/extensions/pocket-tts/voices"
     cp "$SCRIPT_DIR/Resources/voices/"*.safetensors "$CONFIG_DIR/extensions/pocket-tts/voices/" 2>/dev/null || true
     cp "$SCRIPT_DIR/Resources/voices/"*.wav "$CONFIG_DIR/extensions/pocket-tts/voices/" 2>/dev/null || true
 fi
@@ -156,7 +157,9 @@ cat <<EOF > "$PLIST_PATH"
 EOF
 
 chmod 644 "$PLIST_PATH"
-launchctl load -w "$PLIST_PATH"
+if [[ -z "$CI" ]]; then
+    launchctl load -w "$PLIST_PATH" 2>/dev/null || true
+fi
 
 echo -e "\n${GREEN}${BOLD}✓ Agent Speak installed successfully!${NC}"
 echo -e "${BLUE}• Application:${NC}     $APPS_DIR/Agent Speak.app"
@@ -164,5 +167,7 @@ echo -e "${BLUE}• CLI Controller:${NC}  $BIN_DIR/agentspeak (alias: aspk)"
 echo -e "${BLUE}• Voice Engine:${NC}    Default System Voice (Natural macOS)"
 echo -e "${BLUE}• Background:${NC}      Launchd KeepAlive 24/7 (com.agentspeak.app)\n"
 
-sleep 1.5
-"$BIN_DIR/agentspeak" status
+if [[ -z "$CI" ]]; then
+    sleep 1.5
+    "$BIN_DIR/agentspeak" status 2>/dev/null || true
+fi

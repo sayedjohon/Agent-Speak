@@ -1,112 +1,21 @@
 import SwiftUI
 import AVFoundation
 
-// MARK: - Hand Skeleton Canvas View
-struct HandSkeletonCanvasView: View {
-    let hands: [HandSkeletonData]
-    let anchorType: String
-    
-    var body: some View {
-        Canvas { context, size in
-            // Draw keyboard typing boundary line (hands below this elevation threshold are ignored)
-            let thresholdY = (1.0 - GestureClassifier.shared.wristElevationThreshold) * size.height
-            var linePath = Path()
-            linePath.move(to: CGPoint(x: 10, y: thresholdY))
-            linePath.addLine(to: CGPoint(x: size.width - 10, y: thresholdY))
-            context.stroke(
-                linePath,
-                with: .color(Color.yellow.opacity(0.4)),
-                style: StrokeStyle(lineWidth: 1.2, dash: [5, 4])
-            )
-            
-            for hand in hands {
-                let isIntentional = hand.isIntentional
-                let color: Color = isIntentional ? (hand.isRightHand ? .cyan : .orange) : Color.gray.opacity(0.35)
-                let glowColor: Color = isIntentional ? (hand.isRightHand ? Color.cyan.opacity(0.4) : Color.orange.opacity(0.4)) : Color.clear
-                
-                // Helper to transform normalized (0...1) camera coords to canvas coords
-                func screenPt(_ pt: CGPoint) -> CGPoint {
-                    let mx = 1.0 - pt.x // Mirror horizontally for natural webcam reflection
-                    let my = 1.0 - pt.y // Vision Y is bottom-up (1.0 = top)
-                    return CGPoint(x: mx * size.width, y: my * size.height)
-                }
-                
-                let w = screenPt(hand.wrist)
-                let tTip = screenPt(hand.thumbTip)
-                let iTip = screenPt(hand.indexTip)
-                let mTip = screenPt(hand.middleTip)
-                let rTip = screenPt(hand.ringTip)
-                let lTip = screenPt(hand.littleTip)
-                
-                let tIP = screenPt(hand.thumbIP)
-                let iPIP = screenPt(hand.indexPIP)
-                let mPIP = screenPt(hand.middlePIP)
-                let rPIP = screenPt(hand.ringPIP)
-                let lPIP = screenPt(hand.littlePIP)
-                
-                let tMP = screenPt(hand.thumbMP)
-                let iMCP = screenPt(hand.indexMCP)
-                let mMCP = screenPt(hand.middleMCP)
-                let rMCP = screenPt(hand.ringMCP)
-                let lMCP = screenPt(hand.littleMCP)
-                
-                let bones: [[CGPoint]] = [
-                    [w, tMP, tIP, tTip],
-                    [w, iMCP, iPIP, iTip],
-                    [w, mMCP, mPIP, mTip],
-                    [w, rMCP, rPIP, rTip],
-                    [w, lMCP, lPIP, lTip],
-                    [iMCP, mMCP, rMCP, lMCP]
-                ]
-                
-                // Draw bone lines
-                for bone in bones {
-                    var path = Path()
-                    path.addLines(bone)
-                    if isIntentional {
-                        context.stroke(path, with: .color(glowColor), lineWidth: 5)
-                    }
-                    context.stroke(path, with: .color(color), lineWidth: isIntentional ? 2 : 1)
-                }
-                
-                // Draw joint nodes
-                let allTips = [w, tTip, iTip, mTip, rTip, lTip, tIP, iPIP, mPIP, rPIP, lPIP, tMP, iMCP, mMCP, rMCP, lMCP]
-                for node in allTips {
-                    let rect = CGRect(x: node.x - 3.5, y: node.y - 3.5, width: 7, height: 7)
-                    context.fill(Path(ellipseIn: rect), with: .color(isIntentional ? .white : Color(white: 0.3)))
-                    context.stroke(Path(ellipseIn: rect), with: .color(color), lineWidth: 1.2)
-                }
-                
-                // Highlight active tracking anchor on Right Hand with a prominent pulse ring ONLY if intentional
-                if hand.isRightHand && isIntentional {
-                    let activeAnchorPt: CGPoint
-                    switch anchorType {
-                    case "indexTip": activeAnchorPt = iTip
-                    case "indexMCP": activeAnchorPt = iMCP
-                    default: activeAnchorPt = w
-                    }
-                    
-                    let ringRect = CGRect(x: activeAnchorPt.x - 9, y: activeAnchorPt.y - 9, width: 18, height: 18)
-                    context.stroke(Path(ellipseIn: ringRect), with: .color(.green), lineWidth: 2.5)
-                }
-            }
-        }
-    }
-}
-
 // MARK: - Dashboard Gesture View
 public struct DashboardGestureView: View {
     @ObservedObject var manager = CameraGestureManager.shared
     @ObservedObject var whisperManager = GroqWhisperManager.shared
     
     @State private var cursorSpeed: Double = 1.2
+    @State private var scrollSpeed: Double = 1.0
     @State private var smoothing: Double = 0.85
     @State private var pinchDist: Double = 0.055
-    @State private var elevationThreshold: Double = 0.26
     @State private var trackingAnchor: String = "wrist"
     @State private var isHudActive: Bool = true
-    @State private var isApiKeyVisible: Bool = false
+    @State private var isSkeletonHudActive: Bool = true
     @State private var isTestingRecord: Bool = false
+    @State private var customEndpointTestStatus: String? = nil
+    @State private var isTestingCustomEndpoint: Bool = false
     
     private let supportedLanguages: [(code: String, name: String)] = [
         ("", "Auto-detect (All Languages)"),
@@ -135,6 +44,7 @@ public struct DashboardGestureView: View {
             headerBanner
             cameraPreviewCard
             controlsAndSlidersCard
+            GestureTogglesCardView()
             dictationEngineCard
             gestureTestGridCard
             gestureReferenceGuideCard
@@ -325,6 +235,21 @@ public struct DashboardGestureView: View {
                 }
                 
                 GridRow {
+                    Text("Scroll Speed")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.gray)
+                    Slider(value: $scrollSpeed, in: 0.5...3.0, step: 0.1)
+                        .onChange(of: scrollSpeed) { _, val in
+                            GestureClassifier.shared.scrollSensitivity = CGFloat(val)
+                            saveGesturePreferences()
+                        }
+                    Text(String(format: "%.1fx", scrollSpeed))
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.white)
+                        .frame(width: 45, alignment: .trailing)
+                }
+                
+                GridRow {
                     Text("Jitter Smoothing")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.gray)
@@ -353,21 +278,6 @@ public struct DashboardGestureView: View {
                         .foregroundColor(.white)
                         .frame(width: 45, alignment: .trailing)
                 }
-                
-                GridRow {
-                    Text("Elevation Gate")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.gray)
-                    Slider(value: $elevationThreshold, in: 0.15...0.40, step: 0.01)
-                        .onChange(of: elevationThreshold) { _, val in
-                            GestureClassifier.shared.wristElevationThreshold = CGFloat(val)
-                            saveGesturePreferences()
-                        }
-                    Text(String(format: "%d%%", Int(elevationThreshold * 100)))
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundColor(.white)
-                        .frame(width: 45, alignment: .trailing)
-                }
             }
             
             Divider().background(Color.white.opacity(0.1))
@@ -388,6 +298,48 @@ public struct DashboardGestureView: View {
                 if !active { GestureHUDController.shared.hide() }
                 saveGesturePreferences()
             }
+            
+            // Floating Hand Skeleton Box Under Tray
+            Toggle(isOn: $isSkeletonHudActive) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Show Hand Skeleton Box Under Tray")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white)
+                    Text("Compact floating square box underneath the icon tray showing live two-hand skeleton tracking.")
+                        .font(.system(size: 11))
+                        .foregroundColor(.gray)
+                }
+            }
+            .onChange(of: isSkeletonHudActive) { _, active in
+                manager.isSkeletonPreviewEnabled = active
+                if active && manager.isRunning {
+                    TraySkeletonHUDController.shared.show()
+                } else {
+                    TraySkeletonHUDController.shared.hide()
+                }
+                saveGesturePreferences()
+            }
+            
+            if isSkeletonHudActive {
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        TraySkeletonHUDController.shared.resetPosition()
+                        if manager.isRunning {
+                            TraySkeletonHUDController.shared.show()
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.counterclockwise")
+                            Text("Reset Box Under Tray")
+                        }
+                        .font(.system(size: 11, weight: .medium))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(.cyan)
+                }
+                .padding(.top, 2)
+            }
         }
         .padding(16)
         .background(Color(white: 0.1, opacity: 0.6))
@@ -404,10 +356,40 @@ public struct DashboardGestureView: View {
                 
                 Spacer()
                 
-                Text("Triggered by Left Hand Closed Fist")
+                Text("Left Fn Key or Closed Fist")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.orange)
             }
+            
+            // Dedicated MacBook Fn Key Push-to-Talk Toggle
+            Toggle(isOn: $whisperManager.fnHoldDictationEnabled) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("Hold Fn (Globe 🌐) Key to Dictate")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white)
+                        
+                        Text("MacBook Key")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.green)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.green.opacity(0.15))
+                            .cornerRadius(4)
+                    }
+                    Text("Hold down your MacBook's bottom-left Fn button to record speech. Release to transcribe and auto-paste directly into your active app.")
+                        .font(.system(size: 11))
+                        .foregroundColor(.gray)
+                }
+            }
+            .onChange(of: whisperManager.fnHoldDictationEnabled) { _, val in
+                whisperManager.saveConfig()
+                if val {
+                    FnDictationController.shared.start()
+                }
+            }
+            
+            Divider().background(Color.white.opacity(0.1))
             
             // Engine Mode Picker
             VStack(alignment: .leading, spacing: 6) {
@@ -519,30 +501,9 @@ public struct DashboardGestureView: View {
     
     // MARK: - Groq Cloud Settings Section
     private var groqSettingsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // API Key field
-            HStack {
-                Text("Groq API Key:")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
-                    .frame(width: 110, alignment: .leading)
-                
-                if isApiKeyVisible {
-                    TextField("gsk_...", text: $whisperManager.groqApiKey)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .onChange(of: whisperManager.groqApiKey) { _, _ in whisperManager.saveConfig() }
-                } else {
-                    SecureField("gsk_...", text: $whisperManager.groqApiKey)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .onChange(of: whisperManager.groqApiKey) { _, _ in whisperManager.saveConfig() }
-                }
-                
-                Button(action: { isApiKeyVisible.toggle() }) {
-                    Image(systemName: isApiKeyVisible ? "eye.slash" : "eye")
-                        .foregroundColor(.gray)
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
+        VStack(alignment: .leading, spacing: 14) {
+            // Standalone Interactive API Key Manager Component
+            ApiKeyManagerCardView(whisperManager: whisperManager)
             
             // Model Selector
             HStack {
@@ -621,6 +582,49 @@ public struct DashboardGestureView: View {
                 TextField("whisper-large-v3", text: $whisperManager.customModelId)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                     .onChange(of: whisperManager.customModelId) { _, _ in whisperManager.saveConfig() }
+            }
+            
+            HStack {
+                Text("Custom API Key:")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.gray)
+                    .frame(width: 110, alignment: .leading)
+                
+                SecureField("Optional Bearer Token (sk-...)", text: $whisperManager.customApiKey)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .onChange(of: whisperManager.customApiKey) { _, _ in whisperManager.saveConfig() }
+            }
+            
+            // Test Custom Endpoint Button & Feedback
+            HStack {
+                Spacer()
+                if let status = customEndpointTestStatus {
+                    Text(status)
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundColor(status.contains("Reachable") ? .green : .red)
+                }
+                
+                Button(action: testCustomEndpoint) {
+                    HStack(spacing: 4) {
+                        if isTestingCustomEndpoint {
+                            ProgressView()
+                                .scaleEffect(0.4)
+                                .frame(width: 10, height: 10)
+                        } else {
+                            Image(systemName: "bolt.horizontal.fill")
+                                .font(.system(size: 10))
+                        }
+                        Text(isTestingCustomEndpoint ? "Testing..." : "Test Endpoint")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.blue.opacity(0.2))
+                    .foregroundColor(.blue)
+                    .cornerRadius(6)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .disabled(isTestingCustomEndpoint || whisperManager.customBaseUrl.isEmpty)
             }
         }
     }
@@ -704,13 +708,15 @@ public struct DashboardGestureView: View {
                 .foregroundColor(.white)
             
             VStack(alignment: .leading, spacing: 8) {
-                guideRow(hand: "Right", pose: "Wrist / Hand Glide", action: "Moves cursor smoothly with zero pinch drift")
-                guideRow(hand: "Right", pose: "Index + Thumb Pinch", action: "Left click / focus input with position lock")
+                guideRow(hand: "Right", pose: "Index Pointing", action: "Engages Optical Air Mouse; moves cursor relatively")
+                guideRow(hand: "Right", pose: "Open / Relax Hand", action: "Lifts mouse off desk; cursor stays frozen in place")
+                guideRow(hand: "Right", pose: "Index + Thumb Pinch", action: "Left click / focus input with zero cursor drift")
                 guideRow(hand: "Right", pose: "Pinch & Hold (>200ms)", action: "Click and drag windows, text, or files")
                 guideRow(hand: "Right", pose: "Middle + Thumb Pinch", action: "Right click context menu")
-                guideRow(hand: "Right", pose: "2 Fingers Extended", action: "Smooth vertical and horizontal scroll")
+                guideRow(hand: "Right", pose: "2 Fingers Extended", action: "Smooth vertical and horizontal scroll (no cursor drop)")
                 guideRow(hand: "Left", pose: "Closed Fist", action: "Records dictation (Groq Large v3 / Apple Silicon)")
                 guideRow(hand: "Left", pose: "Open Fist", action: "Stops dictation, transcribes & auto-pastes text")
+                guideRow(hand: "MacBook", pose: "Hold Left Fn (🌐)", action: "Push-to-Talk: records while held, auto-pastes on release")
                 guideRow(hand: "Left", pose: "Index Tap / Pinch", action: "Return / Enter (submits chat query)")
                 guideRow(hand: "Left", pose: "V / Peace Sign", action: "Paste (Cmd + V)")
                 guideRow(hand: "Left", pose: "C Hand Pose", action: "Copy (Cmd + C)")
@@ -751,13 +757,14 @@ public struct DashboardGestureView: View {
               let gestures = json["gestures"] as? [String: Any] else { return }
         
         if let speed = gestures["cursor_speed"] as? Double { cursorSpeed = speed }
+        if let sc = gestures["scroll_speed"] as? Double {
+            scrollSpeed = sc
+            GestureClassifier.shared.scrollSensitivity = CGFloat(sc)
+        }
         if let sm = gestures["smoothing_factor"] as? Double { smoothing = sm }
         if let p = gestures["pinch_threshold"] as? Double { pinchDist = p }
-        if let elev = gestures["elevation_threshold"] as? Double {
-            elevationThreshold = elev
-            GestureClassifier.shared.wristElevationThreshold = CGFloat(elev)
-        }
         if let h = gestures["hud_enabled"] as? Bool { isHudActive = h }
+        if let s = gestures["skeleton_preview_enabled"] as? Bool { isSkeletonHudActive = s }
         if let anchor = gestures["tracking_anchor"] as? String { trackingAnchor = anchor }
         if let cam = gestures["camera_device_id"] as? String { manager.selectedCameraId = cam }
         
@@ -766,6 +773,7 @@ public struct DashboardGestureView: View {
         GestureClassifier.shared.pinchThreshold = CGFloat(pinchDist)
         GestureClassifier.shared.trackingAnchor = trackingAnchor
         manager.isHUDEnabled = isHudActive
+        manager.isSkeletonPreviewEnabled = isSkeletonHudActive
     }
     
     private func saveGesturePreferences() {
@@ -779,16 +787,27 @@ public struct DashboardGestureView: View {
         var gestures: [String: Any] = json["gestures"] as? [String: Any] ?? [:]
         gestures["enabled"] = manager.isRunning
         gestures["cursor_speed"] = cursorSpeed
+        gestures["scroll_speed"] = scrollSpeed
         gestures["smoothing_factor"] = smoothing
         gestures["pinch_threshold"] = pinchDist
-        gestures["elevation_threshold"] = elevationThreshold
         gestures["tracking_anchor"] = trackingAnchor
         gestures["hud_enabled"] = isHudActive
+        gestures["skeleton_preview_enabled"] = isSkeletonHudActive
         gestures["camera_device_id"] = manager.selectedCameraId
         json["gestures"] = gestures
         
         if let outData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted]) {
             try? outData.write(to: configPath)
+        }
+    }
+    
+    private func testCustomEndpoint() {
+        guard !whisperManager.customBaseUrl.isEmpty else { return }
+        isTestingCustomEndpoint = true
+        customEndpointTestStatus = nil
+        whisperManager.testCustomEndpoint(url: whisperManager.customBaseUrl, apiKey: whisperManager.customApiKey) { success, result in
+            isTestingCustomEndpoint = false
+            customEndpointTestStatus = result
         }
     }
 }

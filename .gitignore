@@ -13,3 +13,7 @@
 *.pid
 *.sock
 state.json
+
+# Build & Distribution Artifacts
+build/
+dist/

@@ -16,6 +16,8 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
     
     private var hotKeyRefs: [EventHotKeyRef] = []
     private var eventHandlerRef: EventHandlerRef?
+    private var globalKeyMonitor: Any?
+    private var localKeyMonitor: Any?
     
     public var isTrayIconVisible: Bool {
         return statusItem?.isVisible ?? false
@@ -64,6 +66,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         }
         
         NotchWindowController.shared.setupEscapeKeyTap()
+        FnDictationController.shared.start()
         registerGlobalHotKeys()
         
         // Listen for live speech state to toggle tray visual indicator
@@ -74,6 +77,9 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         let trusted = AXIsProcessTrustedWithOptions(options)
         NSLog("[AgentSpeak] Accessibility permission on launch: \(trusted ? "TRUSTED" : "NOT TRUSTED")")
+        
+        // Load speak code blocks preference
+        CodeSpeechManager.shared.loadConfiguration()
         
         // Initialize Camera Gesture engine if enabled in config
         let configPath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".agentspeak/config.json")
@@ -86,8 +92,12 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         
         // Announce persona signature greeting once at application startup
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            let greeting = PersonaGreetingManager.shared.resolveGreeting()
-            SpeechQueueManager.shared.enqueue(source: greeting.character, text: greeting.text)
+            let mgr = PersonaGreetingManager.shared
+            mgr.loadConfiguration()
+            if mgr.speakOnStartup {
+                let greeting = mgr.resolveGreeting()
+                SpeechQueueManager.shared.enqueue(source: greeting.character, text: greeting.text)
+            }
         }
     }
     
@@ -232,6 +242,11 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         }
     }
     
+    public func getTrayButtonScreenFrame() -> NSRect? {
+        guard let button = statusItem?.button, let win = button.window else { return nil }
+        return win.convertToScreen(button.bounds)
+    }
+    
     public func setTrayIconVisible(_ visible: Bool) {
         saveTrayPreference(visible: visible)
         DispatchQueue.main.async { [weak self] in
@@ -314,7 +329,23 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         
         menu.addItem(NSMenuItem.separator())
         
-        // 4. Hands-Free Gestures Direct 1-Click Toggle (hand icon, checkmark state, ⌃G)
+        // 4. Speak Code Blocks Toggle (curly braces icon, checkmark state)
+        let speakCode = CodeSpeechManager.shared.speakCodeBlocks
+        let speakCodeTitle = speakCode ? "Speak Code Blocks: Active" : "Speak Everything Including Code Blocks"
+        let speakCodeItem = NSMenuItem(
+            title: speakCodeTitle,
+            action: #selector(toggleSpeakCodeBlocks),
+            keyEquivalent: ""
+        )
+        speakCodeItem.state = speakCode ? .on : .off
+        if let icon = NSImage(systemSymbolName: speakCode ? "curlybraces.square.fill" : "curlybraces", accessibilityDescription: "Speak Code Blocks") {
+            icon.isTemplate = true
+            speakCodeItem.image = icon
+        }
+        speakCodeItem.target = self
+        menu.addItem(speakCodeItem)
+        
+        // 5. Hands-Free Gestures Direct 1-Click Toggle (hand icon, checkmark state, ⌃G)
         let gesturesRunning = CameraGestureManager.shared.isRunning
         let gestureTitle = gesturesRunning ? "Hands-Free Gestures: Active" : "Hands-Free Gestures: Off"
         let gestureItem = NSMenuItem(
@@ -344,6 +375,45 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         }
         bgmItem.target = self
         menu.addItem(bgmItem)
+        
+        // 6. Hologram Overlay Direct 1-Click Toggle (atom icon, checkmark state, ⌃H)
+        let holoEnabled = HologramManager.shared.isEnabled
+        let holoTitle = holoEnabled ? "Hologram Overlay: Active" : "Hologram Overlay: Disabled"
+        let holoItem = NSMenuItem(
+            title: holoTitle,
+            action: #selector(toggleHologramOverlay),
+            keyEquivalent: "h"
+        )
+        holoItem.keyEquivalentModifierMask = [.control]
+        holoItem.state = holoEnabled ? .on : .off
+        if let icon = NSImage(systemSymbolName: holoEnabled ? "atom" : "circle.slash", accessibilityDescription: "Hologram Overlay") {
+            icon.isTemplate = true
+            holoItem.image = icon
+        }
+        holoItem.target = self
+        menu.addItem(holoItem)
+        
+        // 7. Hologram Blend Mode Submenu (Photoshop Modes)
+        let blendSubmenu = NSMenu()
+        for mode in HologramBlendMode.allCases {
+            let isCurrent = (HologramManager.shared.currentBlendMode == mode)
+            let item = NSMenuItem(title: mode.displayName, action: #selector(selectBlendModeFromMenu(_:)), keyEquivalent: "")
+            item.representedObject = mode.id
+            item.state = isCurrent ? .on : .off
+            item.target = self
+            if let modeIcon = NSImage(systemSymbolName: mode.systemIcon, accessibilityDescription: mode.displayName) {
+                modeIcon.isTemplate = true
+                item.image = modeIcon
+            }
+            blendSubmenu.addItem(item)
+        }
+        let blendParentItem = NSMenuItem(title: "Hologram Blend Mode (\(HologramManager.shared.currentBlendMode.displayName))", action: nil, keyEquivalent: "")
+        if let bIcon = NSImage(systemSymbolName: "circle.lefthalf.filled", accessibilityDescription: "Blend Mode") {
+            bIcon.isTemplate = true
+            blendParentItem.image = bIcon
+        }
+        blendParentItem.submenu = blendSubmenu
+        menu.addItem(blendParentItem)
 
         menu.addItem(NSMenuItem.separator())
         
@@ -464,9 +534,10 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         guard let vTag = sender.representedObject as? String else { return }
         saveMacosVoicePreference(voice: vTag)
         let voiceName = vTag == "default" ? "System Default" : vTag
+        let greeting = PersonaGreetingManager.shared.resolveVoiceSwitchGreeting(voiceName: voiceName)
         SpeechQueueManager.shared.enqueue(
-            source: "Agent Speak",
-            text: "Agent Speak is online and ready with \(voiceName), your Mac System Voice."
+            source: greeting.character,
+            text: greeting.text
         )
     }
     
@@ -619,6 +690,12 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         SpeechQueueManager.shared.stopCurrent()
     }
     
+    @objc func toggleSpeakCodeBlocks() {
+        CodeSpeechManager.shared.toggle()
+        let state = CodeSpeechManager.shared.speakCodeBlocks ? "ENABLED" : "DISABLED"
+        NSLog("[AgentSpeak] Toggled speak code blocks -> \(state)")
+    }
+    
     @objc func toggleBackgroundMusic() {
         let current = BackgroundMusicManager.shared.isEnabled
         BackgroundMusicManager.shared.isEnabled = !current
@@ -632,8 +709,32 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         }
     }
     
+    @objc func toggleHologramOverlay() {
+        let current = HologramManager.shared.isEnabled
+        HologramManager.shared.setEnabled(!current)
+    }
+    
+    @objc func selectBlendModeFromMenu(_ sender: NSMenuItem) {
+        if let modeId = sender.representedObject as? String {
+            HologramManager.shared.setBlendMode(id: modeId)
+        }
+    }
+    
+    private var lastGestureToggleTime: TimeInterval = 0
     @objc func toggleHandsFreeGestures() {
+        let now = Date().timeIntervalSince1970
+        guard now - lastGestureToggleTime > 0.35 else { return }
+        lastGestureToggleTime = now
+        
+        let willBeRunning = !CameraGestureManager.shared.isRunning
         CameraGestureManager.shared.toggle()
+        NSLog("[AgentSpeak] Toggled hands-free gestures -> \(willBeRunning ? "STARTING" : "STOPPING")")
+        
+        if willBeRunning {
+            NSSound(named: "Pop")?.play()
+        } else {
+            NSSound(named: "Blow")?.play()
+        }
     }
     
     // MARK: - Global HotKeys (Carbon)
@@ -641,11 +742,16 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
     private func registerGlobalHotKeys() {
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         let target = GetEventDispatcherTarget()
+        let sig: OSType = 0x4153504B // "ASPK"
         
         InstallEventHandler(target, { (handler, event, userData) -> OSStatus in
-            guard let event = event else { return noErr }
+            guard let event = event else { return OSStatus(eventNotHandledErr) }
             var hotKeyID = EventHotKeyID()
             GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
+            
+            guard hotKeyID.signature == 0x4153504B else {
+                return OSStatus(eventNotHandledErr)
+            }
             
             DispatchQueue.main.async {
                 guard let appDelegate = NSApp.delegate as? AppDelegate else { return }
@@ -659,15 +765,14 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
                 case 4: // Ctrl + X: Stop Speech
                     appDelegate.stopSpeech()
                 case 5: // Ctrl + G: Toggle Camera Gestures
-                    CameraGestureManager.shared.toggle()
+                    NSLog("[AgentSpeak] Carbon HotKey Ctrl+G fired.")
+                    appDelegate.toggleHandsFreeGestures()
                 default:
                     break
                 }
             }
             return noErr
         }, 1, &eventType, nil, &eventHandlerRef)
-        
-        let sig: OSType = 0x4153504B // "ASPK"
         
         // 1. Ctrl + S (Speak Selection)
         var ref1: EventHotKeyRef?
@@ -697,6 +802,32 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         var ref5: EventHotKeyRef?
         if RegisterEventHotKey(UInt32(kVK_ANSI_G), UInt32(controlKey), EventHotKeyID(signature: sig, id: 5), target, 0, &ref5) == noErr, let r = ref5 {
             hotKeyRefs.append(r)
+        }
+        
+        // Redundant NSEvent Global Monitor for Control + G
+        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.modifierFlags.contains(.control) {
+                let key = event.charactersIgnoringModifiers?.lowercased()
+                if key == "g" || event.keyCode == 5 {
+                    DispatchQueue.main.async {
+                        self?.toggleHandsFreeGestures()
+                    }
+                }
+            }
+        }
+        
+        // Redundant NSEvent Local Monitor (when Agent Speak itself is focused)
+        localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.modifierFlags.contains(.control) {
+                let key = event.charactersIgnoringModifiers?.lowercased()
+                if key == "g" || event.keyCode == 5 {
+                    DispatchQueue.main.async {
+                        self?.toggleHandsFreeGestures()
+                    }
+                    return nil
+                }
+            }
+            return event
         }
     }
     

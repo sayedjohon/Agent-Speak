@@ -78,14 +78,48 @@ public enum RecognizedGestureType: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Granular Gesture Toggles
+public struct GestureToggles: Codable, Equatable {
+    public var airMouse: Bool = true        // Right: Point index finger to move cursor
+    public var leftClick: Bool = true       // Right: Quick pinch index & thumb
+    public var clickAndDrag: Bool = false   // Right: Pinch and hold to drag
+    public var rightClick: Bool = false     // Right: Middle finger extended tap
+    public var smoothScroll: Bool = false   // Right: Two fingers extended scroll
+    public var leftDictation: Bool = false  // Left: Closed fist hold for Groq Whisper dictation
+    public var leftReturn: Bool = false     // Left: Index-thumb pinch for Enter ↵
+    public var leftShortcuts: Bool = false  // Left: Peace / V-sign for Paste ⌘V
+    
+    public init(
+        airMouse: Bool = true,
+        leftClick: Bool = true,
+        clickAndDrag: Bool = false,
+        rightClick: Bool = false,
+        smoothScroll: Bool = false,
+        leftDictation: Bool = false,
+        leftReturn: Bool = false,
+        leftShortcuts: Bool = false
+    ) {
+        self.airMouse = airMouse
+        self.leftClick = leftClick
+        self.clickAndDrag = clickAndDrag
+        self.rightClick = rightClick
+        self.smoothScroll = smoothScroll
+        self.leftDictation = leftDictation
+        self.leftReturn = leftReturn
+        self.leftShortcuts = leftShortcuts
+    }
+}
+
 // MARK: - Gesture Classifier Engine
-public class GestureClassifier {
+public class GestureClassifier: ObservableObject {
     public static let shared = GestureClassifier()
+    
+    @Published public var toggles: GestureToggles = GestureToggles()
     
     public var pinchThreshold: CGFloat = 0.055
     public var scrollSensitivity: CGFloat = 1.0
     public var trackingAnchor: String = "wrist" // "wrist", "indexMCP", "indexTip"
-    public var wristElevationThreshold: CGFloat = 0.26 // Rejects bottom 26% of frame (keyboard/desk)
+    public var wristElevationThreshold: CGFloat = 0.0 // Lower area cutoff removed
     
     // Right hand tracking state
     private var isRightPinched: Bool = false
@@ -93,9 +127,13 @@ public class GestureClassifier {
     private var isDraggingActive: Bool = false
     private var lastRightPinchReleaseTime: TimeInterval = 0
     private var lastScrollPoint: CGPoint?
+    private var lastRelativeAnchor: CGPoint?
+    private var smoothedAnchorPt: CGPoint = .zero
+    private var hasAnchorHistory: Bool = false
     
     // Left hand tracking state
     private var isLeftFistHolding: Bool = false
+    private var lastDictationEndTime: TimeInterval = 0
     private var lastLeftReturnTime: TimeInterval = 0
     private var lastLeftCopyTime: TimeInterval = 0
     private var lastLeftPasteTime: TimeInterval = 0
@@ -108,7 +146,69 @@ public class GestureClassifier {
     // Hand motion history for swipe detection
     private var leftWristHistory: [(point: CGPoint, time: TimeInterval)] = []
     
-    private init() {}
+    private init() {
+        loadToggles()
+    }
+    
+    public func loadToggles() {
+        let configPath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".agentspeak/config.json")
+        guard let data = try? Data(contentsOf: configPath),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let gestures = json["gestures"] as? [String: Any] else {
+            return
+        }
+        guard let t = gestures["toggles"] as? [String: Any] else {
+            saveToggles()
+            return
+        }
+        if let v = t["air_mouse"] as? Bool { toggles.airMouse = v }
+        if let v = t["left_click"] as? Bool { toggles.leftClick = v }
+        if let v = t["click_and_drag"] as? Bool { toggles.clickAndDrag = v }
+        if let v = t["right_click"] as? Bool { toggles.rightClick = v }
+        if let v = t["smooth_scroll"] as? Bool { toggles.smoothScroll = v }
+        if let v = t["left_dictation"] as? Bool { toggles.leftDictation = v }
+        if let v = t["left_return"] as? Bool { toggles.leftReturn = v }
+        if let v = t["left_shortcuts"] as? Bool { toggles.leftShortcuts = v }
+    }
+    
+    public func saveToggles() {
+        let configPath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".agentspeak/config.json")
+        var json: [String: Any] = [:]
+        if let data = try? Data(contentsOf: configPath),
+           let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            json = existing
+        }
+        var gestures: [String: Any] = json["gestures"] as? [String: Any] ?? [:]
+        var t: [String: Any] = [:]
+        t["air_mouse"] = toggles.airMouse
+        t["left_click"] = toggles.leftClick
+        t["click_and_drag"] = toggles.clickAndDrag
+        t["right_click"] = toggles.rightClick
+        t["smooth_scroll"] = toggles.smoothScroll
+        t["left_dictation"] = toggles.leftDictation
+        t["left_return"] = toggles.leftReturn
+        t["left_shortcuts"] = toggles.leftShortcuts
+        gestures["toggles"] = t
+        json["gestures"] = gestures
+        
+        if let outData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted]) {
+            try? outData.write(to: configPath)
+        }
+    }
+    
+    public func resetToDefaults() {
+        toggles = GestureToggles(
+            airMouse: true,
+            leftClick: true,
+            clickAndDrag: false,
+            rightClick: false,
+            smoothScroll: false,
+            leftDictation: false,
+            leftReturn: false,
+            leftShortcuts: false
+        )
+        saveToggles()
+    }
     
     public func reset() {
         if isDraggingActive {
@@ -120,38 +220,29 @@ public class GestureClassifier {
             MouseCursorController.shared.unlockCursor()
         }
         if isLeftFistHolding {
-            if GroqWhisperManager.shared.engineMode == .modifierHold {
-                KeyboardShortcutController.shared.setWhisperModifierHold(active: false)
-            } else {
-                GroqWhisperManager.shared.stopRecordingAndTranscribe()
-            }
+            KeyboardShortcutController.shared.releaseAllHeldModifiers()
+            GroqWhisperManager.shared.stopRecordingAndTranscribe()
             isLeftFistHolding = false
+            lastDictationEndTime = Date().timeIntervalSince1970
         }
         lastScrollPoint = nil
+        lastRelativeAnchor = nil
+        MouseCursorController.shared.resetScroll()
+        MouseCursorController.shared.clutchDisengaged()
+        hasAnchorHistory = false
+        smoothedAnchorPt = .zero
         leftWristHistory.removeAll()
         MouseCursorController.shared.resetSmoothing()
     }
     
-    // MARK: - Hand Intentionality & Typing Gating
+    // MARK: - Hand Intentionality & Verification
     public func isIntentionalHand(_ hand: HandSkeletonData) -> Bool {
         // 1. Overall confidence check: Ignore low-confidence camera noise
-        guard hand.confidence >= 0.35 else { return false }
+        guard hand.confidence >= 0.30 else { return false }
         
-        // 2. Wrist Elevation Gate:
-        // In Vision coordinate space, 0.0 is bottom and 1.0 is top.
-        // Hands resting on or hovering slightly above keyboard/desk lie in the bottom ~26% of frame.
-        guard hand.wrist.y >= wristElevationThreshold else { return false }
-        
-        // 3. Upright Hand Posture Gate:
-        // When intentionally gesturing or navigating, the hand faces the camera with fingers pointing upward,
-        // so the knuckles (MCP joints) are physically higher in the frame than the wrist joint.
-        // When typing on a physical keyboard, hands angle downward towards the desk and keys.
-        let highestKnuckleY = max(hand.indexMCP.y, hand.middleMCP.y)
-        guard highestKnuckleY >= (hand.wrist.y + 0.02) else { return false }
-        
-        // 4. Hand Span / Perspective Sanity:
+        // 2. Hand Span / Perspective Sanity: Ignore tiny background specks
         let handSpan = distance(hand.wrist, hand.middleMCP)
-        guard handSpan >= 0.05 && handSpan <= 0.60 else { return false }
+        guard handSpan >= 0.04 && handSpan <= 0.70 else { return false }
         
         return true
     }
@@ -186,11 +277,44 @@ public class GestureClassifier {
             GestureHUDState.shared.hide()
         }
         
-        // Find right and left active hands
+        // Spatially separated hands: Right hand on camera-left, Left hand on camera-right
         let rightHand = activeHands.first(where: { $0.isRightHand })
         let leftHand = activeHands.first(where: { !$0.isRightHand })
         
-        // 1. Process Right Hand (Mouse & Pointer Operations)
+        // 1. Process Left Hand FIRST (Dictation & Shortcuts ONLY - Never moves mouse or clicks)
+        if let left = leftHand {
+            processLeftHand(left, now: now, onGestureDetected: onGestureDetected)
+        } else {
+            if isLeftFistHolding {
+                isLeftFistHolding = false
+                lastDictationEndTime = now
+                KeyboardShortcutController.shared.releaseAllHeldModifiers()
+                GroqWhisperManager.shared.stopRecordingAndTranscribe()
+                onGestureDetected?(.whisperFlowHold, "Transcribing speech...")
+            }
+            leftWristHistory.removeAll()
+        }
+        
+        // 2. CRITICAL DICTATION IMMUNITY GUARD:
+        // When left hand is dictating (fist held) or transcribing, OR during the 1.5s post-dictation cooldown,
+        // completely FREEZE and ignore all right-hand cursor movements, clicks, and drags!
+        // This guarantees that the user's active edit cursor is NEVER deselected or moved!
+        if isLeftFistHolding || GroqWhisperManager.shared.isRecording || GroqWhisperManager.shared.isTranscribing || (now - lastDictationEndTime < 1.5) {
+            if isDraggingActive {
+                MouseCursorController.shared.endDrag()
+                isDraggingActive = false
+            }
+            if isRightPinched {
+                isRightPinched = false
+                MouseCursorController.shared.unlockCursor()
+            }
+            lastScrollPoint = nil
+            lastRelativeAnchor = nil
+            MouseCursorController.shared.clutchDisengaged()
+            return
+        }
+        
+        // 3. Process Right Hand (Optical Air Mouse - Pointing Pose ONLY)
         if let right = rightHand {
             processRightHand(right, now: now, onGestureDetected: onGestureDetected)
         } else {
@@ -202,126 +326,174 @@ public class GestureClassifier {
                 isRightPinched = false
                 MouseCursorController.shared.unlockCursor()
             }
-            lastScrollPoint = nil
-            MouseCursorController.shared.resetSmoothing()
-        }
-        
-        // 2. Process Left Hand (Shortcuts, Modifiers & Dictation Flow)
-        if let left = leftHand {
-            processLeftHand(left, now: now, onGestureDetected: onGestureDetected)
-        } else {
-            if isLeftFistHolding {
-                if GroqWhisperManager.shared.engineMode == .modifierHold {
-                    KeyboardShortcutController.shared.setWhisperModifierHold(active: false)
-                    onGestureDetected?(.whisperFlowHold, "Whisper Command Released")
-                } else {
-                    GroqWhisperManager.shared.stopRecordingAndTranscribe()
-                    onGestureDetected?(.whisperFlowHold, "Transcribing speech...")
-                }
-                isLeftFistHolding = false
+            if lastScrollPoint != nil {
+                MouseCursorController.shared.resetScroll()
             }
-            leftWristHistory.removeAll()
+            lastScrollPoint = nil
+            lastRelativeAnchor = nil
+            MouseCursorController.shared.clutchDisengaged()
+            MouseCursorController.shared.resetSmoothing()
         }
     }
     
-    // MARK: - Right Hand Processing (Pointer, Click, Drag, Scroll)
+    // MARK: - Right Hand Processing (Point-to-Move, Pinch Click, Scroll)
     private func processRightHand(
         _ hand: HandSkeletonData,
         now: TimeInterval,
         onGestureDetected: ((RecognizedGestureType, String) -> Void)?
     ) {
-        let indexExt = isFingerExtended(tip: hand.indexTip, pip: hand.indexPIP, wrist: hand.wrist)
-        let middleExt = isFingerExtended(tip: hand.middleTip, pip: hand.middlePIP, wrist: hand.wrist)
-        let ringExt = isFingerExtended(tip: hand.ringTip, pip: hand.ringPIP, wrist: hand.wrist)
-        let littleExt = isFingerExtended(tip: hand.littleTip, pip: hand.littlePIP, wrist: hand.wrist)
-        let thumbExt = isThumbExtended(tip: hand.thumbTip, ip: hand.thumbIP, wrist: hand.wrist)
+        let indexLen = distance(hand.wrist, hand.indexTip)
+        let middleLen = distance(hand.wrist, hand.middleTip)
+        let ringLen = distance(hand.wrist, hand.ringTip)
+        let littleLen = distance(hand.wrist, hand.littleTip)
+        
+        let indexExt = isFingerExtended(tip: hand.indexTip, pip: hand.indexPIP, wrist: hand.wrist, factor: 1.15)
+        let middleExt = isFingerExtended(tip: hand.middleTip, pip: hand.middlePIP, wrist: hand.wrist, factor: 1.05)
+        let ringExt = isFingerExtended(tip: hand.ringTip, pip: hand.ringPIP, wrist: hand.wrist, factor: 1.05)
+        let littleExt = isFingerExtended(tip: hand.littleTip, pip: hand.littlePIP, wrist: hand.wrist, factor: 1.05)
         
         let indexThumbDist = distance(hand.thumbTip, hand.indexTip)
         let middleThumbDist = distance(hand.thumbTip, hand.middleTip)
         
-        // Safety Clutch: If thumb is tightly tucked inside a closed fist, pause tracking silently
-        if !indexExt && !middleExt && !ringExt && !littleExt && !thumbExt {
-            return
-        }
+        // A. Two-Finger Scroll: Both Index and Middle extended side-by-side, Ring + Pinky curled
+        let isScrollPose = indexExt && middleExt && !ringExt && !littleExt &&
+                           (distance(hand.indexTip, hand.middleTip) < 0.16) &&
+                           (indexThumbDist > 0.050)
         
-        // A. Smooth Two-Finger Scroll: Both Index and Middle extended side-by-side, Ring & Pinky curled
-        if indexExt && middleExt && !ringExt && !littleExt && distance(hand.indexTip, hand.middleTip) < 0.08 {
-            let currentPoint = CGPoint(x: (hand.indexTip.x + hand.middleTip.x) / 2.0,
-                                       y: (hand.indexTip.y + hand.middleTip.y) / 2.0)
+        if isScrollPose && toggles.smoothScroll {
+            if isDraggingActive {
+                MouseCursorController.shared.endDrag()
+                isDraggingActive = false
+            }
+            if isRightPinched {
+                isRightPinched = false
+                MouseCursorController.shared.unlockCursor()
+            }
+            if lastRelativeAnchor != nil {
+                lastRelativeAnchor = nil
+                MouseCursorController.shared.clutchDisengaged()
+            }
+            
+            let currentPoint = CGPoint(
+                x: (hand.indexTip.x + hand.middleTip.x) / 2.0,
+                y: (hand.indexTip.y + hand.middleTip.y) / 2.0
+            )
             if let prev = lastScrollPoint {
-                let dx = (currentPoint.x - prev.x) * scrollSensitivity
-                let dy = (currentPoint.y - prev.y) * scrollSensitivity
-                MouseCursorController.shared.scroll(deltaX: dx, deltaY: dy)
+                let rawDx = (currentPoint.x - prev.x) * scrollSensitivity
+                let rawDy = (currentPoint.y - prev.y) * scrollSensitivity
+                
+                let dx = abs(rawDx) > 0.0010 ? rawDx : 0.0
+                let dy = abs(rawDy) > 0.0010 ? rawDy : 0.0
+                
+                if dx != 0.0 || dy != 0.0 {
+                    MouseCursorController.shared.scroll(deltaX: dx, deltaY: dy)
+                }
                 onGestureDetected?(.smoothScroll, "Scrolling")
             }
             lastScrollPoint = currentPoint
             return
         } else {
+            if lastScrollPoint != nil {
+                MouseCursorController.shared.resetScroll()
+            }
             lastScrollPoint = nil
         }
         
-        // Map target screen coordinates from selected anchor (default: wrist joint)
-        let anchorPt: CGPoint
-        switch trackingAnchor {
-        case "indexTip":
-            anchorPt = hand.indexTip
-        case "indexMCP":
-            anchorPt = hand.indexMCP
-        default:
-            anchorPt = hand.wrist
-        }
-        
-        let screenPoint = MouseCursorController.shared.mapCameraPointToScreen(
-            normX: anchorPt.x,
-            normY: anchorPt.y
-        )
-        
-        // B. Right Click: Middle Finger + Thumb Pinch
-        if middleThumbDist < pinchThreshold && indexExt {
-            if now - lastRightPinchReleaseTime > 0.45 {
-                MouseCursorController.shared.rightClick(at: screenPoint)
+        // B. Right Click: Deliberate gesture only!
+        // Middle finger extended alone, while index, ring, pinky curled, and thumb touches middle tip
+        let isMiddlePinch = middleExt && !indexExt && !ringExt && !littleExt && (middleThumbDist < 0.038)
+        if isMiddlePinch && toggles.rightClick {
+            if now - lastRightPinchReleaseTime > 0.65 {
+                MouseCursorController.shared.rightClick()
                 lastRightPinchReleaseTime = now
                 onGestureDetected?(.rightClick, "Right Click")
             }
             return
         }
         
-        // C. Left Click & Drag State Machine (Index + Thumb Pinch)
-        let isCurrentlyPinched = (indexThumbDist < pinchThreshold)
+        // C. USER CORE RULE: POINTING POSE ONLY!
+        // Mouse cursor ONLY moves when index finger is pointing AND all other fingers (middle, ring, pinky) are fisted/curled!
+        // If 5 fingers are showing, or hand is relaxed/flat: ZERO MOUSE MOVEMENT!
+        let isPointingPose = indexExt && !middleExt && !ringExt && !littleExt &&
+                             (indexLen > middleLen * 1.20) &&
+                             (indexLen > ringLen * 1.25) &&
+                             (indexLen > littleLen * 1.25)
+        
+        guard isPointingPose else {
+            // Hand is not pointing: Freeze cursor instantly!
+            if isDraggingActive {
+                MouseCursorController.shared.endDrag()
+                isDraggingActive = false
+                MouseCursorController.shared.unlockCursor()
+            }
+            if isRightPinched {
+                isRightPinched = false
+                MouseCursorController.shared.unlockCursor()
+            }
+            if lastRelativeAnchor != nil {
+                lastRelativeAnchor = nil
+                MouseCursorController.shared.clutchDisengaged()
+            }
+            hasAnchorHistory = false
+            return
+        }
+        
+        // Rock-solid tracking anchor: Index Knuckle (indexMCP)
+        // Does NOT twitch when finger bends or taps!
+        let rawAnchor = hand.indexMCP
+        let anchorPt: CGPoint
+        if !hasAnchorHistory {
+            anchorPt = rawAnchor
+            smoothedAnchorPt = rawAnchor
+            hasAnchorHistory = true
+        } else {
+            anchorPt = CGPoint(
+                x: 0.65 * rawAnchor.x + 0.35 * smoothedAnchorPt.x,
+                y: 0.65 * rawAnchor.y + 0.35 * smoothedAnchorPt.y
+            )
+            smoothedAnchorPt = anchorPt
+        }
+        
+        // D. Left Click & Drag State Machine (Index + Thumb Pinch)
+        let isCurrentlyPinched = (indexThumbDist < 0.038)
         
         if isCurrentlyPinched {
             if !isRightPinched {
-                // Pinch just started -> Lock cursor position immediately for zero-drift clicking!
+                // Pinch started: Freeze cursor immediately so click has zero drift!
                 isRightPinched = true
                 rightPinchStartTime = now
                 MouseCursorController.shared.lockCursorAtCurrentPosition()
             } else {
-                // Pinch is being held
                 let holdDuration = now - rightPinchStartTime
-                if holdDuration > 0.22 && !isDraggingActive {
-                    // Transition to Drag & Drop -> Unlock cursor to follow hand
+                // Require a deliberate hold (> 0.55s) to convert to drag
+                if toggles.clickAndDrag && holdDuration > 0.55 && !isDraggingActive {
                     isDraggingActive = true
                     MouseCursorController.shared.unlockCursor()
-                    MouseCursorController.shared.startDrag(at: screenPoint)
+                    MouseCursorController.shared.startDrag()
                     onGestureDetected?(.clickAndDrag, "Drag Started")
                 }
             }
             
-            if isDraggingActive {
-                MouseCursorController.shared.moveCursor(to: screenPoint)
+            if isDraggingActive && toggles.clickAndDrag {
+                if let prev = lastRelativeAnchor {
+                    let dx = -(anchorPt.x - prev.x)
+                    let dy = -(anchorPt.y - prev.y)
+                    MouseCursorController.shared.moveRelative(deltaX: dx, deltaY: dy)
+                }
+                lastRelativeAnchor = anchorPt
                 onGestureDetected?(.clickAndDrag, "Dragging...")
             }
         } else {
             if isRightPinched {
-                // Pinch just released
+                // Pinch released
                 let pinchDuration = now - rightPinchStartTime
                 if isDraggingActive {
-                    MouseCursorController.shared.endDrag(at: screenPoint)
+                    MouseCursorController.shared.endDrag()
                     isDraggingActive = false
                     MouseCursorController.shared.unlockCursor()
                     onGestureDetected?(.clickAndDrag, "Drag Released")
-                } else if pinchDuration < 0.28 {
-                    // Quick release -> Single or Double Left Click at locked anchor!
+                } else if pinchDuration < 0.45 && toggles.leftClick {
+                    // Quick release: Clean Left Click at locked cursor position!
                     MouseCursorController.shared.leftClick()
                     MouseCursorController.shared.unlockCursor()
                     onGestureDetected?(.leftClick, "Left Click")
@@ -330,141 +502,84 @@ public class GestureClassifier {
                 }
                 isRightPinched = false
                 lastRightPinchReleaseTime = now
+                lastRelativeAnchor = anchorPt
             } else {
-                // Free Pointer Movement
-                MouseCursorController.shared.moveCursor(to: screenPoint)
-                onGestureDetected?(.hoverPointer, "Hover")
+                // Touchscreen-like Relative Air Mouse Active:
+                if toggles.airMouse {
+                    if let prev = lastRelativeAnchor {
+                        let dx = -(anchorPt.x - prev.x)
+                        let dy = -(anchorPt.y - prev.y)
+                        MouseCursorController.shared.moveRelative(deltaX: dx, deltaY: dy)
+                        onGestureDetected?(.hoverPointer, "Pointing")
+                    } else {
+                        // First frame of pointing: Anchor initial hand position with ZERO cursor jump!
+                        MouseCursorController.shared.clutchEngaged()
+                        onGestureDetected?(.hoverPointer, "Pointing")
+                    }
+                }
+                lastRelativeAnchor = anchorPt
             }
         }
     }
     
-    // MARK: - Left Hand Processing (Whisper Flow, Return, Shortcuts)
+    // MARK: - Left Hand Processing (Whisper Dictation & Safe Shortcuts)
     private func processLeftHand(
         _ hand: HandSkeletonData,
         now: TimeInterval,
         onGestureDetected: ((RecognizedGestureType, String) -> Void)?
     ) {
-        let indexExt = isFingerExtended(tip: hand.indexTip, pip: hand.indexPIP, wrist: hand.wrist)
-        let middleExt = isFingerExtended(tip: hand.middleTip, pip: hand.middlePIP, wrist: hand.wrist)
-        let ringExt = isFingerExtended(tip: hand.ringTip, pip: hand.ringPIP, wrist: hand.wrist)
-        let littleExt = isFingerExtended(tip: hand.littleTip, pip: hand.littlePIP, wrist: hand.wrist)
-        let thumbExt = isThumbExtended(tip: hand.thumbTip, ip: hand.thumbIP, wrist: hand.wrist)
+        let indexExt = isFingerExtended(tip: hand.indexTip, pip: hand.indexPIP, wrist: hand.wrist, factor: 1.15)
+        let middleExt = isFingerExtended(tip: hand.middleTip, pip: hand.middlePIP, wrist: hand.wrist, factor: 1.05)
+        let ringExt = isFingerExtended(tip: hand.ringTip, pip: hand.ringPIP, wrist: hand.wrist, factor: 1.05)
+        let littleExt = isFingerExtended(tip: hand.littleTip, pip: hand.littlePIP, wrist: hand.wrist, factor: 1.05)
         
         let indexThumbDist = distance(hand.thumbTip, hand.indexTip)
         
-        // Track wrist history for swipe velocity (last 0.4 seconds)
-        leftWristHistory.append((point: hand.wrist, time: now))
-        leftWristHistory.removeAll(where: { now - $0.time > 0.4 })
-        
-        var swipeDx: CGFloat = 0.0
-        var swipeDy: CGFloat = 0.0
-        if let oldest = leftWristHistory.first {
-            swipeDx = hand.wrist.x - oldest.point.x
-            swipeDy = hand.wrist.y - oldest.point.y
-        }
-        
-        // 1. Mission Control: 4 or 5 fingers extended, rapid upward swipe
-        if indexExt && middleExt && ringExt && littleExt && swipeDy > 0.16 && now - lastMissionControlTime > 1.2 {
-            KeyboardShortcutController.shared.sendMissionControl()
-            lastMissionControlTime = now
-            onGestureDetected?(.missionControl, "Mission Control")
-            return
-        }
-        
-        // 2. Escape: Open Palm Stop Gesture (all 5 fingers extended, facing forward, stationary)
-        if indexExt && middleExt && ringExt && littleExt && thumbExt && abs(swipeDx) < 0.05 && abs(swipeDy) < 0.05 {
-            if now - lastLeftEscTime > 1.0 {
-                KeyboardShortcutController.shared.sendEscape()
-                lastLeftEscTime = now
-                onGestureDetected?(.escape, "Escape / Dismiss")
-            }
-            return
-        }
-        
-        // 3. Whisper / Dictation Engine: CLOSED FIST (all 4 fingers curled)
+        // 1. PRIMARY PRIORITY: Whisper Dictation: CLOSED FIST (all 4 fingers curled)
         let isClosedFist = (!indexExt && !middleExt && !ringExt && !littleExt)
         if isClosedFist {
-            if !isLeftFistHolding {
-                isLeftFistHolding = true
-                if GroqWhisperManager.shared.engineMode == .modifierHold {
-                    KeyboardShortcutController.shared.setWhisperModifierHold(active: true)
-                    onGestureDetected?(.whisperFlowHold, "Holding ⌘ (Whisper Dictation)")
-                } else {
+            if toggles.leftDictation {
+                if !isLeftFistHolding {
+                    isLeftFistHolding = true
+                    KeyboardShortcutController.shared.releaseAllHeldModifiers()
                     GroqWhisperManager.shared.startRecording()
                     onGestureDetected?(.whisperFlowHold, "Dictating (\(GroqWhisperManager.shared.selectedModel))...")
-                }
-            } else {
-                if GroqWhisperManager.shared.engineMode == .modifierHold {
-                    onGestureDetected?(.whisperFlowHold, "Dictating...")
                 }
             }
             return
         } else {
             if isLeftFistHolding {
                 isLeftFistHolding = false
-                if GroqWhisperManager.shared.engineMode == .modifierHold {
-                    KeyboardShortcutController.shared.setWhisperModifierHold(active: false)
-                    onGestureDetected?(.whisperFlowHold, "Released ⌘ (Transcription Pasting)")
-                } else {
-                    GroqWhisperManager.shared.stopRecordingAndTranscribe()
-                    onGestureDetected?(.whisperFlowHold, "Transcribing speech...")
-                }
+                lastDictationEndTime = now // Start 1.5s gesture immunity cooldown
+                KeyboardShortcutController.shared.releaseAllHeldModifiers()
+                GroqWhisperManager.shared.stopRecordingAndTranscribe()
+                onGestureDetected?(.whisperFlowHold, "Transcribing speech...")
+                return
             }
         }
         
-        // 4. Return / Enter Key: Quick Left Index-Thumb Pinch OR Index Point Down
-        if indexThumbDist < pinchThreshold && !middleExt && !ringExt && !littleExt {
-            if now - lastLeftReturnTime > 0.5 {
+        // 2. GESTURE IMMUNITY COOLDOWN:
+        // When uncurling fingers after dictation, DO NOT trigger any shortcuts!
+        guard (now - lastDictationEndTime > 1.5) && !GroqWhisperManager.shared.isRecording && !GroqWhisperManager.shared.isTranscribing else {
+            return
+        }
+        
+        // 3. Return / Enter Key: Quick Left Index-Thumb Pinch (with middle, ring, pinky curled)
+        if toggles.leftReturn && indexThumbDist < pinchThreshold && indexExt && !middleExt && !ringExt && !littleExt {
+            if now - lastLeftReturnTime > 0.8 {
                 KeyboardShortcutController.shared.sendReturn()
                 lastLeftReturnTime = now
-                onGestureDetected?(.returnKey, "Return ↵ (Sent Query)")
+                onGestureDetected?(.returnKey, "Return ↵")
             }
             return
         }
         
-        // 5. Paste (Cmd + V): Peace / V-Sign (Index + Middle extended, Ring + Pinky curled, fingers separated)
-        if indexExt && middleExt && !ringExt && !littleExt && distance(hand.indexTip, hand.middleTip) > 0.06 {
-            if now - lastLeftPasteTime > 0.6 {
+        // 4. Paste (Cmd + V): Peace / V-Sign (Index + Middle extended, Ring + Pinky curled)
+        if toggles.leftShortcuts && indexExt && middleExt && !ringExt && !littleExt && distance(hand.indexTip, hand.middleTip) > 0.06 {
+            if now - lastLeftPasteTime > 1.0 {
                 KeyboardShortcutController.shared.sendPaste()
                 lastLeftPasteTime = now
                 onGestureDetected?(.paste, "Paste (⌘V)")
-            }
-            return
-        }
-        
-        // 6. Undo (Cmd + Z) & Redo (Cmd + Shift + Z) via Horizontal Swipe
-        if (indexExt || thumbExt) && !ringExt && !littleExt {
-            if swipeDx > 0.18 && now - lastLeftUndoTime > 0.8 {
-                // Left camera swipe right = mirrored left movement -> Undo
-                KeyboardShortcutController.shared.sendUndo()
-                lastLeftUndoTime = now
-                onGestureDetected?(.undo, "Undo (⌘Z)")
-                return
-            } else if swipeDx < -0.18 && now - lastLeftUndoTime > 0.8 {
-                // Redo
-                KeyboardShortcutController.shared.sendRedo()
-                lastLeftUndoTime = now
-                onGestureDetected?(.redo, "Redo (⌘⇧Z)")
-                return
-            }
-        }
-        
-        // 7. Select All (Cmd + A): 3 Fingers Extended (Thumb, Index, Middle)
-        if thumbExt && indexExt && middleExt && !ringExt && !littleExt && indexThumbDist > 0.10 {
-            if now - lastLeftSelectAllTime > 0.8 {
-                KeyboardShortcutController.shared.sendSelectAll()
-                lastLeftSelectAllTime = now
-                onGestureDetected?(.selectAll, "Select All (⌘A)")
-            }
-            return
-        }
-        
-        // 8. Copy (Cmd + C): Left Hand "C" Shape (Thumb & Index curved towards each other, distance ~ 0.07...0.12)
-        if indexExt && thumbExt && !ringExt && !littleExt && indexThumbDist >= 0.065 && indexThumbDist <= 0.13 {
-            if now - lastLeftCopyTime > 0.8 {
-                KeyboardShortcutController.shared.sendCopy()
-                lastLeftCopyTime = now
-                onGestureDetected?(.copy, "Copy (⌘C)")
             }
             return
         }

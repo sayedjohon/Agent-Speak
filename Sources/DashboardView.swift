@@ -51,6 +51,8 @@ enum DashboardTab: String, CaseIterable, Identifiable {
 // MARK: - Dashboard Main View
 public struct DashboardView: View {
     @ObservedObject var queueManager = SpeechQueueManager.shared
+    @ObservedObject var pocketTTS = PocketTTSManager.shared
+    @ObservedObject var codeSpeech = CodeSpeechManager.shared
     @State private var selectedTab: DashboardTab = .voice
     @State private var hoveredTab: DashboardTab? = nil
     @State private var showingCloneSheet: Bool = false
@@ -107,11 +109,31 @@ public struct DashboardView: View {
             if let mv = audio["macos_voice"] as? String { macosVoice = mv }
             if let s = audio["skip_seconds"] as? Int { skipSeconds = s }
             if let ptts = audio["pocket_tts"] as? [String: Any], let v = ptts["voice"] as? String { pocketVoice = v }
+            codeSpeech.loadConfiguration()
         }
         
         if let general = json["general"] as? [String: Any] {
             if let show = general["show_tray_icon"] as? Bool { showTrayIcon = show }
             if let en = general["enabled"] as? Bool { isEnabled = en }
+        }
+        
+        if let workspaces = json["workspaces"] as? [String: Any] {
+            if let ag = workspaces["antigravity"] as? Bool {
+                watchAntigravity = ag
+                TranscriptWatcher.shared.isAntigravityEnabled = ag
+            }
+            if let cl = workspaces["claude"] as? Bool {
+                watchClaude = cl
+                TranscriptWatcher.shared.isClaudeEnabled = cl
+            }
+            if let oc = workspaces["opencode"] as? Bool {
+                watchOpenCode = oc
+                TranscriptWatcher.shared.isOpenCodeEnabled = oc
+            }
+            if let tm = workspaces["terminal"] as? Bool {
+                watchTerminal = tm
+                TranscriptWatcher.shared.isTerminalEnabled = tm
+            }
         }
     }
     
@@ -124,6 +146,7 @@ public struct DashboardView: View {
         audio["engine"] = voiceEngine
         audio["macos_voice"] = macosVoice
         audio["skip_seconds"] = skipSeconds
+        audio["speak_code_blocks"] = codeSpeech.speakCodeBlocks
         var ptts = audio["pocket_tts"] as? [String: Any] ?? [:]
         ptts["voice"] = pocketVoice
         ptts["enabled"] = (voiceEngine == "pocket_tts")
@@ -134,6 +157,18 @@ public struct DashboardView: View {
         general["show_tray_icon"] = showTrayIcon
         general["enabled"] = isEnabled
         json["general"] = general
+        
+        var workspaces: [String: Any] = [:]
+        workspaces["antigravity"] = watchAntigravity
+        workspaces["claude"] = watchClaude
+        workspaces["opencode"] = watchOpenCode
+        workspaces["terminal"] = watchTerminal
+        json["workspaces"] = workspaces
+        
+        TranscriptWatcher.shared.isAntigravityEnabled = watchAntigravity
+        TranscriptWatcher.shared.isClaudeEnabled = watchClaude
+        TranscriptWatcher.shared.isOpenCodeEnabled = watchOpenCode
+        TranscriptWatcher.shared.isTerminalEnabled = watchTerminal
         
         if let updated = try? JSONSerialization.data(withJSONObject: json, options: .prettyPrinted) {
             try? updated.write(to: configPath)
@@ -196,6 +231,7 @@ public struct DashboardView: View {
             loadConfig()
             availableSystemVoices = loadAvailableVoices()
             isAccessibilityTrusted = AXIsProcessTrusted()
+            pocketTTS.refreshState()
         }
         .sheet(isPresented: $showingCloneSheet) {
             VoiceCloningStudioSheet(isPresented: $showingCloneSheet) { newVoiceTag in
@@ -447,7 +483,7 @@ public struct DashboardView: View {
                                 if queueManager.isSpeaking {
                                     queueManager.stopCurrent()
                                 } else {
-                                    let sampleText = "Hello! This is a real-time preview of your active system voice running natively on Apple Silicon."
+                                    let sampleText = PersonaGreetingManager.shared.previewSample()
                                     queueManager.enqueue(source: selectedVoiceDisplayName, text: sampleText, immediate: true)
                                 }
                             }) {
@@ -465,7 +501,7 @@ public struct DashboardView: View {
                         .padding(.vertical, 12)
                     } else {
                         // Pocket-TTS Neural Engine
-                        if !PocketTTSManager.shared.isInstalled {
+                        if !pocketTTS.isInstalled {
                             VStack(alignment: .leading, spacing: 10) {
                                 HStack(spacing: 12) {
                                     ZStack {
@@ -488,16 +524,17 @@ public struct DashboardView: View {
                                     Spacer()
                                 }
                                 
-                                if PocketTTSManager.shared.isInstalling {
+                                if pocketTTS.isInstalling {
                                     HStack(spacing: 8) {
                                         ProgressView().scaleEffect(0.7)
-                                        Text("Setting up neural models...")
+                                        Text(pocketTTS.installProgress.isEmpty ? "Setting up neural models..." : pocketTTS.installProgress)
                                             .font(.system(size: 11))
                                             .foregroundColor(.secondary)
+                                            .lineLimit(1)
                                     }
                                 } else {
                                     Button(action: {
-                                        PocketTTSManager.shared.installExtension { success, _ in
+                                        pocketTTS.installExtension { success, _ in
                                             if success { saveConfig() }
                                         }
                                     }) {
@@ -541,7 +578,7 @@ public struct DashboardView: View {
                                 Spacer()
                                 
                                 Picker("", selection: $pocketVoice) {
-                                    ForEach(PocketTTSManager.shared.availableVoices) { item in
+                                    ForEach(pocketTTS.availableVoices) { item in
                                         Text(item.displayName).tag(item.tag)
                                     }
                                 }
@@ -555,7 +592,7 @@ public struct DashboardView: View {
                                     if queueManager.isSpeaking {
                                         queueManager.stopCurrent()
                                     } else {
-                                        let sample = "Hello! This is a preview of your Pocket-TTS neural voice running on Apple Silicon."
+                                        let sample = PersonaGreetingManager.shared.previewSample()
                                         queueManager.enqueue(source: pocketVoice, text: sample, immediate: true)
                                     }
                                 }) {
@@ -626,7 +663,10 @@ public struct DashboardView: View {
                 )
             }
             
-            // MARK: - Section 3: Playback & Volume Inset Grouped Card
+            // MARK: - Section 3: User Identity & Personalized Startup Greeting
+            StartupGreetingCardView()
+            
+            // MARK: - Section 4: Playback & Volume Inset Grouped Card
             VStack(alignment: .leading, spacing: 8) {
                 Text("PLAYBACK & VOLUME")
                     .font(.system(size: 11, weight: .semibold))
@@ -751,6 +791,39 @@ public struct DashboardView: View {
                         .onChange(of: skipSeconds) {
                             saveConfig()
                         }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    
+                    Divider().padding(.horizontal, 14)
+                    
+                    // Code & Technical Block Speech Row
+                    HStack(spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(LinearGradient(colors: [Color.indigo, Color.purple], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .frame(width: 28, height: 28)
+                            Image(systemName: "curlybraces")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Speak Everything Including Code Blocks")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.primary)
+                            Text("Reads code blocks aloud. Markdown and comment hashtags are automatically cleaned. Off by default.")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Toggle("", isOn: Binding(
+                            get: { codeSpeech.speakCodeBlocks },
+                            set: { codeSpeech.setSpeakCodeBlocks($0) }
+                        ))
+                        .toggleStyle(.switch)
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 12)

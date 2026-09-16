@@ -95,16 +95,149 @@ public struct HologramTheme: Identifiable, Equatable {
     }
 }
 
+// MARK: - Hologram Blending Modes (Photoshop-Grade)
+public enum HologramBlendMode: String, CaseIterable, Identifiable {
+    case normal = "normal"              // Default: Normal standard compositing
+    case screen = "screen"              // Screen: Lighter, drops blacks, translucent
+    case plusLighter = "plusLighter"    // Linear Dodge (Add): Pure additive Stark neon beam
+    case overlay = "overlay"            // Overlay: Crisp contrast & dynamic range
+    case softLight = "softLight"        // Soft Light: Gentle translucent wash (High Screen Readability!)
+    case hardLight = "hardLight"        // Hard Light: Punchy cinematic contrast
+    case colorDodge = "colorDodge"      // Color Dodge: Intense electrified highlights
+    case multiply = "multiply"          // Multiply: Darkened background tint
+    case difference = "difference"      // Difference: Inverted chromatic HUD (stands out on text)
+    
+    public var id: String { rawValue }
+    
+    public var displayName: String {
+        switch self {
+        case .normal: return "Normal (Default)"
+        case .screen: return "Screen"
+        case .plusLighter: return "Linear Dodge (Add)"
+        case .overlay: return "Overlay"
+        case .softLight: return "Soft Light"
+        case .hardLight: return "Hard Light"
+        case .colorDodge: return "Color Dodge"
+        case .multiply: return "Multiply"
+        case .difference: return "Difference"
+        }
+    }
+    
+    public var subtitle: String {
+        switch self {
+        case .normal: return "Standard full-strength holographic projection (default)"
+        case .screen: return "Drops dark pixels, luminous highlights, transparent text areas"
+        case .plusLighter: return "Linear Dodge pure additive neon rays (Stark HUD beam)"
+        case .overlay: return "High contrast highlights and shadows with transparent midtones"
+        case .softLight: return "Subtle translucent diffuse wash — easiest to read text behind"
+        case .hardLight: return "Punchy, dramatic cinematic contrast"
+        case .colorDodge: return "Electrified high-saturation bloom and reactive flares"
+        case .multiply: return "Absorptive darkening tint — filters bright desktop glare"
+        case .difference: return "Inverted spectral contrast — sharp edge distinction on text"
+        }
+    }
+    
+    public var systemIcon: String {
+        switch self {
+        case .normal: return "circle.fill"
+        case .screen: return "sun.max.fill"
+        case .plusLighter: return "plus.circle.fill"
+        case .overlay: return "circle.lefthalf.filled"
+        case .softLight: return "circle.dotted"
+        case .hardLight: return "bolt.circle.fill"
+        case .colorDodge: return "sparkles"
+        case .multiply: return "multiply.circle.fill"
+        case .difference: return "plusminus.circle.fill"
+        }
+    }
+    
+    public var swiftUIBlendMode: BlendMode {
+        switch self {
+        case .normal: return .normal
+        case .screen: return .screen
+        case .plusLighter: return .plusLighter
+        case .overlay: return .overlay
+        case .softLight: return .softLight
+        case .hardLight: return .hardLight
+        case .colorDodge: return .colorDodge
+        case .multiply: return .multiply
+        case .difference: return .difference
+        }
+    }
+    
+    public var graphicsBlendMode: GraphicsContext.BlendMode {
+        switch self {
+        case .normal: return .plusLighter
+        case .screen: return .screen
+        case .plusLighter: return .plusLighter
+        case .overlay: return .overlay
+        case .softLight: return .softLight
+        case .hardLight: return .hardLight
+        case .colorDodge: return .colorDodge
+        case .multiply: return .multiply
+        case .difference: return .difference
+        }
+    }
+    
+    public var baseOpacity: Double {
+        switch self {
+        case .normal: return 1.00
+        case .screen: return 0.88
+        case .plusLighter: return 0.85
+        case .overlay: return 0.85
+        case .softLight: return 0.68
+        case .hardLight: return 0.85
+        case .colorDodge: return 0.80
+        case .multiply: return 0.78
+        case .difference: return 0.82
+        }
+    }
+    
+    public static func find(id: String) -> HologramBlendMode {
+        let cleaned = id.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        switch cleaned {
+        case "normal", "default": return .normal
+        case "screen": return .screen
+        case "pluslighter", "lineardodge", "add", "plus": return .plusLighter
+        case "overlay": return .overlay
+        case "softlight", "soft-light", "soft_light": return .softLight
+        case "hardlight", "hard-light", "hard_light": return .hardLight
+        case "colordodge", "color-dodge", "color_dodge", "dodge": return .colorDodge
+        case "multiply", "darken": return .multiply
+        case "difference", "exclusion": return .difference
+        default:
+            return allCases.first(where: {
+                $0.rawValue.lowercased() == cleaned ||
+                $0.displayName.lowercased() == cleaned ||
+                $0.id.lowercased() == cleaned
+            }) ?? .normal
+        }
+    }
+}
+
 // MARK: - Hologram Manager (Singleton)
 public class HologramManager: ObservableObject {
     public static let shared = HologramManager()
     
     @Published public var isEnabled: Bool = true
     @Published public var currentTheme: HologramTheme = .amber
+    @Published public var currentSkin: HologramSkinType = .classicArc
+    @Published public var currentBlendMode: HologramBlendMode = .normal
+    @Published public var opacity: Double = 1.0
     @Published public var isPreviewActive: Bool = false
+    @Published public var isCollapsing: Bool = false
+    @Published public var isFadingOut: Bool = false
+    @Published public var fadeProgress: Double = 0.0
+    @Published public var bootupDate: Date = Date()
+    @Published public var collapseStartDate: Date? = nil
+    
+    public var effectiveOpacity: Double {
+        return currentBlendMode.baseOpacity * opacity
+    }
     
     private var hologramPanel: NSPanel?
     private var dismissTimer: Timer?
+    private var fadeTimer: Timer?
     private var previewDummyManager: StreamingAudioManager?
     
     public var configURL: URL {
@@ -126,6 +259,15 @@ public class HologramManager: ObservableObject {
             if let themeId = holo["theme"] as? String {
                 self.currentTheme = HologramTheme.find(id: themeId)
             }
+            if let skinId = holo["skin"] as? String {
+                self.currentSkin = HologramSkinType.find(id: skinId)
+            }
+            if let blendId = (holo["blend_mode"] as? String) ?? (holo["blendMode"] as? String) {
+                self.currentBlendMode = HologramBlendMode.find(id: blendId)
+            }
+            if let op = holo["opacity"] as? Double {
+                self.opacity = max(0.15, min(1.0, op))
+            }
         }
     }
     
@@ -136,6 +278,9 @@ public class HologramManager: ObservableObject {
         var holo = json["hologram"] as? [String: Any] ?? [:]
         holo["enabled"] = self.isEnabled
         holo["theme"] = self.currentTheme.id
+        holo["skin"] = self.currentSkin.id
+        holo["blend_mode"] = self.currentBlendMode.id
+        holo["opacity"] = self.opacity
         json["hologram"] = holo
         
         if let updated = try? JSONSerialization.data(withJSONObject: json, options: .prettyPrinted) {
@@ -160,6 +305,41 @@ public class HologramManager: ObservableObject {
         }
     }
     
+    public func setSkin(id: String) {
+        DispatchQueue.main.async {
+            self.currentSkin = HologramSkinType.find(id: id)
+            self.saveConfig()
+        }
+    }
+    
+    public func setSkin(_ skin: HologramSkinType) {
+        DispatchQueue.main.async {
+            self.currentSkin = skin
+            self.saveConfig()
+        }
+    }
+    
+    public func setBlendMode(id: String) {
+        DispatchQueue.main.async {
+            self.currentBlendMode = HologramBlendMode.find(id: id)
+            self.saveConfig()
+        }
+    }
+    
+    public func setBlendMode(_ mode: HologramBlendMode) {
+        DispatchQueue.main.async {
+            self.currentBlendMode = mode
+            self.saveConfig()
+        }
+    }
+    
+    public func setOpacity(_ val: Double) {
+        DispatchQueue.main.async {
+            self.opacity = max(0.15, min(1.0, val))
+            self.saveConfig()
+        }
+    }
+    
     // MARK: - Panel Lifecycle Management
     
     func showHologram(targetScreen: NSScreen, audioManager: StreamingAudioManager) {
@@ -169,9 +349,27 @@ public class HologramManager: ObservableObject {
             guard let self = self else { return }
             self.dismissTimer?.invalidate()
             self.dismissTimer = nil
+            self.fadeTimer?.invalidate()
+            self.fadeTimer = nil
+            self.isFadingOut = false
+            self.fadeProgress = 0.0
+            self.isCollapsing = false
+            self.collapseStartDate = nil
+            self.bootupDate = Date()
             
-            if self.hologramPanel == nil {
-                let screenFrame = targetScreen.frame
+            let screenFrame = targetScreen.frame
+            let hosting = NSHostingView(
+                rootView: FloatingJarvisHologramOverlayView(state: audioManager)
+            )
+            hosting.frame = NSRect(x: 0, y: 0, width: screenFrame.width, height: screenFrame.height)
+            hosting.wantsLayer = true
+            
+            if let panel = self.hologramPanel {
+                panel.setFrame(screenFrame, display: true)
+                panel.contentView = hosting
+                panel.alphaValue = 1.0
+                panel.orderFrontRegardless()
+            } else {
                 let panel = NSPanel(
                     contentRect: screenFrame,
                     styleMask: [.borderless, .nonactivatingPanel],
@@ -185,15 +383,9 @@ public class HologramManager: ObservableObject {
                 panel.isOpaque = false
                 panel.hasShadow = false
                 panel.ignoresMouseEvents = true // 100% click-through anywhere on screen
-                
-                let hosting = NSHostingView(
-                    rootView: FloatingJarvisHologramOverlayView(state: audioManager)
-                )
-                hosting.frame = NSRect(x: 0, y: 0, width: screenFrame.width, height: screenFrame.height)
-                hosting.wantsLayer = true
                 panel.contentView = hosting
                 panel.alphaValue = 0.0
-                panel.orderFront(nil)
+                panel.orderFrontRegardless()
                 self.hologramPanel = panel
                 
                 NSAnimationContext.runAnimationGroup { ctx in
@@ -210,38 +402,92 @@ public class HologramManager: ObservableObject {
             guard let self = self else { return }
             self.dismissTimer?.invalidate()
             self.dismissTimer = nil
+            self.fadeTimer?.invalidate()
+            self.fadeTimer = nil
             self.previewDummyManager = nil
             self.isPreviewActive = false
+            self.isCollapsing = false
+            self.collapseStartDate = nil
+            self.isFadingOut = false
+            self.fadeProgress = 0.0
             self.hologramPanel?.orderOut(nil)
             self.hologramPanel = nil
+        }
+    }
+    
+    public func startWindowFadeOut(duration: Double = 3.0) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            guard let panel = self.hologramPanel, !self.isFadingOut else { return }
+            
+            self.isFadingOut = true
+            self.fadeProgress = 0.0
+            
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = duration
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                panel.animator().alphaValue = 0.0
+            }
+        }
+    }
+    
+    public func dismissHologramWithFade(duration: Double = 3.0) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            guard let panel = self.hologramPanel, !self.isFadingOut else { return }
+            
+            self.dismissTimer?.invalidate()
+            self.dismissTimer = nil
+            self.fadeTimer?.invalidate()
+            self.fadeTimer = nil
+            
+            self.isFadingOut = true
+            self.fadeProgress = 0.0
+            
+            // CoreAnimation window alpha dissolve in parallel
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = duration
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                panel.animator().alphaValue = 0.0
+            }
+            
+            let steps = 60
+            let stepInterval = max(0.02, duration / Double(steps))
+            var currentStep = 0
+            
+            let timer = Timer(timeInterval: stepInterval, repeats: true) { [weak self] t in
+                guard let self = self else {
+                    t.invalidate()
+                    return
+                }
+                currentStep += 1
+                let progress = Double(currentStep) / Double(steps)
+                self.fadeProgress = min(1.0, max(0.0, progress))
+                
+                if currentStep >= steps {
+                    t.invalidate()
+                    self.fadeTimer = nil
+                    self.dismissHologramImmediately()
+                }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            self.fadeTimer = timer
         }
     }
     
     public func onSpeechFinished() {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
+            guard self.hologramPanel != nil, !self.isFadingOut else { return }
             
-            // If background music is still playing or fading out, let the hologram stay alive with the music!
+            // If background music is still playing or fading out, start matching window fade!
             if BackgroundMusicManager.shared.isPlaying || BackgroundMusicManager.shared.isFadingOut {
-                // Keep the panel open; the SwiftUI overlay observes bgm.fadeProgress and dissolves smoothly!
+                self.startWindowFadeOut(duration: BackgroundMusicManager.shared.fadeOutDuration)
                 return
             }
             
-            // Smoothly dissolve using hardware-accelerated CoreAnimation window alpha
-            self.dismissTimer?.invalidate()
-            self.dismissTimer = nil
-            
-            if let panel = self.hologramPanel {
-                NSAnimationContext.runAnimationGroup({ ctx in
-                    ctx.duration = 0.22
-                    ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                    panel.animator().alphaValue = 0.0
-                }, completionHandler: { [weak self] in
-                    self?.dismissHologramImmediately()
-                })
-            } else {
-                self.dismissHologramImmediately()
-            }
+            // If no music is playing, smoothly dissolve just like the music fade (3.0s ease-in-out)
+            self.dismissHologramWithFade(duration: 3.0)
         }
     }
     
@@ -252,6 +498,11 @@ public class HologramManager: ObservableObject {
             
             self.dismissHologramImmediately()
             self.isPreviewActive = true
+            self.isCollapsing = false
+            self.collapseStartDate = nil
+            self.isFadingOut = false
+            self.fadeProgress = 0.0
+            self.bootupDate = Date()
             
             let mouseLoc = NSEvent.mouseLocation
             let targetScreen = NSScreen.screens.first(where: { NSMouseInRect(mouseLoc, $0.frame, false) }) ?? NSScreen.main ?? NSScreen.screens[0]
@@ -264,7 +515,8 @@ public class HologramManager: ObservableObject {
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
                 guard let self = self, self.isPreviewActive else { return }
-                self.dismissHologramImmediately()
+                self.previewDummyManager?.isPlaying = false
+                self.dismissHologramWithFade(duration: 3.0)
             }
         }
     }

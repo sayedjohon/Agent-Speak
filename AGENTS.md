@@ -2,75 +2,108 @@
 
 > **Project**: Agent Speak  
 > **Platform**: macOS 14.0+ (Sonoma & Sequoia)  
-> **Core Stack**: Pure Swift, SwiftUI, AppKit, AVFoundation, Metal/ProMotion CADisplayLink  
+> **Core Stack**: Pure Swift, SwiftUI, AppKit, AVFoundation, Metal/ProMotion CADisplayLink, Apple Vision  
 > **Status**: Active Production  
+> **Last Updated**: 2026-09-16 09:00:00  
 
 ---
 
 ## 🎯 Project Overview
 
-Agent Speak is an ultra-fluid, zero-lag voice companion for macOS designed specifically for developers and AI coding agents (Antigravity, Claude Code, OpenCode, Cursor, Aider). It provides a liquid glass HUD docking directly underneath the MacBook Pro display notch (or floating on external monitors) that visualizes and speaks conversational text while quarantining code blocks.
+Agent Speak is an ultra-fluid, zero-lag voice companion for macOS designed specifically for developers and AI coding agents (Antigravity, Claude Code, Cursor, Windsurf, Roo Code, Cline, Aider). It provides a liquid glass HUD docking directly underneath the MacBook Pro display notch (or floating on external monitors) that visualizes and speaks conversational text while quarantining code blocks.
 
 ---
 
-## 🎙️ Global Voice & Prose Protocol (Mandatory)
+## 🎙️ Global Voice & Prose Protocol (Mandatory for AI Agents)
 
 All conversational text produced by AI agents interacting with the user is read aloud by macOS Text-to-Speech:
-1. **Conversational First**: Write responses naturally for the human ear (spoken English style).
-2. **Code Quarantine**: NEVER write code snippets, paths, shell syntax, or technical symbols inline inside sentences.
-3. **Fenced Code Blocks**: Place all code snippets, terminal commands, and paths strictly inside triple-backtick fenced blocks (` ``` `). The audio player automatically detects and skips all fenced code blocks.
+1. **Conversational First**: Write responses naturally for the human ear (spoken English style, as if on a call).
+2. **Strict Code Quarantine**: NEVER write code snippets, file paths, terminal commands, shell syntax, or technical symbols inline inside sentences.
+3. **Fenced Code Blocks**: Place all code snippets, terminal commands, scripts, and paths strictly inside triple-backtick fenced blocks (` ``` `). The audio player automatically detects and skips all fenced code blocks.
+4. **Digestible Formats**: Use bullet points, status lists, or tables for key updates. Keep spoken prose concise.
+
+See `SYSTEM_PROMPT.md` for copy-paste prompts for Cursor, Claude, and Antigravity.
 
 ---
 
 ## 🏛️ System Architecture
 
 ```
-[Agent Transcripts / Hotkeys / CLI]
-               │
-               ▼
-      /tmp/agentspeak.sock (UNIX Domain Socket)
-               │
-               ▼
-       [TextSanitizer.swift] (Filters markdown tables, code blocks, URLs)
-               │
-               ▼
-     [SpeechQueueManager.swift] (Thread-safe sequential FIFO queue)
-        │                 │
-        ▼                 ▼
- [Apple AVFoundation]  [Pocket-TTS Neural Extension]
-   (Zero-CPU Native)     (Offline Local Cloned Voice)
-        │
-        ▼
- [NotchWindowController.swift]
-   (120 FPS CADisplayLink ProMotion Liquid Glass HUD)
+[Agent Transcripts / Hotkeys / CLI / Fn Dictation]
+                       │
+                       ▼
+            /tmp/agentspeak.sock (UNIX Domain Socket)
+                       │
+                       ▼
+             [TextSanitizer.swift] (Filters markdown tables, code fences, URLs)
+                       │
+                       ▼
+          [SpeechQueueManager.swift] (FIFO queue & state management)
+            │                     │
+            ▼                     ▼
+   [Apple AVFoundation]  [Pocket-TTS Neural Extension]
+     (Zero-CPU Native)     (24 Offline Cloned Personas)
+            │                     │
+            └──────────┬──────────┘
+                       │
+                       ▼
+          [StreamingAudioManager.swift] (JIT Rolling Lookahead Engine, 95% CPU savings)
+                       │
+                       ▼
+         [NotchWindowController.swift] & [HologramManager.swift]
+           • 120 FPS Liquid Glass Notch HUD (ProMotion)
+           • Full-Screen Holographic Arc Reactor (6 Palettes, 7 Blending Modes)
 ```
 
 ---
 
-## 📂 Codebase Directory Map
+## 📂 Subsystem Directory Map
 
-- `Sources/`
-  - `main.swift`: Application initialization and daemon lifecycle.
-  - `AppDelegate.swift`: Menu bar item, status icons, hotkey bindings, global event taps.
-  - `NotchWindowController.swift`: 120 FPS ProMotion liquid glass notch HUD window.
-  - `DashboardView.swift`: Modern Raycast-inspired SwiftUI settings window.
-  - `PocketTTSExtensionCardView.swift`: Offline neural voice cloning extension interface.
-  - `VoiceCloningStudioView.swift`: Interactive voice cloning and audition studio.
-  - `AudioWaveformTrimmerView.swift`: Pocket TTS style waveform track with draggable cut overlay and bounded playback.
-  - `TranscriptWatcher.swift`: Multi-agent file tailing (Antigravity, Claude Code, OpenCode).
-  - `TextSanitizer.swift`: Markdown table, code block, and symbol sanitization regex.
-  - `SpeechQueueManager.swift`: Playback state coordination, ducking, and engine dispatch.
-  - `SpeechLanguageDetector.swift`: Smart clause subdivision and chunk size control.
-  - `AudioEngine.swift`: Audio output routing, volume control, and soundtrack cross-fading.
-- `CLI/`
-  - `main.swift`: Source for the `agentspeak` command-line utility.
-- `Resources/`
-  - `Agent-Speak-Banner.png`: Project banner art.
-  - `Agent-Speak-logo.png`: 1024x1024 master app icon.
-  - `bgm/`: Ambient focus background soundtrack tracks.
-  - `voices/`: Registered voice profiles and reference audio snippets.
-- `docs/assets/`
-  - Image assets for README.md and GitHub presentation.
+### 1. Core Lifecycle & Audio Routing
+- `Sources/main.swift`: Application initialization and daemon lifecycle.
+- `Sources/AppDelegate.swift`: Menu bar tray icon, hotkey bindings, global event taps (including instant `Escape` silence).
+- `Sources/SpeechQueueManager.swift`: Central sequential speech dispatch and engine coordination.
+- `Sources/TextSanitizer.swift`: Markdown table, code block quarantine, link sanitization, and unclosed block containment.
+- `Sources/SpeechLanguageDetector.swift`: Clause segmentation and smart chunk subdivision.
+- `Sources/StreamingAudioManager.swift`: Just-in-Time (JIT) lookahead audio synthesizer, pre-buffering up to 2 chunks, eliminating background CPU spikes.
+
+### 2. HUD & Holographic Visualizers
+- `Sources/NotchWindowController.swift`: 120 FPS ProMotion liquid glass notch HUD docking window.
+- `Sources/NotchBarView.swift`: Waveform frequency visualizer, scrub bar, speed and replay buttons.
+- `Sources/HologramManager.swift`: Full-screen overlay window controller with 100% click-through transparency.
+- `Sources/HologramSkinModels.swift`: Skin presets, color palettes, and 7 blending modes (Screen, Multiply, Additive, Overlay, Color Dodge, Luminosity, Normal).
+- `Sources/HologramLifecycleTracker.swift`: Audio sync and ambient reverb fade-out.
+- `Sources/Skin*.swift`: Specialized shader and canvas renderers for Jarvis, Ultron, Gemini, and GLM visualizer skins.
+
+### 3. Dual-Hand 10-Finger Vision Camera Gesture Control
+- `Sources/CameraGestureManager.swift`: AVCaptureSession and Apple Vision `VNDetectHumanHandPoseRequest` pipeline.
+- `Sources/GestureClassifier.swift`: Index finger cursor flight, pinch click, drag, two-finger vertical scrolling, and fist-hold dictation.
+- `Sources/MouseCursorController.swift`: Adaptive One-Euro filter for jitter-free pointer tracking.
+- `Sources/HandSkeletonCanvasView.swift` & `Sources/TraySkeletonHUDController.swift`: Live skeletal joint visualizers.
+- `Sources/GestureHUDController.swift`: Floating feedback pill for real-time gesture status.
+
+### 4. Neural Voice Cloning & Audio Inputs
+- `Sources/PocketTTSManager.swift`: Kyutai FlowLM offline neural engine with 24 voice personas.
+- `Sources/VoiceCloningStudioView.swift` & `Sources/AudioWaveformTrimmerView.swift`: 1-click zero-shot voice cloning from audio snippets.
+- `Sources/PersonaGreetingManager.swift`: Signature persona greetings and profile registry.
+- `Sources/FnDictationController.swift`: Push-to-Talk Fn key dictation event tap.
+- `Sources/GroqWhisperManager.swift`: High-speed cloud Whisper transcription with local fallback.
+- `Sources/BackgroundMusicManager.swift` & `Sources/BackgroundMusicView.swift`: Iron Man ambient focus soundtrack with auto-ducking.
+
+### 5. Multi-Agent Workspace Watchers
+- `Sources/TranscriptWatcher.swift`: Multi-agent session tailing (Antigravity, Claude Code, OpenCode).
+- `Sources/UniversalConnectorWatcher.swift` & `Sources/UniversalConnectorModels.swift`: Declarative watcher for Cursor, Cline, Windsurf, Roo Code, Aider, Hermes.
+
+### 6. Settings Dashboard
+- `Sources/DashboardView.swift`: SwiftUI preferences window.
+- `Sources/DashboardGestureView.swift`, `DashboardHardwareView.swift`, `DashboardShortcutsView.swift`, `DashboardWorkspacesView.swift`.
+- `Sources/ApiKeyManagerCardView.swift`, `GestureTogglesCardView.swift`, `StartupGreetingCardView.swift`, `VoiceVolumeCardView.swift`.
+
+### 7. CLI & Packaging
+- `CLI/main.swift`: Master command-line utility (`agentspeak` / `aspk`).
+- `install.sh`: Native Swift compilation and launchd background daemon installer.
+- `scripts/build_dmg.sh`: Automated macOS DMG packaging engine with Gatekeeper bypass helper.
+- `.github/workflows/release.yml`: GitHub Actions automated release pipeline.
 
 ---
 
@@ -80,38 +113,33 @@ The daemon exposes a lightweight UNIX domain socket at `/tmp/agentspeak.sock`. A
 
 | Command | Description | Example |
 | :--- | :--- | :--- |
-| `say:<text>` | Queues text for speech synthesis | `echo "say:Task complete" \| nc -U /tmp/agentspeak.sock` |
-| `stop` | Immediately halts current speech and clears queue | `echo "stop" \| nc -U /tmp/agentspeak.sock` |
-| `status` | Returns JSON status of daemon and current engine | `echo "status" \| nc -U /tmp/agentspeak.sock` |
-| `dashboard` | Opens the SwiftUI settings window | `echo "dashboard" \| nc -U /tmp/agentspeak.sock` |
-| `engine:<name>`| Switches active engine (`native` or `pocket-tts`) | `echo "engine:native" \| nc -U /tmp/agentspeak.sock` |
+| `say:<text>` | Queues text for speech synthesis | `echo "say:Build succeeded" \| nc -U /tmp/agentspeak.sock` |
+| `stop` | Halts current speech and clears queue | `echo "stop" \| nc -U /tmp/agentspeak.sock` |
+| `status` | Returns JSON status of daemon | `echo "status" \| nc -U /tmp/agentspeak.sock` |
+| `dashboard` | Opens settings dashboard | `echo "dashboard" \| nc -U /tmp/agentspeak.sock` |
+| `engine:<name>`| Switches active engine (`native` or `pocket-tts`) | `echo "engine:pocket_tts" \| nc -U /tmp/agentspeak.sock` |
+| `hologram:blend:<mode>` | Sets hologram blending mode | `echo "hologram:blend:screen" \| nc -U /tmp/agentspeak.sock` |
+| `gesture:toggle` | Toggles camera gesture tracking | `echo "gesture:toggle" \| nc -U /tmp/agentspeak.sock` |
 
 ---
 
-## 🛠️ Build & Installation Commands
+## 🛠️ Developer Commands
 
-### Full App Rebuild & Reinstall
+### Build & Reinstall Locally
 ```bash
 ./install.sh
 ```
 
-### Manual Compile via Swift Compiler
+### Build Distribution DMG
 ```bash
-swiftc -O -target arm64-apple-macos14.0 \
-  -framework Cocoa -framework SwiftUI -framework AVFoundation -framework Carbon \
-  Sources/*.swift -o bin/AgentSpeak
+./scripts/build_dmg.sh
 ```
 
-### Checking Daemon Logs
+### Test CLI Controller
 ```bash
-tail -f ~/Library/Logs/AgentSpeak.log
+agentspeak status
+agentspeak say "Testing audio output."
+agentspeak hologram blend screen
+agentspeak gesture on
+agentspeak voice list
 ```
-
----
-
-## ⚠️ Development Rules for AI Agents
-
-1. **File Length Limit**: Keep every Swift and documentation file strictly under 900 lines.
-2. **Smooth 120 FPS**: Never block the main AppKit thread. All audio processing, file watching, and socket operations must remain on background Grand Central Dispatch queues.
-3. **Graceful Degradation**: If Pocket-TTS or Python environments are missing or fail, the app must smoothly fall back to the Zero-CPU native Apple Speech engine without crashing.
-4. **No Slop Design**: Keep SwiftUI interfaces clean, aligned with native macOS human interface guidelines, and responsive to mouse hover and click hitboxes.
