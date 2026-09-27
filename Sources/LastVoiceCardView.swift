@@ -127,12 +127,12 @@ public struct LastVoiceCardView: View {
                             .buttonStyle(.plain)
                             
                             Button(action: {
-                                manager.saveAudioToDownloads()
+                                manager.exportWithSavePanel()
                             }) {
                                 HStack(spacing: 4) {
                                     Image(systemName: "arrow.down.circle")
                                         .font(.system(size: 10))
-                                    Text("Save M4A")
+                                    Text("Export M4A")
                                         .font(.system(size: 11, weight: .medium))
                                 }
                                 .padding(.horizontal, 10)

@@ -687,7 +687,7 @@ public class TranscriptWatcher {
                         let jarvisPaths = [
                             Bundle.main.bundlePath + "/Contents/Resources/voices/Jarvis.wav",
                             FileManager.default.homeDirectoryForCurrentUser.path + "/.agentspeak/extensions/pocket-tts/voices/Jarvis.wav",
-                            FileManager.default.currentDirectoryPath + "/Resources/voices/Jarvis.wav"
+                            FileManager.default.homeDirectoryForCurrentUser.path + "/.agentspeak/voices/Jarvis.wav"
                         ]
                         if let p = jarvisPaths.first(where: { FileManager.default.fileExists(atPath: $0) }) {
                             SpeechQueueManager.shared.playAudioFile(filePath: p, source: "Jarvis AI")
@@ -840,6 +840,15 @@ public class TranscriptWatcher {
                             let cur = GroqWhisperManager.shared.fnHoldDictationEnabled
                             GroqWhisperManager.shared.fnHoldDictationEnabled = !cur
                             GroqWhisperManager.shared.saveConfig()
+                        }
+                    } else if raw.hasPrefix("__CMD_DICTATION_KEY__:") {
+                        let keyId = String(raw.dropFirst("__CMD_DICTATION_KEY__:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+                        DispatchQueue.main.async {
+                            if let preset = DictationKeyPreset.standardPresets.first(where: { $0.id.lowercased() == keyId.lowercased() }) {
+                                GroqWhisperManager.shared.setPresetTriggerKey(preset)
+                                FnDictationController.shared.stop()
+                                FnDictationController.shared.start()
+                            }
                         }
                     } else if raw == "__CMD_RELOAD_CONNECTORS__" {
                         DispatchQueue.main.async {

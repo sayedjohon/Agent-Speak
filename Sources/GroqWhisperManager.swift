@@ -1,6 +1,7 @@
 import Cocoa
 import AVFoundation
 import Speech
+import CoreAudio
 
 // MARK: - Dictation Engine Mode
 public enum DictationEngineMode: String, CaseIterable, Identifiable {
@@ -10,6 +11,83 @@ public enum DictationEngineMode: String, CaseIterable, Identifiable {
     case modifierHold = "Hold Modifier Key (Whisper Flow)"
     
     public var id: String { rawValue }
+}
+
+// MARK: - Dictation Trigger Key Model & Presets
+public struct DictationKeyPreset: Identifiable, Hashable {
+    public let id: String
+    public let name: String
+    public let symbol: String
+    public let keyCode: Int64
+    public let isModifier: Bool
+    public let note: String
+    
+    public init(id: String, name: String, symbol: String, keyCode: Int64, isModifier: Bool, note: String = "") {
+        self.id = id
+        self.name = name
+        self.symbol = symbol
+        self.keyCode = keyCode
+        self.isModifier = isModifier
+        self.note = note
+    }
+    
+    public static let standardPresets: [DictationKeyPreset] = [
+        DictationKeyPreset(id: "rightOption", name: "Right Option / Alt", symbol: "⌥", keyCode: 61, isModifier: true, note: "Mac Mini & External Keyboards (Recommended)"),
+        DictationKeyPreset(id: "rightCommand", name: "Right Command", symbol: "⌘", keyCode: 54, isModifier: true, note: "Right Thumb on Mac Keyboards"),
+        DictationKeyPreset(id: "rightControl", name: "Right Control", symbol: "⌃", keyCode: 62, isModifier: true, note: "PC / External Keyboards"),
+        DictationKeyPreset(id: "leftControl", name: "Left Control", symbol: "⌃", keyCode: 59, isModifier: true, note: "Classic Gaming / Streamer PTT"),
+        DictationKeyPreset(id: "leftOption", name: "Left Option / Alt", symbol: "⌥", keyCode: 58, isModifier: true, note: "Left Hand Push-to-Talk"),
+        DictationKeyPreset(id: "capsLock", name: "Caps Lock", symbol: "⇪", keyCode: 57, isModifier: true, note: "Toggleable Modifier Key"),
+        DictationKeyPreset(id: "fn", name: "Fn / Globe", symbol: "🌐", keyCode: 63, isModifier: true, note: "MacBook Built-in Keyboard"),
+        DictationKeyPreset(id: "f12", name: "F12 Key", symbol: "F12", keyCode: 111, isModifier: false, note: "Dedicated Function Key"),
+        DictationKeyPreset(id: "f6", name: "F6 Key", symbol: "F6", keyCode: 97, isModifier: false, note: "Dedicated Function Key"),
+        DictationKeyPreset(id: "grave", name: "Grave / Tilde", symbol: "` ~", keyCode: 50, isModifier: false, note: "Top-Left below Escape")
+    ]
+    
+    public static func isModifierKeyCode(_ code: Int64) -> Bool {
+        return [63, 61, 58, 54, 55, 62, 59, 60, 56, 57].contains(code)
+    }
+    
+    public static func nameForKeyCode(_ keyCode: Int64) -> (name: String, symbol: String) {
+        switch keyCode {
+        case 63: return ("Fn / Globe", "🌐")
+        case 61: return ("Right Option", "⌥")
+        case 58: return ("Left Option", "⌥")
+        case 54: return ("Right Command", "⌘")
+        case 55: return ("Left Command", "⌘")
+        case 62: return ("Right Control", "⌃")
+        case 59: return ("Left Control", "⌃")
+        case 60: return ("Right Shift", "⇧")
+        case 56: return ("Left Shift", "⇧")
+        case 57: return ("Caps Lock", "⇪")
+        case 122: return ("F1", "F1")
+        case 120: return ("F2", "F2")
+        case 99: return ("F3", "F3")
+        case 118: return ("F4", "F4")
+        case 96: return ("F5", "F5")
+        case 97: return ("F6", "F6")
+        case 98: return ("F7", "F7")
+        case 100: return ("F8", "F8")
+        case 101: return ("F9", "F9")
+        case 109: return ("F10", "F10")
+        case 103: return ("F11", "F11")
+        case 111: return ("F12", "F12")
+        case 105: return ("F13", "F13")
+        case 107: return ("F14", "F14")
+        case 113: return ("F15", "F15")
+        case 106: return ("F16", "F16")
+        case 64: return ("F17", "F17")
+        case 79: return ("F18", "F18")
+        case 80: return ("F19", "F19")
+        case 90: return ("F20", "F20")
+        case 50: return ("Grave / Tilde", "` ~")
+        case 49: return ("Space", "␣")
+        case 36: return ("Return", "⏎")
+        case 48: return ("Tab", "⇥")
+        case 51: return ("Delete", "⌫")
+        default: return ("Key #\(keyCode)", "#\(keyCode)")
+        }
+    }
 }
 
 // MARK: - Groq & Whisper Dictation Manager
@@ -60,6 +138,28 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
     @Published public var languageCode: String = "" // Empty = Auto-detect
     @Published public var autoSubmitReturn: Bool = false
     @Published public var fnHoldDictationEnabled: Bool = true
+    
+    // MARK: - Push-to-Talk Trigger Key Configuration
+    @Published public var dictationTriggerKey: String = "rightOption"
+    @Published public var dictationTriggerKeyCode: Int64 = 61
+    @Published public var dictationTriggerName: String = "Right Option (⌥)"
+    @Published public var dictationTriggerIsModifier: Bool = true
+    
+    public func setPresetTriggerKey(_ preset: DictationKeyPreset) {
+        dictationTriggerKey = preset.id
+        dictationTriggerKeyCode = preset.keyCode
+        dictationTriggerName = "\(preset.name) (\(preset.symbol))"
+        dictationTriggerIsModifier = preset.isModifier
+        saveConfig()
+    }
+    
+    public func setCustomTriggerKey(code: Int64, name: String, isModifier: Bool) {
+        dictationTriggerKey = "custom"
+        dictationTriggerKeyCode = code
+        dictationTriggerName = name
+        dictationTriggerIsModifier = isModifier
+        saveConfig()
+    }
     
     // MARK: - Key Management Helpers
     @discardableResult
@@ -200,9 +300,38 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
         }
     }
     
+    // MARK: - Audio Input Hardware Check
+    public static func hasActiveInputDevice() -> Bool {
+        var defaultInputDeviceID: AudioDeviceID = 0
+        var propertySize = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            0,
+            nil,
+            &propertySize,
+            &defaultInputDeviceID
+        )
+        return status == noErr && defaultInputDeviceID != 0 && defaultInputDeviceID != kAudioDeviceUnknown
+    }
+    
     // MARK: - Start Recording
     public func startRecording() {
         guard !isRecording else { return }
+        
+        guard Self.hasActiveInputDevice() else {
+            NSLog("[GroqWhisper] No audio input device detected on Mac.")
+            DispatchQueue.main.async {
+                self.statusMessage = "No Mic Detected"
+                GestureHUDState.shared.showGesture(.clutch, label: "No Mic Connected (Connect AirPods / Mic)")
+            }
+            return
+        }
         
         // Ensure microphone permission cleanly
         if #available(macOS 14.0, *) {
@@ -315,8 +444,8 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
         
         guard FileManager.default.fileExists(atPath: recordingURL.path),
               let audioData = try? Data(contentsOf: recordingURL),
-              audioData.count > 1000 else {
-            notifyFailure("Audio too short")
+              audioData.count > 4100 else {
+            notifyFailure("No audio recorded (Check mic)")
             return
         }
         
@@ -434,6 +563,10 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
             
             if let errorObj = json["error"] as? [String: Any],
                let msg = errorObj["message"] as? String {
+                if msg.lowercased().contains("audio file is too short") {
+                    self.notifyFailure("No speech captured (Check mic)")
+                    return
+                }
                 if attempts + 1 < totalKeys {
                     let nextIndex = (keyIndex + 1) % totalKeys
                     NSLog("[GroqWhisper] Key %ld returned '%@'. Failing over to Key %ld...", keyNum, msg, nextIndex + 1)
@@ -515,12 +648,12 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
             KeyboardShortcutController.shared.releaseAllHeldModifiers()
             
             // Auto paste into active application via Cmd + V
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
                 KeyboardShortcutController.shared.sendPaste()
                 
                 // If auto-submit is enabled, press Return
                 if self.autoSubmitReturn {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
                         KeyboardShortcutController.shared.sendReturn()
                     }
                 }
@@ -566,6 +699,14 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
         if let lang = d["language"] as? String { languageCode = lang }
         if let autoSub = d["auto_submit_return"] as? Bool { autoSubmitReturn = autoSub }
         if let fnHold = d["fn_hold_dictation"] as? Bool { fnHoldDictationEnabled = fnHold }
+        if let trigKey = d["dictation_trigger_key"] as? String { dictationTriggerKey = trigKey }
+        if let trigCode = d["dictation_trigger_keycode"] as? Int64 {
+            dictationTriggerKeyCode = trigCode
+        } else if let trigCodeInt = d["dictation_trigger_keycode"] as? Int {
+            dictationTriggerKeyCode = Int64(trigCodeInt)
+        }
+        if let trigName = d["dictation_trigger_name"] as? String { dictationTriggerName = trigName }
+        if let trigMod = d["dictation_trigger_is_modifier"] as? Bool { dictationTriggerIsModifier = trigMod }
         
         setupAppleSpeechRecognizer()
     }
@@ -590,6 +731,10 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
         d["language"] = languageCode
         d["auto_submit_return"] = autoSubmitReturn
         d["fn_hold_dictation"] = fnHoldDictationEnabled
+        d["dictation_trigger_key"] = dictationTriggerKey
+        d["dictation_trigger_keycode"] = dictationTriggerKeyCode
+        d["dictation_trigger_name"] = dictationTriggerName
+        d["dictation_trigger_is_modifier"] = dictationTriggerIsModifier
         json["dictation"] = d
         
         if let outData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted]) {

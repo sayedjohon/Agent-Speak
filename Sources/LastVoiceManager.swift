@@ -290,9 +290,9 @@ public class LastVoiceManager: NSObject, ObservableObject, AVAudioPlayerDelegate
         let slug = words.joined(separator: "_")
         let fileName = slug.isEmpty ? "AgentSpeak_Voice_\(timestamp).m4a" : "AgentSpeak_\(slug)_\(timestamp).m4a"
         
-        let downloadsDir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
-            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads")
-        let destinationURL = downloadsDir.appendingPathComponent(fileName)
+        let exportsDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".agentspeak/exports")
+        try? FileManager.default.createDirectory(at: exportsDir, withIntermediateDirectories: true)
+        let destinationURL = exportsDir.appendingPathComponent(fileName)
         
         do {
             try? FileManager.default.removeItem(at: destinationURL)
@@ -302,9 +302,9 @@ public class LastVoiceManager: NSObject, ObservableObject, AVAudioPlayerDelegate
             NSWorkspace.shared.activateFileViewerSelecting([destinationURL])
             
             DispatchQueue.main.async { [weak self] in
-                self?.downloadStatusMessage = "Saved to ~/Downloads!"
+                self?.downloadStatusMessage = "Saved to Exports!"
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                    if self?.downloadStatusMessage == "Saved to ~/Downloads!" {
+                    if self?.downloadStatusMessage == "Saved to Exports!" {
                         self?.downloadStatusMessage = nil
                     }
                 }
@@ -343,7 +343,7 @@ public class LastVoiceManager: NSObject, ObservableObject, AVAudioPlayerDelegate
     }
     
     public func saveAudioToDownloads() {
-        downloadAudio()
+        exportWithSavePanel()
     }
     
     public func copyAudioFileToClipboard() {

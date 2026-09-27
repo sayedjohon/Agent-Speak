@@ -1,4 +1,5 @@
 import SwiftUI
+import Cocoa
 import AVFoundation
 
 // MARK: - Dashboard Gesture View
@@ -16,6 +17,8 @@ public struct DashboardGestureView: View {
     @State private var isTestingRecord: Bool = false
     @State private var customEndpointTestStatus: String? = nil
     @State private var isTestingCustomEndpoint: Bool = false
+    @State private var isRecordingKey: Bool = false
+    @State private var keyRecordingMonitor: Any? = nil
     
     private let supportedLanguages: [(code: String, name: String)] = [
         ("", "Auto-detect (All Languages)"),
@@ -51,6 +54,9 @@ public struct DashboardGestureView: View {
         }
         .onAppear {
             loadGesturePreferences()
+        }
+        .onDisappear {
+            stopKeyRecording()
         }
     }
     
@@ -356,28 +362,33 @@ public struct DashboardGestureView: View {
                 
                 Spacer()
                 
-                Text("Left Fn Key or Closed Fist")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.orange)
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(whisperManager.fnHoldDictationEnabled ? Color.green : Color.gray)
+                        .frame(width: 7, height: 7)
+                    Text(whisperManager.dictationTriggerName)
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.orange)
+                }
             }
             
-            // Dedicated MacBook Fn Key Push-to-Talk Toggle
+            // Push-to-Talk Toggle
             Toggle(isOn: $whisperManager.fnHoldDictationEnabled) {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
-                        Text("Hold Fn (Globe 🌐) Key to Dictate")
+                        Text("Hold Key to Dictate (Push-to-Talk)")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(.white)
                         
-                        Text("MacBook Key")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.green)
+                        Text(whisperManager.dictationTriggerName)
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundColor(.cyan)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.green.opacity(0.15))
+                            .background(Color.cyan.opacity(0.15))
                             .cornerRadius(4)
                     }
-                    Text("Hold down your MacBook's bottom-left Fn button to record speech. Release to transcribe and auto-paste directly into your active app.")
+                    Text("Hold down your assigned key to record speech. Release to transcribe with Whisper and auto-paste directly into your active app.")
                         .font(.system(size: 11))
                         .foregroundColor(.gray)
                 }
@@ -388,6 +399,80 @@ public struct DashboardGestureView: View {
                     FnDictationController.shared.start()
                 }
             }
+            
+            // Dictation Trigger Key Selector & Custom Assignment
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .center) {
+                    Text("Trigger Key Assignment:")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.gray)
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        if isRecordingKey {
+                            stopKeyRecording()
+                        } else {
+                            startKeyRecording()
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: isRecordingKey ? "record.circle.fill" : "keyboard")
+                                .font(.system(size: 10))
+                                .foregroundColor(isRecordingKey ? .red : .teal)
+                            Text(isRecordingKey ? "Press any key..." : "Assign Key")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(isRecordingKey ? .red : .teal)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(isRecordingKey ? Color.red.opacity(0.18) : Color.white.opacity(0.08))
+                        .cornerRadius(5)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5)
+                                .stroke(isRecordingKey ? Color.red : Color.white.opacity(0.15), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+                
+                Picker("", selection: Binding(
+                    get: { whisperManager.dictationTriggerKey },
+                    set: { newKeyId in
+                        if let preset = DictationKeyPreset.standardPresets.first(where: { $0.id == newKeyId }) {
+                            whisperManager.setPresetTriggerKey(preset)
+                        }
+                    }
+                )) {
+                    ForEach(DictationKeyPreset.standardPresets) { preset in
+                        Text("\(preset.name) (\(preset.symbol)) — \(preset.note)").tag(preset.id)
+                    }
+                    if whisperManager.dictationTriggerKey == "custom" {
+                        Text("Custom Key: \(whisperManager.dictationTriggerName)").tag("custom")
+                    }
+                }
+                .pickerStyle(MenuPickerStyle())
+                .frame(maxWidth: .infinity, alignment: .leading)
+                
+                if isRecordingKey {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .scaleEffect(0.5)
+                            .frame(width: 12, height: 12)
+                        Text("Listening for key press... Press any key on your keyboard, or Escape to cancel.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.orange)
+                    }
+                    .padding(.top, 2)
+                } else {
+                    Text("Mac Mini keyboards lack the MacBook Fn button. Right Option (⌥), Right Command (⌘), or Right Control (⌃) are ideal for 1-hand push-to-talk.")
+                        .font(.system(size: 10.5))
+                        .foregroundColor(.gray.opacity(0.8))
+                }
+            }
+            .padding(10)
+            .background(Color.white.opacity(0.03))
+            .cornerRadius(8)
             
             Divider().background(Color.white.opacity(0.1))
             
@@ -809,5 +894,33 @@ public struct DashboardGestureView: View {
             isTestingCustomEndpoint = false
             customEndpointTestStatus = result
         }
+    }
+    
+    // MARK: - Key Recording Helpers
+    private func startKeyRecording() {
+        stopKeyRecording()
+        isRecordingKey = true
+        keyRecordingMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
+            if event.type == .keyDown && event.keyCode == 53 { // Escape
+                self.stopKeyRecording()
+                return nil
+            }
+            
+            let code = Int64(event.keyCode)
+            let isMod = DictationKeyPreset.isModifierKeyCode(code)
+            let (name, symbol) = DictationKeyPreset.nameForKeyCode(code)
+            
+            self.whisperManager.setCustomTriggerKey(code: code, name: "\(name) (\(symbol))", isModifier: isMod)
+            self.stopKeyRecording()
+            return nil
+        }
+    }
+    
+    private func stopKeyRecording() {
+        if let m = keyRecordingMonitor {
+            NSEvent.removeMonitor(m)
+            keyRecordingMonitor = nil
+        }
+        isRecordingKey = false
     }
 }

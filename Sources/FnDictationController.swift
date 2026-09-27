@@ -3,18 +3,15 @@ import CoreGraphics
 import Carbon
 import AVFoundation
 
-// MARK: - MacBook Fn (Globe) Key Push-to-Talk Dictation Controller
+// MARK: - Universal Push-to-Talk Dictation Controller (Supports Fn, Option, Command, Control, Function & Custom Keys)
 public class FnDictationController {
     public static let shared = FnDictationController()
-    
-    // Keycode 63 is the Fn / Globe key on Apple MacBook and Magic Keyboards
-    public static let keyFn: Int64 = 63
     
     // Minimum hold threshold before dictation is confirmed (prevents accidental taps)
     public let minimumHoldDuration: TimeInterval = 0.28
     
     // State tracking
-    public private(set) var isHoldingFn: Bool = false
+    public private(set) var isHoldingKey: Bool = false
     private var pressStartTime: TimeInterval = 0.0
     private var wasShortcutCombination: Bool = false
     private var isDictationActive: Bool = false
@@ -33,7 +30,7 @@ public class FnDictationController {
     public func start() {
         setupEventTap()
         setupNSEventMonitors()
-        NSLog("[FnDictation] Push-to-Talk controller initialized.")
+        NSLog("[FnDictation] Push-to-Talk controller initialized for key: %@", GroqWhisperManager.shared.dictationTriggerName)
     }
     
     public func stop() {
@@ -64,8 +61,10 @@ public class FnDictationController {
     private func setupEventTap() {
         guard eventTap == nil else { return }
         
-        // Listen to modifier key changes (flagsChanged) and regular key presses (keyDown)
-        let mask = (1 << CGEventType.flagsChanged.rawValue) | (1 << CGEventType.keyDown.rawValue)
+        // Listen to modifier key changes (flagsChanged), key presses (keyDown), and releases (keyUp)
+        let mask = (1 << CGEventType.flagsChanged.rawValue) | 
+                   (1 << CGEventType.keyDown.rawValue) | 
+                   (1 << CGEventType.keyUp.rawValue)
         let refcon = Unmanaged.passUnretained(self).toOpaque()
         
         guard let tap = CGEvent.tapCreate(
@@ -99,21 +98,29 @@ public class FnDictationController {
         
         self.eventTap = tap
         self.runLoopSource = source
-        NSLog("[FnDictation] CGEventTap active for Fn key push-to-talk.")
+        NSLog("[FnDictation] CGEventTap active for push-to-talk trigger.")
     }
     
     // MARK: - Passive NSEvent Monitors Fallback
     private func setupNSEventMonitors() {
         if globalMonitor == nil {
-            globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged, .keyDown]) { [weak self] event in
-                guard let self = self, self.eventTap == nil else { return }
+            globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged, .keyDown, .keyUp]) { [weak self] event in
+                guard let self = self else { return }
+                if self.eventTap == nil {
+                    self.setupEventTap()
+                }
+                guard self.eventTap == nil else { return }
                 self.processNSEvent(event)
             }
         }
         
         if localMonitor == nil {
-            localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown]) { [weak self] event in
-                guard let self = self, self.eventTap == nil else { return event }
+            localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown, .keyUp]) { [weak self] event in
+                guard let self = self else { return event }
+                if self.eventTap == nil {
+                    self.setupEventTap()
+                }
+                guard self.eventTap == nil else { return event }
                 self.processNSEvent(event)
                 return event
             }
@@ -122,21 +129,54 @@ public class FnDictationController {
     
     private func processNSEvent(_ event: NSEvent) {
         guard GroqWhisperManager.shared.fnHoldDictationEnabled else { return }
+        let targetCode = GroqWhisperManager.shared.dictationTriggerKeyCode
+        let isModifier = GroqWhisperManager.shared.dictationTriggerIsModifier
+        let keyCode = Int64(event.keyCode)
         
-        if event.type == .keyDown {
-            if isHoldingFn {
-                wasShortcutCombination = true
-                cancelDictation()
+        if isModifier {
+            if event.type == .keyDown {
+                if isHoldingKey {
+                    wasShortcutCombination = true
+                    cancelDictation()
+                }
+            } else if event.type == .flagsChanged {
+                guard keyCode == targetCode else { return }
+                let flags = event.modifierFlags
+                let isDown: Bool
+                switch targetCode {
+                case 63:
+                    isDown = flags.contains(.function)
+                case 61, 58:
+                    isDown = flags.contains(.option)
+                case 54, 55:
+                    isDown = flags.contains(.command)
+                case 62, 59:
+                    isDown = flags.contains(.control)
+                case 60, 56:
+                    isDown = flags.contains(.shift)
+                case 57:
+                    isDown = flags.contains(.capsLock)
+                default:
+                    isDown = !isHoldingKey
+                }
+                
+                if isDown && !isHoldingKey {
+                    handleKeyDown()
+                } else if !isDown && isHoldingKey {
+                    _ = handleKeyUp()
+                }
             }
-        } else if event.type == .flagsChanged {
-            let isFnActive = event.modifierFlags.contains(.function)
-            let keyCode = Int64(event.keyCode)
-            
-            if (keyCode == Self.keyFn || isFnActive != isHoldingFn) {
-                if isFnActive && !isHoldingFn {
-                    handleFnDown()
-                } else if !isFnActive && isHoldingFn {
-                    _ = handleFnUp()
+        } else {
+            if event.type == .keyDown {
+                if keyCode == targetCode && !isHoldingKey {
+                    handleKeyDown()
+                } else if isHoldingKey && keyCode != targetCode {
+                    wasShortcutCombination = true
+                    cancelDictation()
+                }
+            } else if event.type == .keyUp {
+                if keyCode == targetCode && isHoldingKey {
+                    _ = handleKeyUp()
                 }
             }
         }
@@ -148,43 +188,83 @@ public class FnDictationController {
             return Unmanaged.passUnretained(event)
         }
         
-        // 1. If any standard key is pressed down while holding Fn:
-        // (e.g. Fn + Backspace for Forward Delete, Fn + Arrows, Fn + F1-F12)
-        // Abort dictation immediately and let the keyboard shortcut fire normally!
-        if type == .keyDown {
-            if isHoldingFn {
-                wasShortcutCombination = true
-                cancelDictation()
-            }
-            return Unmanaged.passUnretained(event)
-        }
+        let targetCode = GroqWhisperManager.shared.dictationTriggerKeyCode
+        let isModifier = GroqWhisperManager.shared.dictationTriggerIsModifier
+        let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
         
-        // 2. Modifier keys changed
-        if type == .flagsChanged {
-            let flags = event.flags
-            let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-            let isSecondaryFnActive = flags.contains(.maskSecondaryFn)
-            
-            // Validate if this event pertains to the Fn / Globe key
-            let isTargetKey = (keyCode == Self.keyFn) || (isSecondaryFnActive != isHoldingFn)
-            guard isTargetKey else {
+        if isModifier {
+            // 1. If any standard key is pressed down while holding modifier:
+            // Abort dictation immediately and let shortcut fire normally!
+            if type == .keyDown {
+                if isHoldingKey {
+                    wasShortcutCombination = true
+                    cancelDictation()
+                }
                 return Unmanaged.passUnretained(event)
             }
             
-            // KEY DOWN: Fn pressed
-            if isSecondaryFnActive && !isHoldingFn {
-                handleFnDown()
-                return Unmanaged.passUnretained(event)
-            }
-            
-            // KEY UP: Fn released
-            if !isSecondaryFnActive && isHoldingFn {
-                let shouldSuppress = handleFnUp()
-                if shouldSuppress {
-                    // Swallow the release event so macOS does NOT open the Emoji picker or switch input source!
-                    return nil
-                } else {
+            // 2. Modifier keys changed
+            if type == .flagsChanged {
+                guard keyCode == targetCode else {
                     return Unmanaged.passUnretained(event)
+                }
+                
+                let flags = event.flags
+                let isDown: Bool
+                switch targetCode {
+                case 63:
+                    isDown = flags.contains(.maskSecondaryFn)
+                case 61, 58:
+                    isDown = flags.contains(.maskAlternate)
+                case 54, 55:
+                    isDown = flags.contains(.maskCommand)
+                case 62, 59:
+                    isDown = flags.contains(.maskControl)
+                case 60, 56:
+                    isDown = flags.contains(.maskShift)
+                case 57:
+                    isDown = flags.contains(.maskAlphaShift)
+                default:
+                    isDown = !isHoldingKey
+                }
+                
+                // KEY DOWN: Trigger pressed
+                if isDown && !isHoldingKey {
+                    handleKeyDown()
+                    return Unmanaged.passUnretained(event)
+                }
+                
+                // KEY UP: Trigger released
+                if !isDown && isHoldingKey {
+                    let shouldSuppress = handleKeyUp()
+                    if shouldSuppress && targetCode == 63 {
+                        // Swallow release event ONLY for Fn / Globe key (63) so macOS does not pop up Emoji picker
+                        return nil
+                    } else {
+                        // For Right Control, Option, Shift, Command, pass the release through so macOS clears modifier flags!
+                        return Unmanaged.passUnretained(event)
+                    }
+                }
+            }
+        } else {
+            // Standard non-modifier key (e.g. F12, F6, Grave, etc.)
+            if type == .keyDown {
+                if keyCode == targetCode {
+                    if !isHoldingKey {
+                        handleKeyDown()
+                    }
+                    return nil // Swallow target key so it does not type characters or trigger system actions
+                } else if isHoldingKey {
+                    wasShortcutCombination = true
+                    cancelDictation()
+                    return Unmanaged.passUnretained(event)
+                }
+            } else if type == .keyUp {
+                if keyCode == targetCode {
+                    if isHoldingKey {
+                        _ = handleKeyUp()
+                    }
+                    return nil // Swallow keyUp
                 }
             }
         }
@@ -193,14 +273,14 @@ public class FnDictationController {
     }
     
     // MARK: - Actions
-    private func handleFnDown() {
-        isHoldingFn = true
+    private func handleKeyDown() {
+        isHoldingKey = true
         pressStartTime = CACurrentMediaTime()
         wasShortcutCombination = false
         isDictationActive = true
         
         DispatchQueue.main.async {
-            // Interruption / Barge-in: If agent is currently speaking, reading observations, or queued, stop it immediately!
+            // Interruption / Barge-in: If agent is speaking, reading observations, or queued, stop immediately!
             if SpeechQueueManager.shared.isSpeaking || SpeechQueueManager.shared.queueCount > 0 || NotchWindowController.shared.isPresenting {
                 NSLog("[FnDictation] Barge-in triggered: cancelling speech playback and starting dictation.")
                 SpeechQueueManager.shared.stopCurrent()
@@ -208,16 +288,17 @@ public class FnDictationController {
             
             KeyboardShortcutController.shared.releaseAllHeldModifiers()
             GroqWhisperManager.shared.startRecording()
+            let triggerName = GroqWhisperManager.shared.dictationTriggerName
             GestureHUDState.shared.showGesture(
                 .whisperFlowHold,
-                label: "Listening... (Release Fn to Paste)"
+                label: "Listening... (Release \(triggerName) to Paste)"
             )
         }
-        NSLog("[FnDictation] Fn button pressed down. Recording voice...")
+        NSLog("[FnDictation] Push-to-talk trigger pressed down. Recording voice...")
     }
     
-    private func handleFnUp() -> Bool {
-        isHoldingFn = false
+    private func handleKeyUp() -> Bool {
+        isHoldingKey = false
         let holdDuration = CACurrentMediaTime() - pressStartTime
         
         // If part of a shortcut combination, do nothing (already cancelled)
@@ -228,7 +309,7 @@ public class FnDictationController {
         
         // Accidental tap guard (< 280ms)
         if holdDuration < minimumHoldDuration {
-            NSLog("[FnDictation] Fn tap duration too short (%.2fs < %.2fs). Discarding.", holdDuration, minimumHoldDuration)
+            NSLog("[FnDictation] Push-to-talk tap duration too short (%.2fs < %.2fs). Discarding.", holdDuration, minimumHoldDuration)
             cancelDictation()
             return false
         }
@@ -246,9 +327,8 @@ public class FnDictationController {
             GroqWhisperManager.shared.stopRecordingAndTranscribe()
             GestureHUDState.shared.showGesture(.whisperFlowHold, label: "Transcribing with Groq Whisper...")
         }
-        NSLog("[FnDictation] Fn button released after %.2fs. Transcribing & auto-pasting...", holdDuration)
+        NSLog("[FnDictation] Push-to-talk trigger released after %.2fs. Transcribing & auto-pasting...", holdDuration)
         
-        // Suppress this event to block macOS Emoji picker popup
         return true
     }
     
@@ -260,3 +340,4 @@ public class FnDictationController {
         NSLog("[FnDictation] Voice recording cancelled.")
     }
 }
+

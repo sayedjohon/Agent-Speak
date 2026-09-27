@@ -85,6 +85,9 @@ The Liquid Glass Voice Companion for AI Coding Agents on macOS
      Control+P for clipboard, Escape to instantly silence audio).
    - Camera: Required only if you enable dual-hand 10-finger camera gesture tracking.
    - Microphone: Required only if you use Push-to-Talk Fn dictation.
+   - Zero Personal Folders Access: Agent Speak stores all models, voice embeddings,
+     and configs strictly inside its private ~/.agentspeak directory and inside the
+     app bundle. It never asks for or accesses your personal Documents or Downloads folders.
 
 4. CLI CONTROLLER (OPTIONAL):
    You can control Agent Speak directly from any terminal or agent prompt:
@@ -93,12 +96,14 @@ The Liquid Glass Voice Companion for AI Coding Agents on macOS
    ln -sf "/Applications/Agent Speak.app/Contents/MacOS/AgentSpeak" ~/.local/bin/aspk
 
    CLI Commands:
-   • agentspeak status              # Check daemon and voice engine state
-   • agentspeak say "Hello world"   # Speak text via notch player
+   • agentspeak status                # Check daemon and voice engine state
+   • agentspeak say "Hello world"     # Speak text via notch player
+   • agentspeak dictation status      # Check push-to-talk dictation state
+   • agentspeak dictation key <key>   # Set trigger key (right-ctrl, fn, right-opt, cmd, shift, f12, grave)
    • agentspeak hologram blend screen # Set hologram blending mode
-   • agentspeak gesture on          # Enable camera hand tracking
-   • agentspeak voice list          # List all available neural & system voices
-   • agentspeak settings            # Open settings dashboard
+   • agentspeak gesture on            # Enable camera hand tracking
+   • agentspeak voice list            # List all available neural & system voices
+   • agentspeak settings              # Open settings dashboard
 
 For full documentation, architecture, and multi-agent guides, visit:
 https://github.com/sayedjohon/Agent-Speak

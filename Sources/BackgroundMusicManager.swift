@@ -72,11 +72,11 @@ public class BackgroundMusicManager: ObservableObject {
         let candidateSources = [
             Bundle.main.resourceURL?.appendingPathComponent("bgm/Iron_Man.mp3"),
             Bundle.main.resourceURL?.appendingPathComponent("Iron_Man.mp3"),
-            URL(fileURLWithPath: FileManager.default.currentDirectoryPath + "/Resources/bgm/Iron_Man.mp3")
+            URL(fileURLWithPath: FileManager.default.homeDirectoryForCurrentUser.path + "/.agentspeak/bgm/Iron_Man.mp3")
         ]
         
         for candidate in candidateSources {
-            guard let c = candidate, FileManager.default.fileExists(atPath: c.path) else { continue }
+            guard let c = candidate, c != defaultDest, FileManager.default.fileExists(atPath: c.path) else { continue }
             try? FileManager.default.copyItem(at: c, to: defaultDest)
             break
         }

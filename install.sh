@@ -38,9 +38,17 @@ pkill -9 -f "AntigravityJarvis" 2>/dev/null || true
 pkill -9 -f "speech-bar" 2>/dev/null || true
 rm -f /tmp/agentspeak.sock 2>/dev/null || true
 
+# Detect SDK for stable SwiftUI compilation
+SDK_ARGS=()
+if [[ -d "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk" ]]; then
+    SDK_ARGS=(-sdk "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk")
+elif [[ -d "/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk" ]]; then
+    SDK_ARGS=(-sdk "/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk")
+fi
+
 # 2. Compile Unified Application (Sources/*.swift)
 echo -e "${CYAN}→ Compiling Agent Speak application (Swift)...${NC}"
-swiftc -j 1 "$SCRIPT_DIR"/Sources/*.swift -o "/tmp/AgentSpeakBinary"
+swiftc "${SDK_ARGS[@]}" -j 4 "$SCRIPT_DIR"/Sources/*.swift -o "/tmp/AgentSpeakBinary"
 mv "/tmp/AgentSpeakBinary" "$APPS_DIR/Agent Speak.app/Contents/MacOS/AgentSpeak"
 cp "$SCRIPT_DIR/dashboard/Info.plist" "$APPS_DIR/Agent Speak.app/Contents/Info.plist"
 chmod +x "$APPS_DIR/Agent Speak.app/Contents/MacOS/AgentSpeak"
@@ -73,7 +81,7 @@ cp "$APPS_DIR/Agent Speak.app/Contents/MacOS/AgentSpeak" "$SCRIPT_DIR/bin/AgentS
 
 # 3. Compile Native Swift CLI (CLI/main.swift)
 echo -e "${CYAN}→ Compiling 'agentspeak' CLI controller...${NC}"
-swiftc -O "$SCRIPT_DIR/CLI/main.swift" -o "$BIN_DIR/agentspeak"
+swiftc "${SDK_ARGS[@]}" -O "$SCRIPT_DIR/CLI/main.swift" -o "$BIN_DIR/agentspeak"
 chmod +x "$BIN_DIR/agentspeak"
 cp "$BIN_DIR/agentspeak" "$SCRIPT_DIR/bin/agentspeak"
 
@@ -87,8 +95,13 @@ if ! echo "$PATH" | grep -q "$BIN_DIR"; then
     fi
 fi
 
-# 4. Install Default Configuration & BGM tracks
+# 4. Install Default Configuration & Private Assets
 mkdir -p "$CONFIG_DIR/bgm"
+mkdir -p "$CONFIG_DIR/voices"
+mkdir -p "$CONFIG_DIR/exports"
+if [[ -L "$CONFIG_DIR/extensions/pocket-tts/venv" ]]; then
+    rm -f "$CONFIG_DIR/extensions/pocket-tts/venv"
+fi
 if [[ -f "$SCRIPT_DIR/Resources/bgm/Iron_Man.mp3" && ! -f "$CONFIG_DIR/bgm/Iron_Man.mp3" ]]; then
     cp "$SCRIPT_DIR/Resources/bgm/Iron_Man.mp3" "$CONFIG_DIR/bgm/Iron_Man.mp3"
 fi
@@ -96,11 +109,14 @@ if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
     cp "$SCRIPT_DIR/config/default_config.json" "$CONFIG_DIR/config.json"
 fi
 
-# Sync bundled neural personas to Pocket-TTS extension directory if present
+# Sync bundled neural personas to Pocket-TTS extension directory and private voices folder
 if [[ -d "$SCRIPT_DIR/Resources/voices" ]]; then
     mkdir -p "$CONFIG_DIR/extensions/pocket-tts/voices"
+    mkdir -p "$CONFIG_DIR/voices"
     cp "$SCRIPT_DIR/Resources/voices/"*.safetensors "$CONFIG_DIR/extensions/pocket-tts/voices/" 2>/dev/null || true
     cp "$SCRIPT_DIR/Resources/voices/"*.wav "$CONFIG_DIR/extensions/pocket-tts/voices/" 2>/dev/null || true
+    cp "$SCRIPT_DIR/Resources/voices/"*.safetensors "$CONFIG_DIR/voices/" 2>/dev/null || true
+    cp "$SCRIPT_DIR/Resources/voices/"*.wav "$CONFIG_DIR/voices/" 2>/dev/null || true
 fi
 
 # 5. Clean Obsolete Legacy LaunchAgents, Login Items & Register 24/7 Daemon
@@ -137,7 +153,10 @@ cat <<EOF > "$PLIST_PATH"
     <string>com.agentspeak.app</string>
     <key>ProgramArguments</key>
     <array>
-        <string>$APPS_DIR/Agent Speak.app/Contents/MacOS/AgentSpeak</string>
+        <string>/usr/bin/open</string>
+        <string>-W</string>
+        <string>-a</string>
+        <string>$APPS_DIR/Agent Speak.app</string>
     </array>
     <key>RunAtLoad</key>
     <true/>

@@ -289,9 +289,7 @@ case "voice":
         let scriptCandidates = [
             "\(extDir)/install.sh",
             "\(home)/Applications/Agent Speak.app/Contents/Resources/install_pocket_tts.sh",
-            "/Applications/Agent Speak.app/Contents/Resources/install_pocket_tts.sh",
-            "\(FileManager.default.currentDirectoryPath)/Resources/install_pocket_tts.sh",
-            "\(FileManager.default.currentDirectoryPath)/config/install_pocket_tts.sh"
+            "/Applications/Agent Speak.app/Contents/Resources/install_pocket_tts.sh"
         ]
         let script = scriptCandidates.first(where: { FileManager.default.fileExists(atPath: $0) }) ?? "\(extDir)/install.sh"
         let p = Process()
@@ -302,7 +300,7 @@ case "voice":
     } else if sub == "clone" {
         guard args.count >= 5 else {
             print("Usage: aspk voice clone <PersonaName> <path_to_audio>")
-            print("Example: aspk voice clone MyVoice ~/Downloads/sample.wav")
+            print("Example: aspk voice clone MyVoice /path/to/sample.wav")
             exit(1)
         }
         let vName = args[3]
@@ -310,8 +308,7 @@ case "voice":
         let cloneCandidates = [
             "\(extDir)/clone_voice.py",
             "\(home)/Applications/Agent Speak.app/Contents/Resources/clone_voice.py",
-            "/Applications/Agent Speak.app/Contents/Resources/clone_voice.py",
-            "\(FileManager.default.currentDirectoryPath)/Resources/clone_voice.py"
+            "/Applications/Agent Speak.app/Contents/Resources/clone_voice.py"
         ]
         let cloneScript = cloneCandidates.first(where: { FileManager.default.fileExists(atPath: $0) }) ?? "\(extDir)/clone_voice.py"
         let py = extPython
@@ -728,16 +725,32 @@ case "dictation", "fn", "ptt":
             dictMode = d["mode"] as? String ?? dictMode
             dictModel = d["model"] as? String ?? dictModel
             autoSubmit = d["auto_submit_return"] as? Bool ?? false
+            let triggerName = d["dictation_trigger_name"] as? String ?? "Right Option (⌥)"
+            print("Push-to-Talk Dictation: \(isEnabled ? "🟢 ACTIVE" : "⚪ DISABLED")")
+            print("Hardware Trigger Key:   \(triggerName)")
+            print("Dictation Engine:       \(dictMode)")
+            print("Whisper Model:          \(dictModel)")
+            print("Auto-Submit (Return):   \(autoSubmit ? "🟢 ON" : "⚪ OFF")")
+            print("Actions:                Hold to record -> Release to transcribe & auto-paste")
+            exit(0)
         }
-        print("MacBook Fn Push-to-Talk: \(isEnabled ? "🟢 ACTIVE" : "⚪ DISABLED")")
-        print("Hardware Trigger:       Hold Left Fn (Globe 🌐) Key")
+        print("Push-to-Talk Dictation: \(isEnabled ? "🟢 ACTIVE" : "⚪ DISABLED")")
+        print("Hardware Trigger Key:   Right Option (⌥)")
         print("Dictation Engine:       \(dictMode)")
         print("Whisper Model:          \(dictModel)")
         print("Auto-Submit (Return):   \(autoSubmit ? "🟢 ON" : "⚪ OFF")")
         print("Actions:                Hold to record -> Release to transcribe & auto-paste")
+    } else if sub == "key" {
+        if args.count < 4 {
+            print("Usage: agentspeak dictation key <rightOption | rightCommand | rightControl | leftControl | leftOption | capsLock | fn | f12 | f6 | grave>")
+            exit(1)
+        }
+        let keyArg = args[3]
+        _ = sendSocketMessage("__CMD_DICTATION_KEY__:\(keyArg)")
+        print("✓ Push-to-Talk trigger key updated to: \(keyArg)")
     } else {
         print("Unknown dictation subcommand: \(sub)")
-        print("Usage: agentspeak dictation <on | off | toggle | status>")
+        print("Usage: agentspeak dictation <on | off | toggle | status | key <preset>>")
     }
 
 case "greet", "welcome", "intro":

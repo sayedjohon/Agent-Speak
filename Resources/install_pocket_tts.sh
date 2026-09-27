@@ -80,15 +80,12 @@ echo -e "${GREEN}✓ Neural engine dependencies installed successfully.${NC}"
 
 # 4. Copy scripts into extension dir
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEV_POCKET_DIR="$(cd "$SCRIPT_DIR/../../pocket-tts" 2>/dev/null && pwd || echo "")"
 
 CANDIDATE_SCRIPTS=(
     "$SCRIPT_DIR/speak.py"
     "$SCRIPT_DIR/../Resources/speak.py"
     "/Applications/Agent Speak.app/Contents/Resources/speak.py"
     "$HOME/Applications/Agent Speak.app/Contents/Resources/speak.py"
-    "$SCRIPT_DIR/../pocket-tts/speak.py"
-    "$DEV_POCKET_DIR/speak.py"
 )
 for sp in "${CANDIDATE_SCRIPTS[@]}"; do
     if [[ -f "$sp" ]]; then
@@ -101,8 +98,7 @@ CANDIDATE_CLONES=(
     "$SCRIPT_DIR/clone_voice.py"
     "$SCRIPT_DIR/../Resources/clone_voice.py"
     "/Applications/Agent Speak.app/Contents/Resources/clone_voice.py"
-    "$SCRIPT_DIR/../pocket-tts/clone_voice.py"
-    "$DEV_POCKET_DIR/clone_voice.py"
+    "$HOME/Applications/Agent Speak.app/Contents/Resources/clone_voice.py"
 )
 for cp_s in "${CANDIDATE_CLONES[@]}"; do
     if [[ -f "$cp_s" ]]; then
@@ -115,14 +111,14 @@ chmod +x "$EXT_DIR/speak.py" "$EXT_DIR/clone_voice.py" 2>/dev/null || true
 # 5. Pre-bundle curated personas and pre-cache standard voices
 echo -e "${CYAN}→ [4/5] Pre-bundling neural personas (Jarvis (Best), Sayed Johon, Studio Personas, Alba, George)...${NC}"
 
-# Copy pre-packaged voices from app bundle, Resources, or dev repo
+# Copy pre-packaged voices from app bundle or Resources
 VOICE_SOURCES=(
     "$SCRIPT_DIR/voices"
     "$SCRIPT_DIR/../Resources/voices"
     "$SCRIPT_DIR/../../Resources/voices"
     "/Applications/Agent Speak.app/Contents/Resources/voices"
     "$HOME/Applications/Agent Speak.app/Contents/Resources/voices"
-    "$DEV_POCKET_DIR/pocket_tts_lab/voices"
+    "$HOME/.agentspeak/voices"
 )
 for vsrc in "${VOICE_SOURCES[@]}"; do
     if [[ -d "$vsrc" ]]; then

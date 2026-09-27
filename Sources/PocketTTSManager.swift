@@ -32,15 +32,9 @@ public class PocketTTSManager: ObservableObject {
         FileManager.default.homeDirectoryForCurrentUser.path + "/.agentspeak/extensions/pocket-tts"
     }
     
-    public var devDir: String {
-        FileManager.default.homeDirectoryForCurrentUser.path + "/Documents/DEV_AREA/ssh linux/pocket-tts"
-    }
-    
     public var activePythonPath: String? {
         let extPython = extensionDir + "/venv/bin/python"
         if FileManager.default.fileExists(atPath: extPython) { return extPython }
-        let devPython = devDir + "/venv/bin/python"
-        if FileManager.default.fileExists(atPath: devPython) { return devPython }
         return nil
     }
     
@@ -50,8 +44,6 @@ public class PocketTTSManager: ObservableObject {
         if let bundleScript = Bundle.main.resourcePath.map({ $0 + "/speak.py" }), FileManager.default.fileExists(atPath: bundleScript) {
             return bundleScript
         }
-        let devScript = devDir + "/speak.py"
-        if FileManager.default.fileExists(atPath: devScript) { return devScript }
         return nil
     }
     
@@ -61,8 +53,6 @@ public class PocketTTSManager: ObservableObject {
         if let bundleClone = Bundle.main.resourcePath.map({ $0 + "/clone_voice.py" }), FileManager.default.fileExists(atPath: bundleClone) {
             return bundleClone
         }
-        let devClone = devDir + "/clone_voice.py"
-        if FileManager.default.fileExists(atPath: devClone) { return devClone }
         return nil
     }
     
@@ -113,18 +103,13 @@ public class PocketTTSManager: ObservableObject {
             }
         }
         
-        // Search custom voice files in voices directories
+        // Search custom voice files strictly in private app storage & application bundle
         var searchDirs = [
             extensionDir + "/voices",
-            devDir + "/pocket_tts_lab/voices",
-            devDir + "/saved_voices"
+            FileManager.default.homeDirectoryForCurrentUser.path + "/.agentspeak/voices"
         ]
         if let bundleVoices = Bundle.main.resourcePath.map({ $0 + "/voices" }) {
             searchDirs.append(bundleVoices)
-        }
-        let cwdVoices = FileManager.default.currentDirectoryPath + "/Resources/voices"
-        if FileManager.default.fileExists(atPath: cwdVoices) {
-            searchDirs.append(cwdVoices)
         }
         
         for dir in searchDirs {
@@ -162,11 +147,8 @@ public class PocketTTSManager: ObservableObject {
             if let bundleScript = Bundle.main.path(forResource: "install_pocket_tts", ofType: "sh"), FileManager.default.fileExists(atPath: bundleScript) {
                 trustedScript = bundleScript
             } else {
-                let cwdScript = FileManager.default.currentDirectoryPath + "/Resources/install_pocket_tts.sh"
                 let localInstall = self.extensionDir + "/install.sh"
-                if FileManager.default.fileExists(atPath: cwdScript) {
-                    trustedScript = cwdScript
-                } else if FileManager.default.fileExists(atPath: localInstall) {
+                if FileManager.default.fileExists(atPath: localInstall) {
                     trustedScript = localInstall
                 }
             }
