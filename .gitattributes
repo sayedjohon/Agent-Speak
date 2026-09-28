@@ -1,0 +1,5 @@
+# GitHub Linguist Overrides
+# Exclude helper scripts and installers so language statistics reflect the native Swift codebase (100% Swift)
+Resources/*.py linguist-vendored
+*.sh linguist-vendored
+scripts/*.sh linguist-vendored
