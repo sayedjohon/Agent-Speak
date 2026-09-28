@@ -16,12 +16,12 @@ public struct GestureTogglesCardView: View {
                             .font(.system(size: 14, weight: .bold))
                             .foregroundColor(.cyan)
                         Text("Active Gesture Switches")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.white)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.primary)
                     }
                     Text("Turn individual gestures on or off to prevent accidental actions. By default, only Point & Left Click are enabled.")
                         .font(.system(size: 11))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 
@@ -40,14 +40,14 @@ public struct GestureTogglesCardView: View {
                     .font(.system(size: 11, weight: .semibold))
                     .padding(.horizontal, 9)
                     .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.10))
+                    .background(Color(nsColor: .quaternaryLabelColor).opacity(0.3))
                     .foregroundColor(.cyan)
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
             }
             
-            Divider().background(Color.white.opacity(0.12))
+            Divider()
             
             // Section 1: Right Hand (Air Mouse & Navigation)
             VStack(alignment: .leading, spacing: 10) {
@@ -210,9 +210,10 @@ public struct GestureTogglesCardView: View {
                         .font(.system(size: 11, weight: .medium))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(Color.white.opacity(0.08))
-                        .foregroundColor(.white.opacity(0.9))
+                        .background(Color(nsColor: .quaternaryLabelColor).opacity(0.25))
+                        .foregroundColor(.primary)
                         .cornerRadius(6)
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.5))
                 }
                 .buttonStyle(.plain)
                 
@@ -235,9 +236,10 @@ public struct GestureTogglesCardView: View {
                         .font(.system(size: 11, weight: .medium))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(Color.white.opacity(0.08))
-                        .foregroundColor(.white.opacity(0.9))
+                        .background(Color(nsColor: .quaternaryLabelColor).opacity(0.25))
+                        .foregroundColor(.primary)
                         .cornerRadius(6)
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.5))
                 }
                 .buttonStyle(.plain)
                 
@@ -260,16 +262,21 @@ public struct GestureTogglesCardView: View {
                         .font(.system(size: 11, weight: .medium))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(Color.white.opacity(0.08))
-                        .foregroundColor(.white.opacity(0.7))
+                        .background(Color(nsColor: .quaternaryLabelColor).opacity(0.25))
+                        .foregroundColor(.secondary)
                         .cornerRadius(6)
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.5))
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(16)
-        .background(Color(white: 0.1, opacity: 0.6))
-        .cornerRadius(12)
+        .padding(14)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
     }
     
     // MARK: - Toggle Row Item
@@ -284,12 +291,12 @@ public struct GestureTogglesCardView: View {
             // Icon Badge
             ZStack {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(isOn.wrappedValue ? iconColor.opacity(0.18) : Color.white.opacity(0.05))
+                    .fill(isOn.wrappedValue ? iconColor.opacity(0.18) : Color(nsColor: .quaternaryLabelColor).opacity(0.3))
                     .frame(width: 32, height: 32)
                 
                 Image(systemName: icon)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(isOn.wrappedValue ? iconColor : Color.gray.opacity(0.6))
+                    .foregroundColor(isOn.wrappedValue ? iconColor : .secondary)
             }
             
             // Description & Posture
@@ -297,7 +304,7 @@ public struct GestureTogglesCardView: View {
                 HStack(spacing: 6) {
                     Text(title)
                         .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundColor(isOn.wrappedValue ? .white : .gray)
+                        .foregroundColor(isOn.wrappedValue ? .primary : .secondary)
                     
                     if isOn.wrappedValue {
                         Text("ACTIVE")
@@ -312,7 +319,7 @@ public struct GestureTogglesCardView: View {
                 
                 Text(posture)
                     .font(.system(size: 11))
-                    .foregroundColor(.gray.opacity(0.9))
+                    .foregroundColor(.secondary)
                     .lineLimit(1)
             }
             
@@ -325,7 +332,7 @@ public struct GestureTogglesCardView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(isOn.wrappedValue ? Color.white.opacity(0.03) : Color.clear)
+        .background(isOn.wrappedValue ? iconColor.opacity(0.05) : Color.clear)
         .cornerRadius(8)
     }
 }

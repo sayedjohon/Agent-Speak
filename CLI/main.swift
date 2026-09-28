@@ -46,7 +46,7 @@ func printHelp() {
       settings    Open the Agent Speak Settings window (alias: dashboard)
       tray        Toggle or set menu bar tray icon (tray on | off | toggle)
       code        Control code block speech (code on | off | toggle | status)
-      hologram    Manage holographic reactor overlay (on | off | blend <mode> | blends | opacity <val> | color <name> | preview | status)
+      hologram    Manage holographic reactor overlay (on | off | zoom <0-100> | pos <x> <y> | reset | blend | blends | opacity | skin | color | preview | status)
       voice       Manage voices and volume (status | list | set | vol <1-200> | install | clone)
       bgm         Manage Iron Man background soundtrack (on | off | vol | test | open | status)
       gesture     Control camera hand tracking (status | on | off | toggle | preview on/off | hud on/off | list)
@@ -473,7 +473,7 @@ case "bgm":
 
 case "hologram", "holo":
     guard args.count > 2 else {
-        print("Usage: agentspeak hologram <on | off | toggle | blend <name> | blends | opacity <10-100> | skin <name> | skins | color <name> | preview | status>")
+        print("Usage: agentspeak hologram <on | off | toggle | zoom <0-100> | pos <x> <y> | reset | blend <name> | blends | opacity <10-100> | skin <name> | skins | color <name> | preview | status>")
         print("Available colors: amber, cyan, green, red, purple, white")
         exit(0)
     }
@@ -489,7 +489,36 @@ case "hologram", "holo":
         print("[Agent Speak] Toggled hologram overlay.")
     } else if sub == "preview" || sub == "test" {
         _ = ensureAppRunningAndSend("__CMD_HOLOGRAM_PREVIEW__")
-        print("[Agent Speak] Triggered 4-second hologram preview.")
+        print("[Agent Speak] Triggered 5-second hologram preview.")
+    } else if sub == "stop" || sub == "dismiss" {
+        _ = ensureAppRunningAndSend("__CMD_HOLOGRAM_STOP__")
+        print("[Agent Speak] Hologram overlay dismissed.")
+    } else if sub == "zoom" || sub == "scale" {
+        if args.count > 3 {
+            let zStr = args[3].replacingOccurrences(of: "%", with: "").replacingOccurrences(of: "x", with: "")
+            if let val = Double(zStr), val >= 0 && val <= 100 {
+                _ = ensureAppRunningAndSend("__CMD_HOLOGRAM_ZOOM_\(Int(val))__")
+                print("[Agent Speak] Hologram zoom scale set to: \(Int(val))% (Default: 50% = 1.0x)")
+            } else {
+                print("Invalid zoom: '\(args[3])'. Please enter a percentage between 0 and 100.")
+            }
+        } else {
+            print("Usage: agentspeak hologram zoom <0-100>")
+            print("Example: agentspeak hologram zoom 50  (1.0x native standard)")
+            print("Example: agentspeak hologram zoom 100 (2.8x expands beyond monitor)")
+        }
+    } else if sub == "pos" || sub == "position" || sub == "offset" {
+        if args.count > 4, let px = Double(args[3]), let py = Double(args[4]) {
+            _ = ensureAppRunningAndSend("__CMD_HOLOGRAM_POS_\(Int(px))_\(Int(py))__")
+            print("[Agent Speak] Hologram position offset set to: X=\(Int(px))px, Y=\(Int(py))px")
+        } else {
+            print("Usage: agentspeak hologram pos <x_offset> <y_offset>")
+            print("Example: agentspeak hologram pos 0 0        (center)")
+            print("Example: agentspeak hologram pos 150 -50    (shift right 150px, up 50px)")
+        }
+    } else if sub == "reset" {
+        _ = ensureAppRunningAndSend("__CMD_HOLOGRAM_RESET__")
+        print("[Agent Speak] Hologram transform reset to default (Zoom: 50% [1.0x], Pos: X=0, Y=0).")
     } else if sub == "blends" || sub == "list-blends" {
         print("─── Photoshop-Grade Holographic Blending Modes ───")
         print("• normal      : Normal (Default) — standard full-strength holographic projection")
@@ -573,6 +602,9 @@ case "hologram", "holo":
         var skin = "classicArc"
         var blendMode = "normal"
         var opacity = 100
+        var zoomScale = 50
+        var offsetX = 0
+        var offsetY = 0
         if let data = try? Data(contentsOf: cfgURL),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let holo = json["hologram"] as? [String: Any] {
@@ -583,15 +615,27 @@ case "hologram", "holo":
             if let op = holo["opacity"] as? Double {
                 opacity = Int(round(op * 100.0))
             }
+            if let sc = (holo["scale"] as? Double) ?? (holo["zoom"] as? Double) {
+                zoomScale = Int(round(sc * 100.0))
+            }
+            if let ox = (holo["offsetX"] as? Double) ?? (holo["positionX"] as? Double) {
+                offsetX = Int(round(ox))
+            }
+            if let oy = (holo["offsetY"] as? Double) ?? (holo["positionY"] as? Double) {
+                offsetY = Int(round(oy))
+            }
         }
+        let scaleMult = zoomScale <= 50 ? (0.25 + Double(zoomScale) / 50.0 * 0.75) : (1.00 + Double(zoomScale - 50) / 50.0 * 1.80)
         print("Hologram Overlay: \(isEnabled ? "🟢 ENABLED" : "🔴 DISABLED")")
         print("Current Theme:    \(theme.capitalized)")
         print("Current Skin:     \(skin)")
         print("Blending Mode:    \(blendMode)")
         print("Opacity / Glow:   \(opacity)%")
+        print("Zoom / Scale (Z): \(zoomScale)% (\(String(format: "%.2f", scaleMult))x)")
+        print("Position Offset:  X: \(offsetX)px, Y: \(offsetY)px")
     } else {
         print("Unknown hologram subcommand: \(sub)")
-        print("Available subcommands: on, off, toggle, blend <name>, blends, opacity <10-100>, skin <name>, skins, color <name>, preview, status")
+        print("Available subcommands: on, off, toggle, zoom <0-100>, pos <x> <y>, reset, blend <name>, blends, opacity <10-100>, skin <name>, skins, color <name>, preview, status")
     }
 
 case "gesture", "gestures":

@@ -88,6 +88,8 @@ The installer will:
   - `Normal`: Solid rendering with adjustable opacity.
 - **6 Vibrant Color Palettes**: Golden Amber (Stark Mk 42), Arc Reactor Cyan, Matrix Emerald, Crimson Ruby, Neon Violet, and Diamond Ice.
 - **Adjustable Opacity**: Dial intensity anywhere from 10% to 100%.
+- **DaVinci Resolve-Style 3-Axis Transform Controls**: Fine-tune Zoom (Scale Z up to 2.8x expanding beyond monitor bounds), Horizontal Position X (-1000px to +1000px), Vertical Position Y (-800px to +800px), and an animated Master Reset button for custom ultra-wide or portrait displays.
+- **Live Preview Auto-Dismiss & Stop**: 5-second auto-exit preview with dynamic Stop Preview controls in the settings inspector.
 
 ### 🖐️ Dual-Hand 10-Finger Camera Gesture Control
 - **On-Device Vision Tracking**: Powered by Apple Vision framework (`VNDetectHumanHandPoseRequest`) running on the Apple Silicon Neural Engine at 60-120 FPS.
@@ -154,7 +156,11 @@ agentspeak hologram blend screen     # normal, screen, additive, multiply, overl
 agentspeak hologram blends           # list all supported blending modes
 agentspeak hologram opacity 80       # 10 to 100 percent
 agentspeak hologram color cyan       # amber, cyan, green, red, purple, white
-agentspeak hologram preview          # 4-second live visualizer test
+agentspeak hologram zoom 0.5         # set scale / zoom (0.0 to 1.0, 0.5 = 100% normal)
+agentspeak hologram pos 0 0          # set X and Y pixel offsets
+agentspeak hologram reset            # reset HUD transform to factory defaults
+agentspeak hologram preview          # 5-second live visualizer test
+agentspeak hologram stop             # instantly stop and dismiss live preview
 
 # Camera Hand Tracking
 agentspeak gesture status

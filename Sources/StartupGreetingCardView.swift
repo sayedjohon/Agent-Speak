@@ -33,7 +33,7 @@ public struct StartupGreetingCardView: View {
                         
                         Text("User Identity & Startup Greeting")
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                     }
                     
                     Text("Personalize your name and assistant persona. Replaces technical system jargon with warm, friendly greetings.")
@@ -62,7 +62,7 @@ public struct StartupGreetingCardView: View {
                 }
             }
             
-            Divider().background(Color.white.opacity(0.10))
+            Divider()
             
             // MARK: - Identity Fields (User Name & Agent Name)
             HStack(spacing: 12) {
@@ -89,15 +89,15 @@ public struct StartupGreetingCardView: View {
                         ))
                         .textFieldStyle(.plain)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
-                    .background(Color.black.opacity(0.35))
+                    .background(Color(nsColor: .textBackgroundColor))
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
+                            .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
                     )
                 }
                 .frame(maxWidth: .infinity)
@@ -125,15 +125,15 @@ public struct StartupGreetingCardView: View {
                         ))
                         .textFieldStyle(.plain)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
-                    .background(Color.black.opacity(0.35))
+                    .background(Color(nsColor: .textBackgroundColor))
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
+                            .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
                     )
                 }
                 .frame(maxWidth: .infinity)
@@ -198,7 +198,7 @@ public struct StartupGreetingCardView: View {
                                         .foregroundColor(greetingCategory == "jarvis" ? .orange : .teal)
                                     Text(selected.displayName)
                                         .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(.white)
+                                        .foregroundColor(.primary)
                                     Spacer()
                                     Text(selected.subtitle)
                                         .font(.system(size: 10.5))
@@ -211,11 +211,11 @@ public struct StartupGreetingCardView: View {
                             }
                             .padding(.horizontal, 10)
                             .padding(.vertical, 7)
-                            .background(Color.black.opacity(0.35))
+                            .background(Color(nsColor: .textBackgroundColor))
                             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
+                                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
                             )
                         }
                     }
@@ -228,7 +228,7 @@ public struct StartupGreetingCardView: View {
                         
                         Text(samplePreviewText.isEmpty ? "Hey \(userName), \(agentName) is here and ready to help!" : samplePreviewText)
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                             .italic()
                             .lineSpacing(2)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -254,8 +254,8 @@ public struct StartupGreetingCardView: View {
                             }
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
-                            .background(Color.white.opacity(0.08))
-                            .foregroundColor(.white)
+                            .background(Color(nsColor: .quaternaryLabelColor).opacity(0.25))
+                            .foregroundColor(.primary)
                             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         }
                         .buttonStyle(.plain)
@@ -294,14 +294,14 @@ public struct StartupGreetingCardView: View {
                             }
                         ))
                         .font(.system(size: 12))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                         .frame(minHeight: 52)
                         .padding(6)
-                        .background(Color.black.opacity(0.35))
+                        .background(Color(nsColor: .textBackgroundColor))
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         .overlay(
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
+                                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
                         )
                     }
                     

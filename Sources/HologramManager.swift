@@ -224,6 +224,9 @@ public class HologramManager: ObservableObject {
     @Published public var currentSkin: HologramSkinType = .classicArc
     @Published public var currentBlendMode: HologramBlendMode = .normal
     @Published public var opacity: Double = 1.0
+    @Published public var zoomScale: Double = 0.50          // Range 0.0...1.0, default 0.50 = 50% (1.00x)
+    @Published public var positionX: Double = 0.0           // Range -1000.0...+1000.0 px (default 0.0)
+    @Published public var positionY: Double = 0.0           // Range -800.0...+800.0 px (default 0.0)
     @Published public var isPreviewActive: Bool = false
     @Published public var isCollapsing: Bool = false
     @Published public var isFadingOut: Bool = false
@@ -235,9 +238,22 @@ public class HologramManager: ObservableObject {
         return currentBlendMode.baseOpacity * opacity
     }
     
+    /// DaVinci Resolve-grade dynamic scale multiplier.
+    /// At 50% (0.50): exactly 1.00x standard scale.
+    /// Below 50%: smoothly scales down to 0.25x mini HUD.
+    /// Above 50%: smoothly scales up to 2.80x, exceeding standard monitor bounds for ultra-immersive setups.
+    public var effectiveScaleMultiplier: Double {
+        if zoomScale <= 0.50 {
+            return 0.25 + (zoomScale / 0.50) * 0.75
+        } else {
+            return 1.00 + ((zoomScale - 0.50) / 0.50) * 1.80
+        }
+    }
+    
     private var hologramPanel: NSPanel?
     private var dismissTimer: Timer?
     private var fadeTimer: Timer?
+    private var previewTimer: Timer?
     private var previewDummyManager: StreamingAudioManager?
     
     public var configURL: URL {
@@ -268,6 +284,15 @@ public class HologramManager: ObservableObject {
             if let op = holo["opacity"] as? Double {
                 self.opacity = max(0.15, min(1.0, op))
             }
+            if let sc = (holo["scale"] as? Double) ?? (holo["zoom"] as? Double) {
+                self.zoomScale = max(0.0, min(1.0, sc))
+            }
+            if let ox = (holo["offsetX"] as? Double) ?? (holo["positionX"] as? Double) {
+                self.positionX = max(-1000.0, min(1000.0, ox))
+            }
+            if let oy = (holo["offsetY"] as? Double) ?? (holo["positionY"] as? Double) {
+                self.positionY = max(-800.0, min(800.0, oy))
+            }
         }
     }
     
@@ -281,6 +306,9 @@ public class HologramManager: ObservableObject {
         holo["skin"] = self.currentSkin.id
         holo["blend_mode"] = self.currentBlendMode.id
         holo["opacity"] = self.opacity
+        holo["scale"] = self.zoomScale
+        holo["offsetX"] = self.positionX
+        holo["offsetY"] = self.positionY
         json["hologram"] = holo
         
         if let updated = try? JSONSerialization.data(withJSONObject: json, options: .prettyPrinted) {
@@ -336,6 +364,44 @@ public class HologramManager: ObservableObject {
     public func setOpacity(_ val: Double) {
         DispatchQueue.main.async {
             self.opacity = max(0.15, min(1.0, val))
+            self.saveConfig()
+        }
+    }
+    
+    public func setZoomScale(_ val: Double) {
+        DispatchQueue.main.async {
+            self.zoomScale = max(0.0, min(1.0, val))
+            self.saveConfig()
+        }
+    }
+    
+    public func setPositionX(_ val: Double) {
+        DispatchQueue.main.async {
+            self.positionX = max(-1000.0, min(1000.0, val))
+            self.saveConfig()
+        }
+    }
+    
+    public func setPositionY(_ val: Double) {
+        DispatchQueue.main.async {
+            self.positionY = max(-800.0, min(800.0, val))
+            self.saveConfig()
+        }
+    }
+    
+    public func setPosition(x: Double, y: Double) {
+        DispatchQueue.main.async {
+            self.positionX = max(-1000.0, min(1000.0, x))
+            self.positionY = max(-800.0, min(800.0, y))
+            self.saveConfig()
+        }
+    }
+    
+    public func resetTransform() {
+        DispatchQueue.main.async {
+            self.zoomScale = 0.50
+            self.positionX = 0.0
+            self.positionY = 0.0
             self.saveConfig()
         }
     }
@@ -400,22 +466,29 @@ public class HologramManager: ObservableObject {
     public func dismissHologramImmediately() {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
+            self.previewTimer?.invalidate()
+            self.previewTimer = nil
             self.dismissTimer?.invalidate()
             self.dismissTimer = nil
             self.fadeTimer?.invalidate()
             self.fadeTimer = nil
+            self.previewDummyManager?.isPlaying = false
             self.previewDummyManager = nil
             self.isPreviewActive = false
             self.isCollapsing = false
             self.collapseStartDate = nil
             self.isFadingOut = false
             self.fadeProgress = 0.0
-            self.hologramPanel?.orderOut(nil)
-            self.hologramPanel = nil
+            
+            if let panel = self.hologramPanel {
+                panel.orderOut(nil)
+                panel.contentView = nil
+                self.hologramPanel = nil
+            }
         }
     }
     
-    public func startWindowFadeOut(duration: Double = 3.0) {
+    public func startWindowFadeOut(duration: Double = 2.0) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             guard let panel = self.hologramPanel, !self.isFadingOut else { return }
@@ -431,47 +504,40 @@ public class HologramManager: ObservableObject {
         }
     }
     
-    public func dismissHologramWithFade(duration: Double = 3.0) {
+    public func dismissHologramWithFade(duration: Double = 1.0) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            guard let panel = self.hologramPanel, !self.isFadingOut else { return }
+            self.previewTimer?.invalidate()
+            self.previewTimer = nil
+            self.previewDummyManager?.isPlaying = false
+            self.previewDummyManager = nil
+            self.isPreviewActive = false
+            
+            guard let panel = self.hologramPanel else {
+                self.dismissHologramImmediately()
+                return
+            }
             
             self.dismissTimer?.invalidate()
-            self.dismissTimer = nil
             self.fadeTimer?.invalidate()
-            self.fadeTimer = nil
-            
             self.isFadingOut = true
             self.fadeProgress = 0.0
             
-            // CoreAnimation window alpha dissolve in parallel
-            NSAnimationContext.runAnimationGroup { ctx in
+            // CoreAnimation window alpha dissolve in parallel with guaranteed completion
+            NSAnimationContext.runAnimationGroup({ ctx in
                 ctx.duration = duration
                 ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 panel.animator().alphaValue = 0.0
-            }
+            }, completionHandler: { [weak self] in
+                self?.dismissHologramImmediately()
+            })
             
-            let steps = 60
-            let stepInterval = max(0.02, duration / Double(steps))
-            var currentStep = 0
-            
-            let timer = Timer(timeInterval: stepInterval, repeats: true) { [weak self] t in
-                guard let self = self else {
-                    t.invalidate()
-                    return
-                }
-                currentStep += 1
-                let progress = Double(currentStep) / Double(steps)
-                self.fadeProgress = min(1.0, max(0.0, progress))
-                
-                if currentStep >= steps {
-                    t.invalidate()
-                    self.fadeTimer = nil
-                    self.dismissHologramImmediately()
+            // Hard safety fallback timeout (guarantees exit even if animation drops)
+            DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.15) { [weak self] in
+                if self?.hologramPanel != nil {
+                    self?.dismissHologramImmediately()
                 }
             }
-            RunLoop.main.add(timer, forMode: .common)
-            self.fadeTimer = timer
         }
     }
     
@@ -486,17 +552,19 @@ public class HologramManager: ObservableObject {
                 return
             }
             
-            // If no music is playing, smoothly dissolve just like the music fade (3.0s ease-in-out)
-            self.dismissHologramWithFade(duration: 3.0)
+            // If no music is playing, smoothly dissolve in 1.5s
+            self.dismissHologramWithFade(duration: 1.5)
         }
     }
     
-    public func triggerPreview() {
+    public func triggerPreview(duration: Double = 5.0) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             guard self.isEnabled else { return }
             
-            self.dismissHologramImmediately()
+            // Immediately stop any existing preview
+            self.stopPreview()
+            
             self.isPreviewActive = true
             self.isCollapsing = false
             self.collapseStartDate = nil
@@ -513,11 +581,23 @@ public class HologramManager: ObservableObject {
             
             self.showHologram(targetScreen: targetScreen, audioManager: dummy)
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
-                guard let self = self, self.isPreviewActive else { return }
-                self.previewDummyManager?.isPlaying = false
-                self.dismissHologramWithFade(duration: 3.0)
+            // Automatic ironclad exit after specified seconds
+            self.previewTimer?.invalidate()
+            self.previewTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
+                self?.dismissHologramWithFade(duration: 1.0)
             }
+        }
+    }
+    
+    public func stopPreview() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.previewTimer?.invalidate()
+            self.previewTimer = nil
+            self.previewDummyManager?.isPlaying = false
+            self.previewDummyManager = nil
+            self.isPreviewActive = false
+            self.dismissHologramImmediately()
         }
     }
 }

@@ -225,7 +225,7 @@ public struct DashboardView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(nsColor: .windowBackgroundColor))
         }
-        .frame(minWidth: 760, idealWidth: 820, maxWidth: 960, minHeight: 600, idealHeight: 740, maxHeight: .infinity)
+        .frame(minWidth: 840, idealWidth: 880, maxWidth: 1100, minHeight: 580, idealHeight: 640, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             loadConfig()
@@ -245,7 +245,7 @@ public struct DashboardView: View {
     
     private var sidebarView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Brand Header in Apple Settings style
+            // Brand Header in Apple Settings style with safe top margin below window controls
             HStack(spacing: 10) {
                 if let logo = brandLogoImage {
                     Image(nsImage: logo)
@@ -271,7 +271,7 @@ public struct DashboardView: View {
                 Spacer()
             }
             .padding(.horizontal, 16)
-            .padding(.top, 20)
+            .padding(.top, 40)
             .padding(.bottom, 16)
             
             // Nav Tab List (macOS System Settings Style)
@@ -364,9 +364,9 @@ public struct DashboardView: View {
     @ViewBuilder
     private var detailContentView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header Bar
+            // Header Bar aligned with sidebar header baseline
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(selectedTab.rawValue)
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.primary)
@@ -377,7 +377,7 @@ public struct DashboardView: View {
                 Spacer()
             }
             .padding(.horizontal, 28)
-            .padding(.top, 22)
+            .padding(.top, 38)
             .padding(.bottom, 16)
             
             Divider()

@@ -37,7 +37,7 @@ public struct VoiceVolumeCardView: View {
                         HStack(spacing: 6) {
                             Text("VOICE PLAYBACK VOLUME & FORCE GAIN")
                                 .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(.white)
+                                .foregroundColor(.primary)
                             
                             if volumeManager.isBoosted {
                                 Text("BOOST ACTIVE")
@@ -54,7 +54,7 @@ public struct VoiceVolumeCardView: View {
                              ? "Force Decibel Boost actively amplifying quiet voice models with analog soft-saturation"
                              : "100% represents standard full loudness. Scale down or boost up to 200% (+6.0 dB)")
                             .font(.system(size: 11))
-                            .foregroundColor(Color(red: 0.60, green: 0.62, blue: 0.70))
+                            .foregroundColor(.secondary)
                             .lineLimit(1)
                     }
                 }
@@ -92,17 +92,17 @@ public struct VoiceVolumeCardView: View {
                             .frame(width: 6, height: 6)
                         Text(statusBadgeText)
                             .font(.system(size: 11.5, weight: .bold))
-                            .foregroundColor(volumeManager.isBoosted ? .orange : (volumeManager.volume == 100 ? .green : .white))
+                            .foregroundColor(volumeManager.isBoosted ? .orange : (volumeManager.volume == 100 ? .green : .primary))
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(volumeManager.isBoosted ? Color.orange.opacity(0.12) : Color.white.opacity(0.06))
+                            .fill(volumeManager.isBoosted ? Color.orange.opacity(0.12) : Color(nsColor: .quaternaryLabelColor).opacity(0.2))
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
-                            .stroke(volumeManager.isBoosted ? Color.orange.opacity(0.35) : Color.white.opacity(0.1), lineWidth: 1)
+                            .stroke(volumeManager.isBoosted ? Color.orange.opacity(0.35) : Color(nsColor: .separatorColor), lineWidth: 0.5)
                     )
                 }
             }
@@ -133,7 +133,7 @@ public struct VoiceVolumeCardView: View {
                     // Stepper / Value Display
                     Text("\(volumeManager.volume)%")
                         .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundColor(volumeManager.isBoosted ? .orange : .white)
+                        .foregroundColor(volumeManager.isBoosted ? .orange : .primary)
                         .frame(width: 44, alignment: .trailing)
                 }
                 
@@ -175,18 +175,18 @@ public struct VoiceVolumeCardView: View {
                         .padding(.vertical, 6)
                         .background(
                             volumeManager.volume == p.val
-                                ? (p.val > 100 ? Color.orange : (p.val == 100 ? Color.blue : Color.white.opacity(0.18)))
-                                : Color.white.opacity(0.06)
+                                ? (p.val > 100 ? Color.orange : (p.val == 100 ? Color.blue : Color(nsColor: .quaternaryLabelColor).opacity(0.35)))
+                                : Color(nsColor: .quaternaryLabelColor).opacity(0.2)
                         )
-                        .foregroundColor(volumeManager.volume == p.val ? .white : Color(red: 0.82, green: 0.84, blue: 0.90))
+                        .foregroundColor(volumeManager.volume == p.val ? .white : .primary)
                         .cornerRadius(6)
                         .overlay(
                             RoundedRectangle(cornerRadius: 6)
                                 .stroke(
                                     volumeManager.volume == p.val
                                         ? (p.val > 100 ? Color.orange : Color.blue)
-                                        : Color.white.opacity(0.08),
-                                    lineWidth: 1
+                                        : Color(nsColor: .separatorColor),
+                                    lineWidth: 0.5
                                 )
                         )
                     }
@@ -202,15 +202,15 @@ public struct VoiceVolumeCardView: View {
                         .foregroundColor(.green)
                     Text("Studio analog soft-saturation limiter active (tanh curve): Smooths waveform peaks approaching 0 dBFS to prevent harsh clipping.")
                         .font(.system(size: 10))
-                        .foregroundColor(Color(red: 0.70, green: 0.72, blue: 0.78))
+                        .foregroundColor(.secondary)
                 }
                 .padding(.top, 2)
             }
         }
         .padding(14)
-        .background(Color(red: 0.11, green: 0.12, blue: 0.15))
+        .background(Color(nsColor: .controlBackgroundColor))
         .cornerRadius(8)
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(red: 0.18, green: 0.19, blue: 0.24), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(nsColor: .separatorColor), lineWidth: 0.5))
     }
     
     private var statusBadgeText: String {

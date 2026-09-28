@@ -38,7 +38,7 @@ public struct BackgroundMusicView: View {
         HStack(spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(bgmManager.isEnabled ? Color.purple.opacity(0.20) : Color.white.opacity(0.06))
+                    .fill(bgmManager.isEnabled ? Color.purple.opacity(0.20) : Color(nsColor: .quaternaryLabelColor).opacity(0.2))
                     .frame(width: 48, height: 48)
                 
                 Image(systemName: bgmManager.isPlaying ? "waveform.path.badge.plus" : "music.quarternote.3")
@@ -50,7 +50,7 @@ public struct BackgroundMusicView: View {
                 HStack(spacing: 8) {
                     Text("Iron Man Soundtrack Mode")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                     
                     if bgmManager.isPlaying {
                         HStack(spacing: 4) {
@@ -161,14 +161,14 @@ public struct BackgroundMusicView: View {
         }) {
             Text(title)
                 .font(.system(size: 10, weight: isSelected ? .bold : .medium))
-                .foregroundColor(isSelected ? .white : .secondary)
+                .foregroundColor(isSelected ? .white : .primary)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)
-                .background(isSelected ? Color.purple.opacity(0.35) : Color.white.opacity(0.06))
+                .background(isSelected ? Color.purple : Color(nsColor: .quaternaryLabelColor).opacity(0.2))
                 .cornerRadius(6)
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
-                        .stroke(isSelected ? Color.purple : Color.white.opacity(0.08), lineWidth: 1)
+                        .stroke(isSelected ? Color.purple : Color(nsColor: .separatorColor), lineWidth: 0.5)
                 )
         }
         .buttonStyle(PlainButtonStyle())
@@ -179,14 +179,14 @@ public struct BackgroundMusicView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("PLAYBACK BEHAVIOR")
                 .font(.system(size: 10, weight: .bold))
-                .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                .foregroundColor(.secondary)
             
             // Random Offset Toggle
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Start from Random Position")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                     Text("Starts audio from a random point in the song instead of beginning at 0:00 every time.")
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
@@ -203,14 +203,14 @@ public struct BackgroundMusicView: View {
                 .labelsHidden()
             }
             
-            Divider().background(Color.white.opacity(0.06))
+            Divider()
             
             // Shuffle Toggle
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Shuffle Playlist")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                     Text("Picks a random song from your music folder whenever speech begins.")
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
@@ -227,7 +227,7 @@ public struct BackgroundMusicView: View {
                 .labelsHidden()
             }
             
-            Divider().background(Color.white.opacity(0.06))
+            Divider()
             
             // Reverb Fade Out Toggle
             HStack {
@@ -235,7 +235,7 @@ public struct BackgroundMusicView: View {
                     HStack(spacing: 6) {
                         Text("Cinematic Reverb Fade-Out")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                         Text("2.5s Decay")
                             .font(.system(size: 9, weight: .bold))
                             .foregroundColor(.cyan)
@@ -279,14 +279,14 @@ public struct BackgroundMusicView: View {
                     Text(isTestingReverbFade ? "Stop Test" : "Test Play & Reverb Fade-Out")
                         .font(.system(size: 12, weight: .medium))
                 }
-                .foregroundColor(isTestingReverbFade ? .red : .white)
+                .foregroundColor(isTestingReverbFade ? .white : .primary)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
-                .background(isTestingReverbFade ? Color.red.opacity(0.15) : Color.purple.opacity(0.25))
+                .background(isTestingReverbFade ? Color.red : Color(nsColor: .quaternaryLabelColor).opacity(0.25))
                 .cornerRadius(8)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(isTestingReverbFade ? Color.red.opacity(0.5) : Color.purple.opacity(0.5), lineWidth: 1)
+                        .stroke(isTestingReverbFade ? Color.red : Color(nsColor: .separatorColor), lineWidth: 0.5)
                 )
             }
             .buttonStyle(PlainButtonStyle())
@@ -298,8 +298,12 @@ public struct BackgroundMusicView: View {
             Spacer()
         }
         .padding(12)
-        .background(Color(red: 0.09, green: 0.10, blue: 0.13))
+        .background(Color(nsColor: .controlBackgroundColor))
         .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
     }
     
     private func triggerTestFadeOut() {
@@ -330,7 +334,7 @@ public struct BackgroundMusicView: View {
             HStack {
                 Text("MUSIC LIBRARY")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                    .foregroundColor(.secondary)
                 
                 Spacer()
                 
@@ -365,7 +369,7 @@ public struct BackgroundMusicView: View {
                 }
             }
             
-            Divider().background(Color.white.opacity(0.06))
+            Divider()
             
             // Actions
             HStack(spacing: 10) {
@@ -376,11 +380,15 @@ public struct BackgroundMusicView: View {
                         Text("Add Track...")
                             .font(.system(size: 11, weight: .medium))
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.08))
+                    .background(Color(nsColor: .quaternaryLabelColor).opacity(0.2))
                     .cornerRadius(6)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                    )
                 }
                 .buttonStyle(PlainButtonStyle())
                 
@@ -391,11 +399,15 @@ public struct BackgroundMusicView: View {
                         Text("Open in Finder")
                             .font(.system(size: 11, weight: .medium))
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.08))
+                    .background(Color(nsColor: .quaternaryLabelColor).opacity(0.2))
                     .cornerRadius(6)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                    )
                 }
                 .buttonStyle(PlainButtonStyle())
                 
@@ -438,7 +450,7 @@ public struct BackgroundMusicView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(name)
                     .font(.system(size: 11, weight: isCurrent ? .bold : .medium))
-                    .foregroundColor(isCurrent ? .purple : .white)
+                    .foregroundColor(isCurrent ? .purple : .primary)
                     .lineLimit(1)
                 
                 HStack(spacing: 6) {
@@ -472,8 +484,12 @@ public struct BackgroundMusicView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
-        .background(isCurrent ? Color.purple.opacity(0.12) : Color.white.opacity(0.04))
+        .background(isCurrent ? Color.purple.opacity(0.12) : Color(nsColor: .quaternaryLabelColor).opacity(0.15))
         .cornerRadius(6)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(isCurrent ? Color.purple.opacity(0.3) : Color(nsColor: .separatorColor).opacity(0.4), lineWidth: 0.5)
+        )
     }
     
     private func pickAudioFile() {

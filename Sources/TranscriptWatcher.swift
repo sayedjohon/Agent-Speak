@@ -782,6 +782,18 @@ public class TranscriptWatcher {
                                 HologramManager.shared.setOpacity(val > 1.0 ? val / 100.0 : val)
                             }
                         }
+                    } else if raw.hasPrefix("__CMD_HOLOGRAM_ZOOM_") && raw.hasSuffix("__") {
+                        let str = raw.replacingOccurrences(of: "__CMD_HOLOGRAM_ZOOM_", with: "").replacingOccurrences(of: "__", with: "")
+                        if let val = Double(str) { DispatchQueue.main.async { HologramManager.shared.setZoomScale(val > 1.0 ? val / 100.0 : val) } }
+                    } else if raw.hasPrefix("__CMD_HOLOGRAM_POS_") && raw.hasSuffix("__") {
+                        let parts = raw.replacingOccurrences(of: "__CMD_HOLOGRAM_POS_", with: "").replacingOccurrences(of: "__", with: "").split(separator: "_")
+                        if parts.count >= 2, let px = Double(parts[0]), let py = Double(parts[1]) {
+                            DispatchQueue.main.async { HologramManager.shared.setPosition(x: px, y: py) }
+                        }
+                    } else if raw == "__CMD_HOLOGRAM_RESET__" {
+                        DispatchQueue.main.async { HologramManager.shared.resetTransform() }
+                    } else if raw == "__CMD_HOLOGRAM_STOP__" {
+                        DispatchQueue.main.async { HologramManager.shared.stopPreview() }
                     } else if raw == "__CMD_GESTURE_ON__" {
                         DispatchQueue.main.async {
                             CameraGestureManager.shared.start()

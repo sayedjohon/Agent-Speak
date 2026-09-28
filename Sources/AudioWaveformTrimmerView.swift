@@ -232,9 +232,9 @@ public struct AudioWaveformTrimmerView: View {
             presetChipsAndGuidanceBar
         }
         .padding(10)
-        .background(Color(red: 0.09, green: 0.10, blue: 0.13))
+        .background(Color(nsColor: .controlBackgroundColor))
         .cornerRadius(7)
-        .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color(red: 0.18, green: 0.19, blue: 0.24), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color(nsColor: .separatorColor), lineWidth: 0.5))
         .onDisappear {
             player.stop()
         }
@@ -268,24 +268,24 @@ public struct AudioWaveformTrimmerView: View {
                 if player.isPlaying {
                     Text(formatClock(player.currentTime))
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                     Text("/")
                         .font(.system(size: 9.5))
-                        .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                        .foregroundColor(.secondary)
                     Text(formatClock(isCutActive ? endTime : totalDuration))
                         .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                        .foregroundColor(.secondary)
                 } else if isCutActive {
                     Text("Selected: \(formatClock(startTime)) – \(formatClock(endTime))")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .foregroundColor(Color(red: 0.20, green: 0.75, blue: 1.0))
+                        .foregroundColor(Color.accentColor)
                     Text("(\(String(format: "%.1fs", max(0.1, endTime - startTime))))")
                         .font(.system(size: 9.5, weight: .medium, design: .monospaced))
-                        .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                        .foregroundColor(.secondary)
                 } else {
                     Text("Full Track: \(formatClock(totalDuration))")
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                        .foregroundColor(.secondary)
                 }
             }
             
@@ -320,14 +320,14 @@ public struct AudioWaveformTrimmerView: View {
                     Text(isCutActive ? "Cut Active" : "Cut")
                         .font(.system(size: 10, weight: .bold))
                 }
-                .foregroundColor(isCutActive ? .white : Color(red: 0.70, green: 0.72, blue: 0.80))
+                .foregroundColor(isCutActive ? .white : .primary)
                 .padding(.horizontal, 9)
                 .frame(height: 24)
-                .background(isCutActive ? Color(red: 0.05, green: 0.48, blue: 0.95) : Color(red: 0.16, green: 0.17, blue: 0.22))
+                .background(isCutActive ? Color.accentColor : Color(nsColor: .quaternaryLabelColor).opacity(0.3))
                 .cornerRadius(5)
                 .overlay(
                     RoundedRectangle(cornerRadius: 5)
-                        .stroke(isCutActive ? Color(red: 0.35, green: 0.65, blue: 1.0) : Color(red: 0.24, green: 0.26, blue: 0.33), lineWidth: 1)
+                        .stroke(isCutActive ? Color.accentColor : Color(nsColor: .separatorColor), lineWidth: 0.5)
                 )
             }
             .buttonStyle(PlainButtonStyle())
@@ -352,7 +352,7 @@ public struct AudioWaveformTrimmerView: View {
             ZStack(alignment: .leading) {
                 // Background Track Fill
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(Color(red: 0.06, green: 0.07, blue: 0.09))
+                    .fill(Color(nsColor: .quaternaryLabelColor).opacity(0.18))
                     .frame(height: trackHeight)
                 
                 // Waveform Bars Across Track
@@ -364,7 +364,7 @@ public struct AudioWaveformTrimmerView: View {
                         let inCut = !isCutActive || (barX >= leftX && barX <= rightX)
                         
                         RoundedRectangle(cornerRadius: 1)
-                            .fill(inCut ? Color(red: 0.15, green: 0.75, blue: 1.0) : Color.white.opacity(0.12))
+                            .fill(inCut ? Color.accentColor : Color.secondary.opacity(0.25))
                             .frame(
                                 width: max(1.5, (trackWidth / CGFloat(samples.count)) - 2),
                                 height: max(4.0, samples[idx] * (trackHeight - 14))
@@ -485,7 +485,7 @@ public struct AudioWaveformTrimmerView: View {
         .frame(height: 52)
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(Color(red: 0.18, green: 0.20, blue: 0.26), lineWidth: 1)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
         )
     }
     
@@ -514,7 +514,7 @@ public struct AudioWaveformTrimmerView: View {
         HStack(spacing: 6) {
             Text("Cut Length:")
                 .font(.system(size: 9.5, weight: .medium))
-                .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                .foregroundColor(.secondary)
             
             presetPill(label: "10s", seconds: 10.0)
             presetPill(label: "15s • Optimal", seconds: 15.0)
@@ -526,7 +526,7 @@ public struct AudioWaveformTrimmerView: View {
             
             Text("✂️ Only overlay plays & clones")
                 .font(.system(size: 9, weight: .medium))
-                .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                .foregroundColor(.secondary)
         }
         .padding(.top, 2)
     }
@@ -554,14 +554,14 @@ public struct AudioWaveformTrimmerView: View {
         }) {
             Text(label)
                 .font(.system(size: 9, weight: isSelected ? .bold : .medium))
-                .foregroundColor(isSelected ? .white : Color(red: 0.55, green: 0.56, blue: 0.62))
+                .foregroundColor(isSelected ? .white : .primary)
                 .padding(.horizontal, 7)
                 .padding(.vertical, 3)
-                .background(isSelected ? Color(red: 0.16, green: 0.18, blue: 0.24) : Color(red: 0.12, green: 0.13, blue: 0.17))
+                .background(isSelected ? Color.accentColor : Color(nsColor: .quaternaryLabelColor).opacity(0.2))
                 .cornerRadius(4)
                 .overlay(
                     RoundedRectangle(cornerRadius: 4)
-                        .stroke(isSelected ? Color(red: 0.05, green: 0.48, blue: 0.95) : Color(red: 0.20, green: 0.22, blue: 0.28), lineWidth: 1)
+                        .stroke(isSelected ? Color.accentColor : Color(nsColor: .separatorColor), lineWidth: 0.5)
                 )
         }
         .buttonStyle(PlainButtonStyle())

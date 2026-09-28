@@ -444,14 +444,17 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
     
     func setupDashboardWindow() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 750, height: 750),
+            contentRect: NSRect(x: 0, y: 0, width: 880, height: 640),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        window.minSize = NSSize(width: 740, height: 580)
-        window.maxSize = NSSize(width: 950, height: 950)
-        window.center()
+        window.minSize = NSSize(width: 840, height: 580)
+        window.maxSize = NSSize(width: 1100, height: 850)
+        window.setFrameAutosaveName("AgentSpeakDashboardWindow")
+        if !window.setFrameUsingName("AgentSpeakDashboardWindow") {
+            window.center()
+        }
         window.isReleasedWhenClosed = false
         window.title = "Agent Speak"
         window.titleVisibility = .hidden
@@ -551,7 +554,9 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
            let icon = NSImage(contentsOf: iconUrl) {
             NSApp.applicationIconImage = icon
         }
-        window.center()
+        if !window.setFrameUsingName("AgentSpeakDashboardWindow") && !window.isVisible {
+            window.center()
+        }
         window.makeKeyAndOrderFront(nil)
         startDashboardDisplayLink()
         NSApp.activate(ignoringOtherApps: true)

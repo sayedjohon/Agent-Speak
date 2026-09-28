@@ -50,7 +50,7 @@ public struct DashboardHardwareView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Full-Screen Hologram Overlay")
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                         Text("Renders an arc reactor dead-center on screen with ambient audio-reactive wave glow")
                             .font(.system(size: 10))
                             .foregroundColor(.secondary)
@@ -64,7 +64,7 @@ public struct DashboardHardwareView: View {
                 }
                 
                 if hologram.isEnabled {
-                    Divider().background(Color.white.opacity(0.06))
+                    Divider()
                     
                     // MARK: - Live Interactive Holographic Stage Viewport
                     ZStack {
@@ -90,6 +90,10 @@ public struct DashboardHardwareView: View {
                         
                         // Live rendering of the currently selected skin spanning full stage width
                         GeometryReader { stageGeo in
+                            let previewScale = CGFloat(hologram.effectiveScaleMultiplier)
+                            let previewX = (stageGeo.size.width / 2.0) + CGFloat(hologram.positionX * 0.15)
+                            let previewY = 108.0 + CGFloat(hologram.positionY * 0.15)
+                            
                             HologramSkinContainerView(
                                 skin: hologram.currentSkin,
                                 theme: hologram.currentTheme,
@@ -101,8 +105,10 @@ public struct DashboardHardwareView: View {
                                 simulateAudio: true
                             )
                             .frame(width: stageGeo.size.width, height: 216)
-                            .position(x: stageGeo.size.width / 2.0, y: 108)
+                            .scaleEffect(previewScale, anchor: .center)
+                            .position(x: previewX, y: previewY)
                         }
+                        .clipped()
                         
                         // Overlay HUD Badges
                         VStack {
@@ -123,26 +129,49 @@ public struct DashboardHardwareView: View {
                                 
                                 Spacer()
                                 
-                                Button(action: {
-                                    hologram.triggerPreview()
-                                }) {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "macwindow.on.rectangle")
-                                            .font(.system(size: 8.5, weight: .bold))
-                                        Text(hologram.isPreviewActive ? "PREVIEWING..." : "TEST FULL SCREEN")
-                                            .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                if hologram.isPreviewActive {
+                                    Button(action: {
+                                        withAnimation(.easeOut(duration: 0.2)) {
+                                            hologram.stopPreview()
+                                        }
+                                    }) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "stop.fill")
+                                                .font(.system(size: 8, weight: .bold))
+                                            Text("STOP PREVIEW")
+                                                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                        }
+                                        .padding(.horizontal, 7)
+                                        .padding(.vertical, 3)
+                                        .background(Color.red.opacity(0.90))
+                                        .foregroundColor(.white)
+                                        .cornerRadius(5)
                                     }
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 3)
-                                    .background(hologram.currentTheme.previewColor.opacity(0.20))
-                                    .foregroundColor(hologram.currentTheme.previewColor)
-                                    .cornerRadius(5)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 5)
-                                            .stroke(hologram.currentTheme.previewColor.opacity(0.6), lineWidth: 1)
-                                    )
+                                    .buttonStyle(.plain)
+                                } else {
+                                    Button(action: {
+                                        withAnimation(.easeOut(duration: 0.2)) {
+                                            hologram.triggerPreview()
+                                        }
+                                    }) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "macwindow.on.rectangle")
+                                                .font(.system(size: 8.5, weight: .bold))
+                                            Text("TEST FULL SCREEN")
+                                                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                        }
+                                        .padding(.horizontal, 7)
+                                        .padding(.vertical, 3)
+                                        .background(hologram.currentTheme.previewColor.opacity(0.20))
+                                        .foregroundColor(hologram.currentTheme.previewColor)
+                                        .cornerRadius(5)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 5)
+                                                .stroke(hologram.currentTheme.previewColor.opacity(0.6), lineWidth: 1)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                                 
                                 HStack(spacing: 4) {
                                     Text(hologram.currentSkin.name.uppercased())
@@ -176,7 +205,7 @@ public struct DashboardHardwareView: View {
                     .frame(height: 220)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     
-                    Divider().background(Color.white.opacity(0.06))
+                    Divider()
                     
                     // MARK: - Holographic Core Skin Selector
                     VStack(alignment: .leading, spacing: 8) {
@@ -207,7 +236,7 @@ public struct DashboardHardwareView: View {
                                     HStack(spacing: 6) {
                                         Text(HologramSkinType.classicArc.name)
                                             .font(.system(size: 11.5, weight: .bold))
-                                            .foregroundColor(isDefaultSelected ? .white : Color(red: 0.88, green: 0.89, blue: 0.94))
+                                            .foregroundColor(.primary)
                                         
                                         Text("MASTER DEFAULT")
                                             .font(.system(size: 8, weight: .black, design: .monospaced))
@@ -231,11 +260,11 @@ public struct DashboardHardwareView: View {
                             }
                             .padding(.horizontal, 10)
                             .padding(.vertical, 8)
-                            .background(isDefaultSelected ? hologram.currentTheme.previewColor.opacity(0.14) : Color.white.opacity(0.03))
+                            .background(isDefaultSelected ? hologram.currentTheme.previewColor.opacity(0.14) : Color(nsColor: .quaternaryLabelColor).opacity(0.2))
                             .cornerRadius(8)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .stroke(isDefaultSelected ? hologram.currentTheme.previewColor.opacity(0.8) : Color.white.opacity(0.08), lineWidth: isDefaultSelected ? 1.5 : 1)
+                                    .stroke(isDefaultSelected ? hologram.currentTheme.previewColor.opacity(0.8) : Color(nsColor: .separatorColor), lineWidth: isDefaultSelected ? 1.5 : 0.5)
                             )
                         }
                         .buttonStyle(.plain)
@@ -252,13 +281,13 @@ public struct DashboardHardwareView: View {
                                             .font(.system(size: 11, weight: .bold))
                                             .foregroundColor(isSelected ? hologram.currentTheme.previewColor : .secondary)
                                             .frame(width: 20, height: 20)
-                                            .background(isSelected ? hologram.currentTheme.previewColor.opacity(0.2) : Color.white.opacity(0.04))
+                                            .background(isSelected ? hologram.currentTheme.previewColor.opacity(0.2) : Color(nsColor: .quaternaryLabelColor).opacity(0.2))
                                             .clipShape(Circle())
                                         
                                         VStack(alignment: .leading, spacing: 1) {
                                             Text(skin.name)
                                                 .font(.system(size: 10, weight: isSelected ? .bold : .medium))
-                                                .foregroundColor(isSelected ? .white : Color(red: 0.82, green: 0.83, blue: 0.88))
+                                                .foregroundColor(.primary)
                                                 .lineLimit(1)
                                             Text(skin.creator)
                                                 .font(.system(size: 8, design: .monospaced))
@@ -273,11 +302,11 @@ public struct DashboardHardwareView: View {
                                     }
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 6)
-                                    .background(isSelected ? hologram.currentTheme.previewColor.opacity(0.12) : Color.white.opacity(0.03))
+                                    .background(isSelected ? hologram.currentTheme.previewColor.opacity(0.12) : Color(nsColor: .quaternaryLabelColor).opacity(0.2))
                                     .cornerRadius(7)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 7)
-                                            .stroke(isSelected ? hologram.currentTheme.previewColor.opacity(0.7) : Color.white.opacity(0.06), lineWidth: isSelected ? 1.2 : 0.8)
+                                            .stroke(isSelected ? hologram.currentTheme.previewColor.opacity(0.7) : Color(nsColor: .separatorColor), lineWidth: isSelected ? 1.2 : 0.5)
                                     )
                                 }
                                 .buttonStyle(.plain)
@@ -285,7 +314,7 @@ public struct DashboardHardwareView: View {
                         }
                     }
                     
-                    Divider().background(Color.white.opacity(0.06))
+                    Divider()
                     
                     // Theme Color Selector
                     VStack(alignment: .leading, spacing: 8) {
@@ -308,7 +337,7 @@ public struct DashboardHardwareView: View {
                                         VStack(alignment: .leading, spacing: 1) {
                                             Text(theme.name)
                                                 .font(.system(size: 11, weight: isSelected ? .bold : .medium))
-                                                .foregroundColor(isSelected ? .white : Color(red: 0.82, green: 0.83, blue: 0.88))
+                                                .foregroundColor(.primary)
                                             Text(theme.subtitle)
                                                 .font(.system(size: 8.5))
                                                 .foregroundColor(.secondary)
@@ -323,11 +352,11 @@ public struct DashboardHardwareView: View {
                                     }
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 8)
-                                    .background(isSelected ? theme.previewColor.opacity(0.12) : Color.white.opacity(0.03))
+                                    .background(isSelected ? theme.previewColor.opacity(0.12) : Color(nsColor: .quaternaryLabelColor).opacity(0.2))
                                     .cornerRadius(8)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 8)
-                                            .stroke(isSelected ? theme.previewColor.opacity(0.7) : Color.white.opacity(0.06), lineWidth: isSelected ? 1.5 : 1)
+                                            .stroke(isSelected ? theme.previewColor.opacity(0.7) : Color(nsColor: .separatorColor), lineWidth: isSelected ? 1.5 : 0.5)
                                     )
                                 }
                                 .buttonStyle(.plain)
@@ -335,7 +364,7 @@ public struct DashboardHardwareView: View {
                         }
                     }
                     
-                    Divider().background(Color.white.opacity(0.06))
+                    Divider()
                     
                     // MARK: - Holographic Blending Mode Selector (Photoshop-Grade)
                     VStack(alignment: .leading, spacing: 10) {
@@ -373,7 +402,7 @@ public struct DashboardHardwareView: View {
                                         .foregroundColor(hologram.currentTheme.previewColor)
                                     Text(hologram.currentBlendMode.displayName)
                                         .font(.system(size: 10.5, weight: .bold, design: .monospaced))
-                                        .foregroundColor(.white)
+                                        .foregroundColor(.primary)
                                     Image(systemName: "chevron.up.chevron.down")
                                         .font(.system(size: 8, weight: .semibold))
                                         .foregroundColor(.secondary)
@@ -405,15 +434,15 @@ public struct DashboardHardwareView: View {
                                                 .foregroundColor(isSelected ? hologram.currentTheme.previewColor : .secondary)
                                             Text(mode.displayName)
                                                 .font(.system(size: 9.5, weight: isSelected ? .bold : .medium))
-                                                .foregroundColor(isSelected ? .white : Color(white: 0.72))
+                                                .foregroundColor(isSelected ? .primary : .secondary)
                                         }
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 5)
-                                        .background(isSelected ? hologram.currentTheme.previewColor.opacity(0.18) : Color.white.opacity(0.04))
+                                        .background(isSelected ? hologram.currentTheme.previewColor.opacity(0.18) : Color(nsColor: .quaternaryLabelColor).opacity(0.2))
                                         .cornerRadius(6)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 6)
-                                                .stroke(isSelected ? hologram.currentTheme.previewColor.opacity(0.75) : Color.white.opacity(0.08), lineWidth: isSelected ? 1.2 : 0.8)
+                                                .stroke(isSelected ? hologram.currentTheme.previewColor.opacity(0.75) : Color(nsColor: .separatorColor), lineWidth: isSelected ? 1.2 : 0.5)
                                         )
                                     }
                                     .buttonStyle(.plain)
@@ -442,7 +471,7 @@ public struct DashboardHardwareView: View {
                             Spacer()
                         }
                         .padding(8)
-                        .background(Color.white.opacity(0.025))
+                        .background(Color(nsColor: .quaternaryLabelColor).opacity(0.15))
                         .cornerRadius(6)
                         
                         // Overlay Opacity / Translucency Slider
@@ -477,7 +506,7 @@ public struct DashboardHardwareView: View {
                                                 .font(.system(size: 8.5, weight: .bold, design: .monospaced))
                                                 .padding(.horizontal, 5)
                                                 .padding(.vertical, 3)
-                                                .background(abs(hologram.opacity - val) < 0.05 ? hologram.currentTheme.previewColor.opacity(0.25) : Color.white.opacity(0.04))
+                                                .background(abs(hologram.opacity - val) < 0.05 ? hologram.currentTheme.previewColor.opacity(0.25) : Color(nsColor: .quaternaryLabelColor).opacity(0.2))
                                                 .foregroundColor(abs(hologram.opacity - val) < 0.05 ? hologram.currentTheme.previewColor : .secondary)
                                                 .cornerRadius(4)
                                         }
@@ -488,35 +517,67 @@ public struct DashboardHardwareView: View {
                         }
                     }
                     
-                    Divider().background(Color.white.opacity(0.06))
+                    Divider()
                     
-                    // Live Preview Button
+                    // DaVinci Resolve-Grade HUD Transform Controls (Z-Zoom, X-Pos, Y-Pos)
+                    HUDTransformCardView()
+                    
+                    Divider()
+                    
+                    // Live Preview & Stop Controls
                     HStack {
                         VStack(alignment: .leading, spacing: 1) {
                             Text("Test Holographic Glow")
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.white)
-                            Text("Simulates the full-screen visualizer overlay live on your display for 4 seconds")
+                                .foregroundColor(.primary)
+                            Text(hologram.isPreviewActive ? "Preview is currently active on screen (auto-exits in 5s)..." : "Simulates the full-screen visualizer overlay live on your display for 5 seconds")
                                 .font(.system(size: 9.5))
-                                .foregroundColor(.secondary)
+                                .foregroundColor(hologram.isPreviewActive ? hologram.currentTheme.previewColor : .secondary)
                         }
                         Spacer()
-                        Button(action: {
-                            hologram.triggerPreview()
-                        }) {
-                            HStack(spacing: 5) {
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 10, weight: .bold))
-                                Text("Preview Live")
-                                    .font(.system(size: 11, weight: .semibold))
+                        
+                        HStack(spacing: 8) {
+                            if hologram.isPreviewActive {
+                                Button(action: {
+                                    withAnimation(.easeOut(duration: 0.2)) {
+                                        hologram.stopPreview()
+                                    }
+                                }) {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: "stop.fill")
+                                            .font(.system(size: 10, weight: .bold))
+                                        Text("Stop Preview")
+                                            .font(.system(size: 11, weight: .bold))
+                                    }
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 6)
+                                    .background(Color.red.opacity(0.90))
+                                    .cornerRadius(6)
+                                    .shadow(color: Color.red.opacity(0.5), radius: 6)
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                Button(action: {
+                                    withAnimation(.easeOut(duration: 0.2)) {
+                                        hologram.triggerPreview()
+                                    }
+                                }) {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: "sparkles")
+                                            .font(.system(size: 10, weight: .bold))
+                                        Text("Preview Live")
+                                            .font(.system(size: 11, weight: .semibold))
+                                    }
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(hologram.currentTheme.previewColor.opacity(0.85))
+                                    .cornerRadius(6)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(hologram.currentTheme.previewColor.opacity(0.85))
-                            .cornerRadius(6)
                         }
-                        .buttonStyle(.plain)
                     }
                 } else {
                     // Deactivated Hologram Notice with 1-Click Activate Button
@@ -527,7 +588,7 @@ public struct DashboardHardwareView: View {
                         VStack(alignment: .leading, spacing: 1) {
                             Text("Hologram Overlay is Deactivated")
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.white)
+                                .foregroundColor(.primary)
                             Text("Audio output and Notch HUD play normally without full-screen graphics.")
                                 .font(.system(size: 9.5))
                                 .foregroundColor(.secondary)
@@ -550,7 +611,7 @@ public struct DashboardHardwareView: View {
                         .buttonStyle(.plain)
                     }
                     .padding(8)
-                    .background(Color.white.opacity(0.025))
+                    .background(Color(nsColor: .quaternaryLabelColor).opacity(0.15))
                     .cornerRadius(8)
                 }
             }

@@ -35,7 +35,7 @@ public struct ApiKeyManagerCardView: View {
                     
                     Text("Groq API Key Pool & Fallbacks")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                 }
                 
                 Spacer()
@@ -57,8 +57,8 @@ public struct ApiKeyManagerCardView: View {
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.white.opacity(0.08))
-                    .foregroundColor(.gray)
+                    .background(Color(nsColor: .quaternaryLabelColor).opacity(0.2))
+                    .foregroundColor(.secondary)
                     .cornerRadius(6)
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -90,22 +90,22 @@ public struct ApiKeyManagerCardView: View {
             // Subtitle description
             Text("Automatic failover chain: If rate-limited (HTTP 429), Agent Speak instantly shifts to the next key.")
                 .font(.system(size: 11))
-                .foregroundColor(.gray)
+                .foregroundColor(.secondary)
             
             // Bulk Edit Text Area Drawer
             if isBulkImportOpen {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Paste multiple Groq API keys (one per line):")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                     
                     TextEditor(text: $bulkImportText)
                         .font(.system(size: 11, design: .monospaced))
                         .frame(height: 80)
                         .padding(6)
-                        .background(Color(white: 0.12))
+                        .background(Color(nsColor: .textBackgroundColor))
                         .cornerRadius(6)
-                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.15), lineWidth: 1))
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(nsColor: .separatorColor), lineWidth: 0.5))
                     
                     HStack {
                         Spacer()
@@ -114,7 +114,7 @@ public struct ApiKeyManagerCardView: View {
                         }
                         .buttonStyle(PlainButtonStyle())
                         .font(.system(size: 11))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                         .padding(.trailing, 8)
                         
                         Button(action: saveBulkKeys) {
@@ -130,7 +130,7 @@ public struct ApiKeyManagerCardView: View {
                     }
                 }
                 .padding(10)
-                .background(Color(white: 0.08))
+                .background(Color(nsColor: .quaternaryLabelColor).opacity(0.15))
                 .cornerRadius(8)
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.green.opacity(0.3), lineWidth: 1))
             }
@@ -145,15 +145,15 @@ public struct ApiKeyManagerCardView: View {
                             .foregroundColor(.orange)
                         Text("No Groq API keys added yet.")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                         Text("Paste a Groq key below to enable cloud transcription.")
                             .font(.system(size: 11))
-                            .foregroundColor(.gray)
+                            .foregroundColor(.secondary)
                     }
                     .padding(.vertical, 12)
                     Spacer()
                 }
-                .background(Color.white.opacity(0.03))
+                .background(Color(nsColor: .quaternaryLabelColor).opacity(0.15))
                 .cornerRadius(8)
             } else {
                 VStack(spacing: 8) {
@@ -166,7 +166,7 @@ public struct ApiKeyManagerCardView: View {
             // Add New Key Box
             HStack(spacing: 8) {
                 Image(systemName: "plus.circle")
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
                     .font(.system(size: 13))
                 
                 TextField("Add new Groq API key (gsk_...)", text: $newKeyInput)
@@ -178,9 +178,9 @@ public struct ApiKeyManagerCardView: View {
                 Button(action: pasteFromClipboard) {
                     Image(systemName: "doc.on.clipboard")
                         .font(.system(size: 12))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                         .padding(6)
-                        .background(Color.white.opacity(0.08))
+                        .background(Color(nsColor: .quaternaryLabelColor).opacity(0.2))
                         .cornerRadius(6)
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -204,7 +204,7 @@ public struct ApiKeyManagerCardView: View {
                 .disabled(newKeyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
             .padding(10)
-            .background(Color.white.opacity(0.04))
+            .background(Color(nsColor: .quaternaryLabelColor).opacity(0.2))
             .cornerRadius(8)
             
             // Brief Copied Banner
@@ -221,9 +221,9 @@ public struct ApiKeyManagerCardView: View {
             }
         }
         .padding(14)
-        .background(Color(white: 0.12, opacity: 0.7))
+        .background(Color(nsColor: .controlBackgroundColor))
         .cornerRadius(10)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(nsColor: .separatorColor), lineWidth: 0.5))
     }
     
     // MARK: - Individual Key Row
@@ -252,11 +252,11 @@ public struct ApiKeyManagerCardView: View {
                     HStack(spacing: 4) {
                         Text("Fallback #\(index + 1)")
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(.gray)
+                            .foregroundColor(.secondary)
                     }
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(Color.white.opacity(0.08))
+                    .background(Color(nsColor: .quaternaryLabelColor).opacity(0.2))
                     .cornerRadius(4)
                     
                     Button(action: {
@@ -276,7 +276,7 @@ public struct ApiKeyManagerCardView: View {
                 case .idle:
                     Text("Not tested")
                         .font(.system(size: 10))
-                        .foregroundColor(.gray.opacity(0.7))
+                        .foregroundColor(.secondary.opacity(0.7))
                 case .testing:
                     HStack(spacing: 4) {
                         ProgressView()
@@ -312,7 +312,7 @@ public struct ApiKeyManagerCardView: View {
                 // Key Display
                 Text(isRevealed ? key : maskedKey(key))
                     .font(.system(size: 11, weight: .regular, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.9))
+                    .foregroundColor(.primary)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 
@@ -326,7 +326,7 @@ public struct ApiKeyManagerCardView: View {
                 }) {
                     Image(systemName: isRevealed ? "eye.slash" : "eye")
                         .font(.system(size: 11))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                 }
                 .buttonStyle(PlainButtonStyle())
                 .help(isRevealed ? "Hide key" : "Show full key")
@@ -335,14 +335,14 @@ public struct ApiKeyManagerCardView: View {
                 Button(action: { copyKey(key) }) {
                     Image(systemName: "doc.on.doc")
                         .font(.system(size: 11))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                 }
                 .buttonStyle(PlainButtonStyle())
                 .help("Copy key to clipboard")
                 
                 Divider()
                     .frame(height: 14)
-                    .background(Color.white.opacity(0.15))
+                    .background(Color(nsColor: .separatorColor))
                 
                 // 1-Click Test Button
                 Button(action: { testKey(key) }) {
@@ -375,11 +375,11 @@ public struct ApiKeyManagerCardView: View {
             }
         }
         .padding(10)
-        .background(isActive ? Color.green.opacity(0.05) : Color.white.opacity(0.03))
+        .background(isActive ? Color.green.opacity(0.05) : Color(nsColor: .quaternaryLabelColor).opacity(0.15))
         .cornerRadius(8)
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(isActive ? Color.green.opacity(0.3) : Color.white.opacity(0.07), lineWidth: 1)
+                .stroke(isActive ? Color.green.opacity(0.3) : Color(nsColor: .separatorColor), lineWidth: 0.5)
         )
     }
     

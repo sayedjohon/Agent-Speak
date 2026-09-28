@@ -33,7 +33,7 @@ public struct PocketTTSExtensionCardView: View {
                             HStack {
                                 Text("Pocket-TTS Neural Extension")
                                     .font(.system(size: 13, weight: .bold))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.primary)
                                 
                                 Spacer()
                                 
@@ -68,7 +68,7 @@ public struct PocketTTSExtensionCardView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("On-Device Neural Voice")
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.white)
+                                .foregroundColor(.primary)
                             Text("Synthesizes neural voices entirely on your Mac's Apple Silicon CPU. For maximum battery efficiency or near-zero CPU usage, you can switch back to the MacBook Built-in Voice at any time.")
                                 .font(.system(size: 9.5))
                                 .foregroundColor(.secondary)
@@ -77,9 +77,9 @@ public struct PocketTTSExtensionCardView: View {
                         Spacer()
                     }
                     .padding(8)
-                    .background(Color.white.opacity(0.04))
+                    .background(Color(nsColor: .quaternaryLabelColor).opacity(0.2))
                     .cornerRadius(6)
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(nsColor: .separatorColor), lineWidth: 0.5))
                     
                     // Multilingual Auto-Fallback Notice
                     HStack(alignment: .top, spacing: 8) {
@@ -102,7 +102,7 @@ public struct PocketTTSExtensionCardView: View {
                     .cornerRadius(6)
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.cyan.opacity(0.25), lineWidth: 1))
                     
-                    Divider().background(Color.white.opacity(0.1))
+                    Divider()
                     
                     if manager.isInstalling {
                         VStack(alignment: .leading, spacing: 8) {
@@ -165,7 +165,7 @@ public struct PocketTTSExtensionCardView: View {
                             HStack(spacing: 6) {
                                 Text("Pocket-TTS Neural Extension")
                                     .font(.system(size: 13, weight: .bold))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.primary)
                                 
                                 Text("● READY")
                                     .font(.system(size: 9, weight: .heavy))
@@ -173,7 +173,7 @@ public struct PocketTTSExtensionCardView: View {
                             }
                             Text("Active Persona: \(selectedVoiceLabel)")
                                 .font(.system(size: 11))
-                                .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                                .foregroundColor(.secondary)
                         }
                         
                         Spacer()
@@ -200,19 +200,19 @@ public struct PocketTTSExtensionCardView: View {
                                 HStack(spacing: 8) {
                                     Text(selectedVoiceLabel)
                                         .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(.white)
+                                        .foregroundColor(.primary)
                                         .lineLimit(1)
                                     Image(systemName: "chevron.up.chevron.down")
                                         .font(.system(size: 10, weight: .semibold))
-                                        .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                                        .foregroundColor(.secondary)
                                 }
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
-                                .background(Color(red: 0.16, green: 0.17, blue: 0.22))
+                                .background(Color(nsColor: .quaternaryLabelColor).opacity(0.25))
                                 .cornerRadius(6)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 6)
-                                        .stroke(Color(red: 0.24, green: 0.26, blue: 0.33), lineWidth: 1)
+                                        .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
                                 )
                             }
                             .menuStyle(BorderlessButtonMenuStyle())
@@ -243,7 +243,7 @@ public struct PocketTTSExtensionCardView: View {
                         }
                     }
                     
-                    Divider().background(Color.white.opacity(0.06))
+                    Divider()
                     
                     // Active Neural Engine Note
                     HStack(spacing: 6) {
@@ -252,7 +252,7 @@ public struct PocketTTSExtensionCardView: View {
                             .foregroundColor(.purple)
                         Text("On-device neural AI. Switch to MacBook Built-in Voice anytime for instant zero-CPU playback.")
                             .font(.system(size: 9.5))
-                            .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                            .foregroundColor(.secondary)
                         Spacer()
                     }
                     .padding(.horizontal, 8)
@@ -269,14 +269,14 @@ public struct PocketTTSExtensionCardView: View {
                                 Text(isAuditioning ? "Synthesizing..." : "Audition Voice")
                                     .font(.system(size: 11.5, weight: .medium))
                             }
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(Color(red: 0.16, green: 0.17, blue: 0.22))
+                            .background(Color(nsColor: .quaternaryLabelColor).opacity(0.25))
                             .cornerRadius(6)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color(red: 0.25, green: 0.27, blue: 0.34), lineWidth: 1)
+                                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -331,13 +331,13 @@ public struct PocketTTSExtensionCardView: View {
                         Button(action: { manager.refreshState() }) {
                             Image(systemName: "arrow.clockwise")
                                 .font(.system(size: 11))
-                                .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                                .foregroundColor(.secondary)
                                 .padding(6)
-                                .background(Color(red: 0.14, green: 0.15, blue: 0.19))
+                                .background(Color(nsColor: .quaternaryLabelColor).opacity(0.25))
                                 .cornerRadius(6)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 6)
-                                        .stroke(Color(red: 0.22, green: 0.24, blue: 0.30), lineWidth: 1)
+                                        .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
                                 )
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -345,9 +345,9 @@ public struct PocketTTSExtensionCardView: View {
                     }
                 }
                 .padding(14)
-                .background(Color(red: 0.11, green: 0.12, blue: 0.15))
+                .background(Color(nsColor: .controlBackgroundColor))
                 .cornerRadius(8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(red: 0.18, green: 0.19, blue: 0.24), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(nsColor: .separatorColor), lineWidth: 0.5))
             }
         }
         .sheet(isPresented: $showingGuideSheet) {
@@ -447,7 +447,7 @@ public struct CloningGuideModalView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Voice Persona Cloning Guide")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                     Text("Follow these 3 simple steps to create crystal-clear custom AI voices.")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
@@ -463,7 +463,7 @@ public struct CloningGuideModalView: View {
                 .buttonStyle(PlainButtonStyle())
             }
             
-            Divider().background(Color.white.opacity(0.1))
+            Divider()
             
             // Steps List
             VStack(spacing: 11) {
@@ -507,7 +507,7 @@ public struct CloningGuideModalView: View {
             .background(Color.orange.opacity(0.07))
             .cornerRadius(6)
             
-            Divider().background(Color.white.opacity(0.1))
+            Divider()
             
             // Bottom Bar
             HStack {
@@ -551,7 +551,7 @@ public struct CloningGuideModalView: View {
         }
         .padding(20)
         .frame(width: 530)
-        .background(Color(red: 0.10, green: 0.11, blue: 0.14))
+        .background(Color(nsColor: .windowBackgroundColor))
     }
     
     private func close() {
@@ -575,7 +575,7 @@ public struct CloningGuideModalView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.system(size: 11.5, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
                 Text(desc)
                     .font(.system(size: 10.5))
                     .foregroundColor(.secondary)
@@ -585,9 +585,9 @@ public struct CloningGuideModalView: View {
             Spacer()
         }
         .padding(10)
-        .background(Color.white.opacity(0.03))
+        .background(Color(nsColor: .quaternaryLabelColor).opacity(0.2))
         .cornerRadius(8)
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.06), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(nsColor: .separatorColor), lineWidth: 0.5))
     }
 }
 

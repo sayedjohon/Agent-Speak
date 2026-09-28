@@ -49,8 +49,8 @@ public struct DashboardGestureView: View {
             controlsAndSlidersCard
             GestureTogglesCardView()
             dictationEngineCard
-            gestureTestGridCard
-            gestureReferenceGuideCard
+            GestureTestGridCardView()
+            GestureReferenceGuideCardView()
         }
         .onAppear {
             loadGesturePreferences()
@@ -65,12 +65,12 @@ public struct DashboardGestureView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Vision & Hand Gestures")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundColor(.primary)
                 
                 Text("100% on-device dual-hand tracking on Apple Silicon. Control your cursor, click, drag, scroll, and dictate hands-free.")
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundColor(.gray)
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(.secondary)
             }
             
             Spacer()
@@ -82,18 +82,19 @@ public struct DashboardGestureView: View {
                 HStack(spacing: 8) {
                     Circle()
                         .fill(manager.isRunning ? Color.green : Color.gray)
-                        .frame(width: 9, height: 9)
+                        .frame(width: 8, height: 8)
                     
                     Text(manager.isRunning ? "Stop Camera" : "Enable Gestures")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                 }
                 .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(manager.isRunning ? Color.red.opacity(0.15) : Color.blue.opacity(0.2))
-                .cornerRadius(8)
+                .padding(.vertical, 7)
+                .background(manager.isRunning ? Color.red.opacity(0.15) : Color.accentColor.opacity(0.18))
+                .foregroundColor(manager.isRunning ? .red : .accentColor)
+                .cornerRadius(7)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(manager.isRunning ? Color.red.opacity(0.4) : Color.blue.opacity(0.4), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(manager.isRunning ? Color.red.opacity(0.35) : Color.accentColor.opacity(0.35), lineWidth: 1)
                 )
             }
             .buttonStyle(PlainButtonStyle())
@@ -105,8 +106,8 @@ public struct DashboardGestureView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label("Live Hand Landmark Feed", systemImage: "hand.raised.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.primary)
                 
                 Spacer()
                 
@@ -115,7 +116,7 @@ public struct DashboardGestureView: View {
                         HStack(spacing: 4) {
                             Text("FPS:")
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.gray)
+                                .foregroundColor(.secondary)
                             Text(String(format: "%.1f", manager.currentFPS))
                                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                                 .foregroundColor(.green)
@@ -124,18 +125,18 @@ public struct DashboardGestureView: View {
                         HStack(spacing: 4) {
                             Text("Hands:")
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.gray)
+                                .foregroundColor(.secondary)
                             Text("\(manager.detectedHands.count)")
                                 .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                .foregroundColor(manager.detectedHands.isEmpty ? .gray : .cyan)
+                                .foregroundColor(manager.detectedHands.isEmpty ? .secondary : .cyan)
                         }
                     }
                 }
             }
             
             ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color(white: 0.05))
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color(red: 0.05, green: 0.06, blue: 0.08))
                     .frame(height: 220)
                 
                 if manager.isRunning {
@@ -145,7 +146,7 @@ public struct DashboardGestureView: View {
                     if manager.detectedHands.isEmpty {
                         VStack(spacing: 8) {
                             Image(systemName: "hand.raised")
-                                .font(.system(size: 30))
+                                .font(.system(size: 28))
                                 .foregroundColor(.gray.opacity(0.6))
                             Text("Raise your hands in front of the camera")
                                 .font(.system(size: 12, weight: .medium))
@@ -155,7 +156,7 @@ public struct DashboardGestureView: View {
                 } else {
                     VStack(spacing: 8) {
                         Image(systemName: "video.slash")
-                            .font(.system(size: 32))
+                            .font(.system(size: 30))
                             .foregroundColor(.gray.opacity(0.5))
                         Text("Camera is currently off. Click 'Enable Gestures' to start.")
                             .font(.system(size: 12, weight: .medium))
@@ -164,15 +165,15 @@ public struct DashboardGestureView: View {
                 }
             }
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
             )
             
             // Camera device picker
             HStack {
                 Text("Camera Source:")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
                 
                 Picker("", selection: $manager.selectedCameraId) {
                     Text("System Default Camera").tag("default")
@@ -191,24 +192,28 @@ public struct DashboardGestureView: View {
             }
             .padding(.top, 4)
         }
-        .padding(16)
-        .background(Color(white: 0.1, opacity: 0.6))
-        .cornerRadius(12)
+        .padding(14)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
     }
     
     // MARK: - Sliders & Tuning Card
     private var controlsAndSlidersCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             Text("Tracking & Sensitivity Tuning")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.primary)
             
-            Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 14) {
+            Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 12) {
                 // Tracking Anchor (Wrist vs Knuckle vs Tip)
                 GridRow {
                     Text("Tracking Anchor")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                     
                     Picker("", selection: $trackingAnchor) {
                         Text("Wrist Joint (Rock-Solid / No Click Drift)").tag("wrist")
@@ -228,7 +233,7 @@ public struct DashboardGestureView: View {
                 GridRow {
                     Text("Cursor Speed")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                     Slider(value: $cursorSpeed, in: 0.6...2.4, step: 0.1)
                         .onChange(of: cursorSpeed) { _, val in
                             MouseCursorController.shared.cursorSpeed = CGFloat(val)
@@ -236,14 +241,14 @@ public struct DashboardGestureView: View {
                         }
                     Text(String(format: "%.1fx", cursorSpeed))
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                         .frame(width: 45, alignment: .trailing)
                 }
                 
                 GridRow {
                     Text("Scroll Speed")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                     Slider(value: $scrollSpeed, in: 0.5...3.0, step: 0.1)
                         .onChange(of: scrollSpeed) { _, val in
                             GestureClassifier.shared.scrollSensitivity = CGFloat(val)
@@ -251,14 +256,14 @@ public struct DashboardGestureView: View {
                         }
                     Text(String(format: "%.1fx", scrollSpeed))
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                         .frame(width: 45, alignment: .trailing)
                 }
                 
                 GridRow {
                     Text("Jitter Smoothing")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                     Slider(value: $smoothing, in: 0.5...0.98, step: 0.02)
                         .onChange(of: smoothing) { _, val in
                             MouseCursorController.shared.smoothingFactor = val
@@ -266,14 +271,14 @@ public struct DashboardGestureView: View {
                         }
                     Text(String(format: "%d%%", Int(smoothing * 100)))
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                         .frame(width: 45, alignment: .trailing)
                 }
                 
                 GridRow {
                     Text("Pinch Threshold")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                     Slider(value: $pinchDist, in: 0.035...0.085, step: 0.005)
                         .onChange(of: pinchDist) { _, val in
                             GestureClassifier.shared.pinchThreshold = CGFloat(val)
@@ -281,22 +286,22 @@ public struct DashboardGestureView: View {
                         }
                     Text(String(format: "%.3f", pinchDist))
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                         .frame(width: 45, alignment: .trailing)
                 }
             }
             
-            Divider().background(Color.white.opacity(0.1))
+            Divider()
             
             // Floating HUD toggle
             Toggle(isOn: $isHudActive) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Show Floating Gesture HUD")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                     Text("Displays immediate visual status badge whenever a gesture triggers.")
                         .font(.system(size: 11))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                 }
             }
             .onChange(of: isHudActive) { _, active in
@@ -310,10 +315,10 @@ public struct DashboardGestureView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Show Hand Skeleton Box Under Tray")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                     Text("Compact floating square box underneath the icon tray showing live two-hand skeleton tracking.")
                         .font(.system(size: 11))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                 }
             }
             .onChange(of: isSkeletonHudActive) { _, active in
@@ -347,18 +352,22 @@ public struct DashboardGestureView: View {
                 .padding(.top, 2)
             }
         }
-        .padding(16)
-        .background(Color(white: 0.1, opacity: 0.6))
-        .cornerRadius(12)
+        .padding(14)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
     }
     
     // MARK: - Voice Dictation & Whisper Settings Card
     private var dictationEngineCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Label("Voice Dictation & Whisper Engine", systemImage: "waveform.badge.mic")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.primary)
                 
                 Spacer()
                 
@@ -378,7 +387,7 @@ public struct DashboardGestureView: View {
                     HStack(spacing: 6) {
                         Text("Hold Key to Dictate (Push-to-Talk)")
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                         
                         Text(whisperManager.dictationTriggerName)
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
@@ -390,7 +399,7 @@ public struct DashboardGestureView: View {
                     }
                     Text("Hold down your assigned key to record speech. Release to transcribe with Whisper and auto-paste directly into your active app.")
                         .font(.system(size: 11))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                 }
             }
             .onChange(of: whisperManager.fnHoldDictationEnabled) { _, val in
@@ -405,7 +414,7 @@ public struct DashboardGestureView: View {
                 HStack(alignment: .center) {
                     Text("Trigger Key Assignment:")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                     
                     Spacer()
                     
@@ -426,11 +435,11 @@ public struct DashboardGestureView: View {
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(isRecordingKey ? Color.red.opacity(0.18) : Color.white.opacity(0.08))
+                        .background(isRecordingKey ? Color.red.opacity(0.18) : Color(nsColor: .quaternaryLabelColor).opacity(0.3))
                         .cornerRadius(5)
                         .overlay(
                             RoundedRectangle(cornerRadius: 5)
-                                .stroke(isRecordingKey ? Color.red : Color.white.opacity(0.15), lineWidth: 1)
+                                .stroke(isRecordingKey ? Color.red : Color(nsColor: .separatorColor), lineWidth: 0.5)
                         )
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -467,20 +476,20 @@ public struct DashboardGestureView: View {
                 } else {
                     Text("Mac Mini keyboards lack the MacBook Fn button. Right Option (⌥), Right Command (⌘), or Right Control (⌃) are ideal for 1-hand push-to-talk.")
                         .font(.system(size: 10.5))
-                        .foregroundColor(.gray.opacity(0.8))
+                        .foregroundColor(.secondary)
                 }
             }
             .padding(10)
-            .background(Color.white.opacity(0.03))
+            .background(Color(nsColor: .quaternaryLabelColor).opacity(0.18))
             .cornerRadius(8)
             
-            Divider().background(Color.white.opacity(0.1))
+            Divider()
             
             // Engine Mode Picker
             VStack(alignment: .leading, spacing: 6) {
                 Text("Dictation Engine:")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
                 
                 Picker("", selection: $whisperManager.engineMode) {
                     ForEach(DictationEngineMode.allCases) { mode in
@@ -506,14 +515,14 @@ public struct DashboardGestureView: View {
                 modifierHoldSection
             }
             
-            Divider().background(Color.white.opacity(0.1))
+            Divider()
             
             // Language & Auto-Submit options
             HStack(spacing: 20) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Spoken Language:")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                     
                     Picker("", selection: $whisperManager.languageCode) {
                         ForEach(supportedLanguages, id: \.code) { lang in
@@ -533,10 +542,10 @@ public struct DashboardGestureView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Auto-Submit (Return ↵)")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                         Text("Press Return after pasting text")
                             .font(.system(size: 10))
-                            .foregroundColor(.gray)
+                            .foregroundColor(.secondary)
                     }
                 }
                 .onChange(of: whisperManager.autoSubmitReturn) { _, _ in
@@ -565,23 +574,28 @@ public struct DashboardGestureView: View {
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(whisperManager.isRecording ? Color.red.opacity(0.2) : Color.white.opacity(0.1))
+                    .background(whisperManager.isRecording ? Color.red.opacity(0.2) : Color(nsColor: .quaternaryLabelColor).opacity(0.3))
+                    .foregroundColor(whisperManager.isRecording ? .red : .primary)
                     .cornerRadius(6)
                 }
                 .buttonStyle(PlainButtonStyle())
                 
                 Text(whisperManager.statusMessage)
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundColor(whisperManager.isRecording ? .red : (whisperManager.isTranscribing ? .yellow : .gray))
+                    .foregroundColor(whisperManager.isRecording ? .red : (whisperManager.isTranscribing ? .yellow : .secondary))
                     .padding(.leading, 8)
                 
                 Spacer()
             }
             .padding(.top, 4)
         }
-        .padding(16)
-        .background(Color(white: 0.1, opacity: 0.6))
-        .cornerRadius(12)
+        .padding(14)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
     }
     
     // MARK: - Groq Cloud Settings Section
@@ -594,7 +608,7 @@ public struct DashboardGestureView: View {
             HStack {
                 Text("Model:")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
                     .frame(width: 110, alignment: .leading)
                 
                 Picker("", selection: $whisperManager.selectedModel) {
@@ -612,7 +626,7 @@ public struct DashboardGestureView: View {
                 HStack {
                     Text("Custom Model:")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                         .frame(width: 110, alignment: .leading)
                     
                     TextField("e.g. whisper-large-v3 or custom ID", text: $whisperManager.customModelId)
@@ -628,20 +642,24 @@ public struct DashboardGestureView: View {
         HStack(spacing: 12) {
             Image(systemName: "applelogo")
                 .font(.system(size: 24))
-                .foregroundColor(.white)
+                .foregroundColor(.primary)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text("100% On-Device Neural Engine Dictation")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
                 Text("Zero cloud calls, zero monthly subscriptions, complete offline privacy. Dictation is recognized natively by Apple Silicon.")
                     .font(.system(size: 11))
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
             }
         }
         .padding(12)
-        .background(Color.white.opacity(0.04))
+        .background(Color(nsColor: .quaternaryLabelColor).opacity(0.18))
         .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
     }
     
     // MARK: - Local Endpoint Section
@@ -650,7 +668,7 @@ public struct DashboardGestureView: View {
             HStack {
                 Text("Base URL:")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
                     .frame(width: 110, alignment: .leading)
                 
                 TextField("http://localhost:8080/v1/audio/transcriptions", text: $whisperManager.customBaseUrl)
@@ -661,7 +679,7 @@ public struct DashboardGestureView: View {
             HStack {
                 Text("Model ID:")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
                     .frame(width: 110, alignment: .leading)
                 
                 TextField("whisper-large-v3", text: $whisperManager.customModelId)
@@ -672,7 +690,7 @@ public struct DashboardGestureView: View {
             HStack {
                 Text("Custom API Key:")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
                     .frame(width: 110, alignment: .leading)
                 
                 SecureField("Optional Bearer Token (sk-...)", text: $whisperManager.customApiKey)
@@ -720,118 +738,20 @@ public struct DashboardGestureView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("External Whisper App Modifier Hold")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
                 Text("Holds down the Command key while your left fist is closed for external apps like Whisper Flow.")
                     .font(.system(size: 11))
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
             }
             Spacer()
             Text("⌘ Command")
                 .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .foregroundColor(.primary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
-                .background(Color.white.opacity(0.1))
+                .background(Color(nsColor: .quaternaryLabelColor).opacity(0.3))
                 .cornerRadius(6)
         }
-    }
-    
-    // MARK: - Live Gesture Test Grid
-    private var gestureTestGridCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("Interactive Gesture Monitor")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
-                Spacer()
-                Text("Perform gestures to see live illumination")
-                    .font(.system(size: 11))
-                    .foregroundColor(.gray)
-            }
-            
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
-                ForEach(RecognizedGestureType.allCases.filter { $0 != .none }) { g in
-                    let isCurrent = (manager.lastGesture == g)
-                    HStack(spacing: 8) {
-                        Image(systemName: g.iconName)
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(isCurrent ? .white : .cyan)
-                        
-                        Text(g.rawValue)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(isCurrent ? .white : .gray)
-                            .lineLimit(1)
-                        
-                        Spacer()
-                        
-                        if isCurrent {
-                            Circle()
-                                .fill(Color.green)
-                                .frame(width: 6, height: 6)
-                        }
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(isCurrent ? Color.blue.opacity(0.45) : Color(white: 0.12, opacity: 0.5))
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(isCurrent ? Color.cyan : Color.white.opacity(0.08), lineWidth: isCurrent ? 1.5 : 1)
-                    )
-                }
-            }
-        }
-        .padding(16)
-        .background(Color(white: 0.1, opacity: 0.6))
-        .cornerRadius(12)
-    }
-    
-    // MARK: - Gesture Reference Guide
-    private var gestureReferenceGuideCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Two-Handed 10-Finger Command Map")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
-            
-            VStack(alignment: .leading, spacing: 8) {
-                guideRow(hand: "Right", pose: "Index Pointing", action: "Engages Optical Air Mouse; moves cursor relatively")
-                guideRow(hand: "Right", pose: "Open / Relax Hand", action: "Lifts mouse off desk; cursor stays frozen in place")
-                guideRow(hand: "Right", pose: "Index + Thumb Pinch", action: "Left click / focus input with zero cursor drift")
-                guideRow(hand: "Right", pose: "Pinch & Hold (>200ms)", action: "Click and drag windows, text, or files")
-                guideRow(hand: "Right", pose: "Middle + Thumb Pinch", action: "Right click context menu")
-                guideRow(hand: "Right", pose: "2 Fingers Extended", action: "Smooth vertical and horizontal scroll (no cursor drop)")
-                guideRow(hand: "Left", pose: "Closed Fist", action: "Records dictation (Groq Large v3 / Apple Silicon)")
-                guideRow(hand: "Left", pose: "Open Fist", action: "Stops dictation, transcribes & auto-pastes text")
-                guideRow(hand: "MacBook", pose: "Hold Left Fn (🌐)", action: "Push-to-Talk: records while held, auto-pastes on release")
-                guideRow(hand: "Left", pose: "Index Tap / Pinch", action: "Return / Enter (submits chat query)")
-                guideRow(hand: "Left", pose: "V / Peace Sign", action: "Paste (Cmd + V)")
-                guideRow(hand: "Left", pose: "C Hand Pose", action: "Copy (Cmd + C)")
-                guideRow(hand: "Left", pose: "Open Palm Stop", action: "Escape / Dismiss active popup")
-            }
-        }
-        .padding(16)
-        .background(Color(white: 0.1, opacity: 0.6))
-        .cornerRadius(12)
-    }
-    
-    private func guideRow(hand: String, pose: String, action: String) -> some View {
-        HStack(spacing: 12) {
-            Text(hand)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(hand == "Right" ? .cyan : .orange)
-                .frame(width: 44, alignment: .leading)
-            
-            Text(pose)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.white)
-                .frame(width: 170, alignment: .leading)
-            
-            Text(action)
-                .font(.system(size: 11))
-                .foregroundColor(.gray)
-            
-            Spacer()
-        }
-        .padding(.vertical, 2)
     }
     
     // MARK: - Preferences I/O

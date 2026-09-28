@@ -100,6 +100,11 @@ The Liquid Glass Voice Companion for AI Coding Agents on macOS
    • agentspeak say "Hello world"     # Speak text via notch player
    • agentspeak dictation status      # Check push-to-talk dictation state
    • agentspeak dictation key <key>   # Set trigger key (right-ctrl, fn, right-opt, cmd, shift, f12, grave)
+   • agentspeak hologram zoom <0-1>   # Set HUD zoom/scale (0.5 = 100% normal)
+   • agentspeak hologram pos <x> <y>  # Set HUD center offset in pixels
+   • agentspeak hologram reset        # Reset HUD transform to factory defaults
+   • agentspeak hologram preview      # 5-second live visualizer test
+   • agentspeak hologram stop         # Instantly stop and dismiss preview
    • agentspeak hologram blend screen # Set hologram blending mode
    • agentspeak gesture on            # Enable camera hand tracking
    • agentspeak voice list            # List all available neural & system voices

@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag (e.g. v1.1.0)'
+        description: 'Release Tag (e.g. v1.2.0)'
         required: false
-        default: 'v1.1.0'
+        default: 'v1.2.0'
 
 permissions:
   contents: write
@@ -38,7 +38,7 @@ jobs:
         run: |
           TAG="${{ github.ref_name }}"
           if [ -z "$TAG" ] || [ "$TAG" = "main" ]; then
-            TAG="${{ github.event.inputs.tag_name || 'v1.1.0' }}"
+            TAG="${{ github.event.inputs.tag_name || 'v1.2.0' }}"
           fi
           cat << 'NOTES' > dist/RELEASE_NOTES.md
           # ✦ Agent Speak Release
@@ -60,6 +60,8 @@ jobs:
           5. In macOS System Settings > Privacy & Security, grant **Accessibility** permissions (for global hotkeys).
 
           ### ✨ Highlights & Features
+          - **DaVinci Resolve-Style 3-Axis HUD Transforms**: Precision sliders and preset buttons for Zoom / Scale Z (up to 2.8x expanding beyond monitor bounds), Horizontal Position X (-1000px to +1000px), Vertical Position Y (-800px to +800px), and an animated Master Reset button.
+          - **Live HUD Preview Auto-Dismiss & Dynamic Stop**: Live preview auto-exits smoothly after 5 seconds or immediately via dynamic red Stop Preview buttons in the viewport and inspector.
           - **Universal Hardware Push-to-Talk Dictation**: Switch trigger key anytime via `agentspeak dictation key <key>` (Right Control, Fn, Option, Command, Shift, F-keys, Grave).
           - **Hardware Mic Detection & Multi-Key Failover**: Real-time CoreAudio detection for wired headsets and AirPods, plus multi-key pool failover for Groq Whisper.
           - **Zero-Double-Paste CoreGraphics Event Engine**: Single-channel event delivery for clean, instant pasting into Electron, Antigravity, VS Code, and native inputs.

@@ -39,7 +39,7 @@ public struct StudioScriptEditorView: View {
             HStack {
                 Text("VOICE TEST SCRIPT")
                     .font(.system(size: 10.5, weight: .bold))
-                    .foregroundColor(Color(red: 0.55, green: 0.56, blue: 0.62))
+                    .foregroundColor(.secondary)
                 
                 Spacer()
                 
@@ -49,7 +49,7 @@ public struct StudioScriptEditorView: View {
                     Text("\(wordCount) words")
                 }
                 .font(.system(size: 10, design: .monospaced))
-                .foregroundColor(Color(red: 0.50, green: 0.52, blue: 0.58))
+                .foregroundColor(.secondary)
             }
             
             // Preset Scenario Chips (Apple HIG Pill Bar)

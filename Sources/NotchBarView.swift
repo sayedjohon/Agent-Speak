@@ -133,91 +133,96 @@ struct FloatingJarvisHologramOverlayView: View {
                     let isSpeechActive = state.isPlaying || queue.isSpeaking
                     let isMusicActive = bgm.isPlaying || bgm.isFadingOut
                     let isFading = bgm.isFadingOut || hologram.isFadingOut
-                    let isAnyActive = isSpeechActive || isMusicActive || hologram.isFadingOut
+                    let isAnyActive = isSpeechActive || isMusicActive || hologram.isFadingOut || hologram.isPreviewActive
                     
                     // Smooth opacity: fades gracefully with background music or fade timer
                     let dynamicOpacity: Double = {
-                        if bgm.isFadingOut {
-                            return max(0.0, min(1.0, 1.0 - bgm.fadeProgress))
-                        }
                         if hologram.isFadingOut {
                             return max(0.0, min(1.0, 1.0 - hologram.fadeProgress))
                         }
-                        if isSpeechActive { return 1.0 }
+                        if bgm.isFadingOut {
+                            return max(0.0, min(1.0, 1.0 - bgm.fadeProgress))
+                        }
+                        if isSpeechActive || hologram.isPreviewActive { return 1.0 }
                         if isMusicActive { return 0.88 }
-                        return 1.0
+                        return 0.0
                     }()
                     
                     let theme = hologram.currentTheme
                     let energy = isSpeechActive ? meter.level : (isMusicActive ? max(0.15, CGFloat(meter.bass) * 0.30) : 0.0)
                     
+                    let targetCenterX = (w / 2.0) + CGFloat(hologram.positionX)
+                    let targetCenterY = (h / 2.0) + CGFloat(hologram.positionY)
+                    let transformScale = CGFloat(hologram.effectiveScaleMultiplier)
+                    
                     ZStack(alignment: .center) {
                         // Invisible click-through container
                         Color.clear
                         
-                        // 1. Ambient Scene Wave Glow (Radiates across the room/screen in chosen theme color)
-                        if isAnyActive && dynamicOpacity > 0.02 {
-                            TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
-                                let now = timeline.date.timeIntervalSinceReferenceDate
-                                let pulse = sin(now * 2.4) * 0.5 + 0.5
-                                let waveRadius: CGFloat = 520.0 + CGFloat(pulse) * 50.0 + CGFloat(energy) * 80.0
-                                let rippleProgress = CGFloat((now.truncatingRemainder(dividingBy: 2.5)) / 2.5)
-                                
-                                let ambientBlend = (hologram.currentBlendMode == .normal) ? BlendMode.plusLighter : hologram.currentBlendMode.swiftUIBlendMode
-                                
-                                ZStack {
-                                    // Atmospheric room illumination in selected theme color
-                                    Circle()
-                                        .fill(
-                                            RadialGradient(
-                                                colors: [
-                                                    theme.amber.opacity((0.13 + Double(energy) * 0.12) * dynamicOpacity * hologram.opacity),
-                                                    theme.deepAmber.opacity((0.05 + Double(energy) * 0.05) * dynamicOpacity * hologram.opacity),
-                                                    Color.clear
-                                                ],
-                                                center: .center,
-                                                startRadius: 40,
-                                                endRadius: waveRadius
-                                            )
-                                        )
-                                        .frame(width: max(10, waveRadius * 2), height: max(10, waveRadius * 2))
-                                        .blur(radius: 28)
-                                        .blendMode(ambientBlend)
+                        // Transformed HUD Group: Core Reactor + Ambient Glow scale and shift together
+                        ZStack(alignment: .center) {
+                            // 1. Ambient Scene Wave Glow (Radiates across the room/screen in chosen theme color)
+                            if isAnyActive && dynamicOpacity > 0.02 {
+                                TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
+                                    let now = timeline.date.timeIntervalSinceReferenceDate
+                                    let pulse = sin(now * 2.4) * 0.5 + 0.5
+                                    let waveRadius: CGFloat = 520.0 + CGFloat(pulse) * 50.0 + CGFloat(energy) * 80.0
+                                    let rippleProgress = CGFloat((now.truncatingRemainder(dividingBy: 2.5)) / 2.5)
                                     
-                                    // Outward propagating harmonic ripple wave ring
-                                    if !isFading {
+                                    let ambientBlend = (hologram.currentBlendMode == .normal) ? BlendMode.plusLighter : hologram.currentBlendMode.swiftUIBlendMode
+                                    
+                                    ZStack {
+                                        // Atmospheric room illumination in selected theme color
                                         Circle()
-                                            .stroke(
-                                                theme.lensAmber.opacity((1.0 - Double(rippleProgress)) * (0.22 + Double(energy) * 0.20) * dynamicOpacity * hologram.opacity),
-                                                lineWidth: 2.0
+                                            .fill(
+                                                RadialGradient(
+                                                    colors: [
+                                                        theme.amber.opacity((0.13 + Double(energy) * 0.12) * dynamicOpacity * hologram.opacity),
+                                                        theme.deepAmber.opacity((0.05 + Double(energy) * 0.05) * dynamicOpacity * hologram.opacity),
+                                                        Color.clear
+                                                    ],
+                                                    center: .center,
+                                                    startRadius: 40,
+                                                    endRadius: waveRadius
+                                                )
                                             )
-                                            .frame(width: 300 + rippleProgress * 500, height: 300 + rippleProgress * 500)
-                                            .blur(radius: 3)
+                                            .frame(width: max(10, waveRadius * 2), height: max(10, waveRadius * 2))
+                                            .blur(radius: 28)
                                             .blendMode(ambientBlend)
+                                        
+                                        // Outward propagating harmonic ripple wave ring
+                                        if !isFading {
+                                            Circle()
+                                                .stroke(
+                                                    theme.lensAmber.opacity((1.0 - Double(rippleProgress)) * (0.22 + Double(energy) * 0.20) * dynamicOpacity * hologram.opacity),
+                                                    lineWidth: 2.0
+                                                )
+                                                .frame(width: 300 + rippleProgress * 500, height: 300 + rippleProgress * 500)
+                                                .blur(radius: 3)
+                                                .blendMode(ambientBlend)
+                                        }
                                     }
                                 }
-                                // Center ambient glow in the perfect middle of the screen
-                                .position(x: w / 2.0, y: h / 2.0)
+                            }
+                            
+                            // 2. Full-Screen Dynamic Holographic Core (Double size, crisp 100% opacity, theme colored)
+                            if dynamicOpacity > 0.02 {
+                                let coreHeight = min(h * 0.88, reactorSize)
+                                HologramSkinContainerView(
+                                    skin: hologram.currentSkin,
+                                    theme: theme,
+                                    blendMode: hologram.currentBlendMode,
+                                    isSpeaking: isSpeechActive,
+                                    isPlayingMusic: isMusicActive,
+                                    size: coreHeight,
+                                    customWidth: w
+                                )
+                                .frame(width: w, height: coreHeight)
+                                .opacity(dynamicOpacity * hologram.opacity)
                             }
                         }
-                        
-                        // 2. Full-Screen Dynamic Holographic Core (Double size, crisp 100% opacity, theme colored)
-                        if dynamicOpacity > 0.02 {
-                            let coreHeight = min(h * 0.88, reactorSize)
-                            HologramSkinContainerView(
-                                skin: hologram.currentSkin,
-                                theme: theme,
-                                blendMode: hologram.currentBlendMode,
-                                isSpeaking: isSpeechActive,
-                                isPlayingMusic: isMusicActive,
-                                size: coreHeight,
-                                customWidth: w
-                            )
-                            .frame(width: w, height: coreHeight)
-                            .opacity(dynamicOpacity * hologram.opacity)
-                            // Position in the PERFECT MIDDLE of the screen
-                            .position(x: w / 2.0, y: h / 2.0)
-                        }
+                        .scaleEffect(transformScale, anchor: .center)
+                        .position(x: targetCenterX, y: targetCenterY)
                     }
                     .frame(width: w, height: h)
                     .allowsHitTesting(false)
