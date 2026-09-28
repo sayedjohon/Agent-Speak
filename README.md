@@ -5,33 +5,46 @@
 <img src="docs/assets/logo.png" alt="Agent Speak Logo" width="96" height="96" style="margin-bottom: 12px;" />
 
 # Agent Speak
-### The Liquid Glass Voice Companion for AI Coding Agents on macOS
+### Real-Life Jarvis for AI Coding Agents on macOS
 
 [![macOS](https://img.shields.io/badge/macOS-14.0%2B%20Sonoma%20%7C%20Sequoia-000000?style=for-the-badge&logo=apple&logoColor=white)](https://apple.com)
 [![Swift](https://img.shields.io/badge/Swift-5.9%2B-F05138?style=for-the-badge&logo=swift&logoColor=white)](https://swift.org)
-[![ProMotion](https://img.shields.io/badge/ProMotion-120_FPS-4E54C8?style=for-the-badge&logo=apple&logoColor=white)](#-liquid-glass-notch-player-120-fps-promotion)
-[![Zero CPU](https://img.shields.io/badge/Engine-Zero_CPU_Native-success?style=for-the-badge)](#-dual-engine-audio-architecture)
-[![Pocket-TTS](https://img.shields.io/badge/Offline_Cloning-Pocket--TTS-blueviolet?style=for-the-badge)](#-pocket-tts-neural-engine--voice-cloning-studio)
+[![Agents](https://img.shields.io/badge/Supports-Antigravity%20%7C%20Claude%20%7C%20Cursor-blueviolet?style=for-the-badge)](#-works-instantly-with-your-favorite-ai-tools)
+[![Engine](https://img.shields.io/badge/Engine-Zero_CPU_Native-success?style=for-the-badge)](#-built-for-speed-on-apple-silicon)
+[![Pocket-TTS](https://img.shields.io/badge/Offline_Cloning-Pocket--TTS-6366f1?style=for-the-badge)](#-offline-voice-cloning-in-10-seconds)
 [![Release](https://img.shields.io/github/v/release/sayedjohon/Agent-Speak?style=for-the-badge&color=orange)](https://github.com/sayedjohon/Agent-Speak/releases)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 <p align="center">
-  <b>Give your AI coding agents a voice without burning CPU or sacrificing privacy.</b><br>
-  Agent Speak docks fluidly under your MacBook Pro notch at 120 FPS, watches your active agent sessions in real time, and brings voice cloning, system hotkeys, holographic overlays, camera hand gestures, and ambient focus music into one unified native macOS app.
+  <b>Give your AI coding agents a real human voice.</b><br>
+  You code. Your AI agent works. Agent Speak reads its answers out loud so you never have to stop and read long walls of text again.<br>
+  Built natively for macOS with offline voice cloning, push-to-talk dictation, holographic HUD, and touchless hand gestures.
 </p>
 
 [Download DMG](#-download--installation) •
-[Key Highlights](#-key-highlights) •
-[Holographic Reactor](#-holographic-arc-reactor--blending-modes) •
-[Camera Gestures](#-dual-hand-10-finger-camera-gesture-control) •
+[Why Developers Love It](#-why-developers-love-it) •
+[Feature Tour](#-feature-tour) •
 [Global Hotkeys](#-global-hotkeys) •
 [Developer CLI](#-developer-cli-agentspeak--aspk) •
-[Agent System Prompt](#-agent-integration--voice-first-protocol) •
-[Permissions & Gatekeeper](#-macos-permissions--gatekeeper-bypass)
+[Agent Setup](#-agent-integration--voice-first-protocol) •
+[Privacy Guarantee](#-100-private--on-device)
 
 ---
 
 </div>
+
+## 🌟 Why Developers Love It
+
+| What You Get | How It Helps You | Where It Runs |
+| :--- | :--- | :--- |
+| **🗣️ Real AI Agent Voice** | Automatically speaks answers from Antigravity, Claude Code, Cursor, and terminals. Skips code blocks so you only hear the explanation. | 100% Local on Mac |
+| **🧬 Offline Voice Cloning** | Clone any voice in 10 seconds (Jarvis, Storyteller, or your own voice). Zero cloud fees, zero subscriptions. | Apple Silicon Neural Engine |
+| **🎤 Push-to-Talk Dictation** | Hold Right Option (or Fn, Ctrl) and talk. Transcribes instantly and types right where your cursor is with zero double-paste. | Groq Whisper + Local Fallback |
+| **⚛️ Holographic Arc Reactor** | Floating Iron Man visualizer with DaVinci Resolve-style 3-axis zoom and position sliders. | Metal GPU Overlay |
+| **🖐️ Touchless Hand Gestures** | Pinch to click, move two fingers to scroll, and hold a fist to dictate hands-free via your Mac camera. | Apple Vision Neural Engine |
+| **🎵 Dynamic Focus Music** | Ambient Iron Man soundtrack that plays while your agent thinks and auto-ducks the moment it speaks. | Native CoreAudio |
+
+---
 
 ## 📦 Download & Installation
 
@@ -39,19 +52,19 @@
 
 1. Download the latest **`Agent-Speak.dmg`** from the [**GitHub Releases**](https://github.com/sayedjohon/Agent-Speak/releases) page.
 2. Open the disk image and drag **`Agent Speak.app`** into your **`Applications`** folder.
-3. **Bypass Gatekeeper**: Because Agent Speak is an open-source, independently distributed app without an Apple Developer ID ($99/year), macOS Gatekeeper will flag it on first launch:
-   - **1-Click Helper**: Double-click the **`Setup & Bypass Gatekeeper.command`** included inside the DMG.
-   - **Terminal Alternative**: Run this command to remove the quarantine flag:
+3. **First-Time Open (Gatekeeper Helper)**:
+   - Double-click the **`Setup & Bypass Gatekeeper.command`** helper inside the DMG.
+   - *Or run this quick command in Terminal:*
      ```bash
      xattr -cr "/Applications/Agent Speak.app"
      ```
-4. Launch **Agent Speak** from your Applications folder or menu bar.
+4. Open **Agent Speak** from your Applications folder. It docks neatly under your display notch and starts working right away.
 
 ---
 
 ### Option 2: Build from Source (1-Click Terminal Setup)
 
-If you prefer building directly on your Mac:
+If you prefer building directly from source on your Mac:
 
 ```bash
 git clone https://github.com/sayedjohon/Agent-Speak.git
@@ -59,155 +72,158 @@ cd Agent-Speak
 ./install.sh
 ```
 
-The installer will:
-1. Compile the native Swift application (`Sources/*.swift`) and CLI (`CLI/main.swift`) using the Apple Silicon compiler.
-2. Sign the bundle with local ad-hoc credentials and configure LaunchServices.
-3. Link `agentspeak` and `aspk` to `~/.local/bin/`.
-4. Register a permanent 24/7 background service via launchd (`com.agentspeak.app`).
+The installer takes care of everything:
+1. Compiles the native Swift application and CLI using the Apple Silicon compiler.
+2. Signs the app bundle locally and sets up macOS permissions.
+3. Links the `agentspeak` and `aspk` CLI commands to your path.
+4. Registers a lightweight background service that starts automatically when you log in.
 
 ---
 
-## 🌟 Key Highlights
+## 🚀 Works Instantly with Your Favorite AI Tools
 
-### 🛸 Liquid Glass Notch Player (120 FPS ProMotion)
-- **Zero-Flicker Hardware Sync**: Driven by native `CADisplayLink` running at 120 frames per second on Apple Silicon displays.
-- **Dynamic Display Adaptability**: Seamlessly hugs your physical camera notch with zero-radius top corners, or floats as a pill on external monitors.
-- **JIT Rolling Lookahead Engine**: Audio is synthesized just-in-time with a lookahead buffer capped at 2 chunks ahead, slashing background CPU by 95% with zero playback latency.
-- **Dual-Transcript Ingestion**: Resilient file tailing automatically resolves untruncated content from full logs, preventing clipped audio on long agent outputs.
-- **Real-Time Audio Waveform**: Fluid frequency visualizer reacts directly to synthesized speech.
+Agent Speak watches your active agent sessions in real time. Whenever an agent finishes writing or thinking, Agent Speak reads the answer to you.
 
-### ⚛️ Holographic Arc Reactor & Blending Modes
-- **Cinema-Grade Floating Visualizer**: Floats dead-center across your display with 100% click-through transparency (clicks pass directly to apps underneath).
-- **7 Professional Blending Modes**:
-  - `Screen`: Lightens and blends seamlessly with dark IDE code editors.
-  - `Additive` (`Plus Lighter`): Maximum holographic plasma glow.
-  - `Multiply`: Deepens tones against bright white documents.
-  - `Overlay`: Balances contrast dynamically.
-  - `Color Dodge`: High-intensity neon illumination.
-  - `Luminosity`: Retains background hue while modulating brightness.
-  - `Normal`: Solid rendering with adjustable opacity.
-- **6 Vibrant Color Palettes**: Golden Amber (Stark Mk 42), Arc Reactor Cyan, Matrix Emerald, Crimson Ruby, Neon Violet, and Diamond Ice.
-- **Adjustable Opacity**: Dial intensity anywhere from 10% to 100%.
-- **DaVinci Resolve-Style 3-Axis Transform Controls**: Fine-tune Zoom (Scale Z up to 2.8x expanding beyond monitor bounds), Horizontal Position X (-1000px to +1000px), Vertical Position Y (-800px to +800px), and an animated Master Reset button for custom ultra-wide or portrait displays.
-- **Live Preview Auto-Dismiss & Stop**: 5-second auto-exit preview with dynamic Stop Preview controls in the settings inspector.
+```
+┌────────────────────────────────────────────────────────┐
+│  Antigravity • Claude Code • Cursor • Windsurf • CLI   │
+└──────────────────────────┬─────────────────────────────┘
+                           │ Active Session Stream
+                           ▼
+┌────────────────────────────────────────────────────────┐
+│                     Agent Speak                        │
+│   • Quarantines code blocks (never speaks raw syntax)  │
+│   • Synthesizes natural human speech in real time      │
+│   • Pulses the 120 FPS notch player & Iron Man HUD     │
+└────────────────────────────────────────────────────────┘
+```
 
-### 🖐️ Dual-Hand 10-Finger Camera Gesture Control
-- **On-Device Vision Tracking**: Powered by Apple Vision framework (`VNDetectHumanHandPoseRequest`) running on the Apple Silicon Neural Engine at 60-120 FPS.
-- **Precision Cursor Flight**: Jitter-free cursor flight calibrated with adaptive One-Euro filtering.
-- **Natural Interaction**:
-  - **Index-Thumb Pinch**: Left click.
-  - **Pinch & Hold**: Drag windows, select code, or reorder files.
-  - **Middle-Thumb Pinch**: Right click.
-  - **Two-Finger Vertical Scroll**: Fluidly scroll pages up or down by moving your index and middle fingers together.
-  - **Left Fist Hold**: Holds `Command` or dictation mode; opening your fist releases and commits text.
-- **Live Skeletal HUD**: Floating feedback pill and skeletal hand joint rendering confirm detected gestures in real time.
-- **Instant Hotkey Toggle**: Press `Control + G` to toggle camera tracking on or off at any time.
+- **Smart Code Quarantine**: It automatically detects code blocks, shell commands, tables, and links. It speaks only the human explanation, keeping code blocks completely muted so you can copy and paste without voice interruptions.
+- **Dual-Transcript Ingestion**: Never clips long answers. It reads the full output so you get every detail.
+- **Universal Connectors**: Works with Google Antigravity, Claude Code, Cursor, Windsurf, Roo Code, Cline, Aider, and custom terminal scripts.
 
-### 🎙️ Pocket-TTS Neural Engine & Voice Cloning Studio
-- **100% Offline Local Inference**: Kyutai FlowLM models run directly on Apple Silicon. Zero cloud calls, zero monthly subscriptions, complete privacy.
-- **24 Curated & Cloned Personas**: Includes Jarvis (Best & Classic), Sayed Johon Primary, Male Peace, Storyteller, Narrator, alba, cosette, george, marius, and more.
-- **1-Click Voice Cloning Studio**: Drop in any 10 to 25 second audio recording, scrub timestamps with the waveform trimmer, and audition your cloned persona instantly.
-- **Synchronous Engine Detection**: Instant zero-lag status checks when launching the dashboard.
+---
 
-### 🎵 Ambient Focus Soundtrack (Iron Man BGM)
-- Integrated ambient background soundtrack engine that plays during thinking and speech phases.
-- Smart auto-ducking with smooth logarithmic cross-fading and 2.5-second spatial reverb tails.
+## ✨ Feature Tour
 
-### 🎤 Push-to-Talk Fn Dictation
-- Hold the physical `Fn` (Globe) key to speak your prompt or query.
-- Instant cloud transcription via Groq Whisper API (or local speech recognition fallback) injects transcribed text directly into your active IDE or terminal.
+### 🎙️ Real-Life Jarvis Voice
+Give your Mac the personality of Tony Stark's assistant, a natural podcast host, or a calm narrator. Choose from 24 ready-to-use personas or use your macOS system voices.
+
+### 🧬 Offline Voice Cloning in 10 Seconds
+Want your assistant to sound like you? Drop in any 10-to-25 second audio clip, scrub the waveform trimmer, and click clone.
+- Runs 100% offline using Kyutai FlowLM models on your Apple Silicon chip.
+- Zero cloud calls. Zero monthly subscriptions. Complete privacy.
+
+### 🎤 Push-to-Talk Hardware Dictation
+Never take your hands off the keyboard to switch apps.
+- Hold **Right Option** (or configure it to **Fn**, **Right Control**, **Command**, or **Shift**) and speak your prompt.
+- High-speed transcription types your words directly into your active code editor or terminal.
+- Single-channel event engine ensures **zero double-paste bugs** across VS Code, Antigravity, Electron, and native macOS text fields.
+
+### ⚛️ Holographic Arc Reactor HUD (DaVinci Resolve Controls)
+A cinema-grade floating visualizer that pulses on your screen when your agent thinks and speaks:
+- **Click-Through Transparency**: Clicks pass right through it so it never blocks your work.
+- **3-Axis DaVinci Controls**: Use precision sliders for Zoom (Scale Z up to 2.8x), Horizontal Position X (-1000px to +1000px), and Vertical Position Y (-800px to +800px).
+- **Master Reset Button**: One click snaps everything back to default.
+- **7 Blending Modes**: Screen, Additive, Multiply, Overlay, Color Dodge, Luminosity, and Normal.
+- **6 Color Themes**: Golden Amber (Stark Mk 42), Arc Reactor Cyan, Matrix Emerald, Crimson Ruby, Neon Violet, and Diamond Ice.
+- **Smart Preview**: 5-second auto-exit test preview with a dynamic red Stop button.
+
+### 🖐️ Touchless Camera Hand Gestures
+Control your computer hands-free using your Mac's built-in FaceTime camera:
+- **Point & Move**: Jitter-free cursor flight powered by Apple Vision neural tracking.
+- **Pinch**: Left click.
+- **Pinch & Hold**: Drag windows, select text, or move files.
+- **Two-Finger Slide**: Scroll up and down smoothly through code and web pages.
+- **Fist Hold**: Trigger voice dictation hands-free.
+- Press **`Control + G`** anytime to turn camera tracking on or off.
+
+### 🎵 Ambient Focus Soundtrack
+Coding with music helps you stay in the zone.
+- Built-in Iron Man and ambient focus soundtrack that plays softly in the background.
+- **Smart Auto-Ducking**: Automatically lowers music volume the exact millisecond your agent speaks, and brings it back up smoothly when speech ends.
 
 ---
 
 ## ⌨️ Global Hotkeys
 
-| Shortcut | Function | Description |
+| Shortcut | Action | What It Does |
 | :--- | :--- | :--- |
-| **`Control + S`** | **Speak Selection** | Highlight any paragraph in any app and speak it aloud immediately. |
-| **`Control + P`** | **Speak Clipboard** | Speaks whatever text is currently stored in your clipboard buffer. |
-| **`Control + G`** | **Toggle Camera Gestures** | Turn camera hand tracking on or off without opening settings. |
-| **`Fn` (Hold)** | **Push-to-Talk Dictation** | Speak while holding `Fn`; transcribed text is typed directly into your active window. |
-| **`Escape`** | **Instant Silence** | Low-level event tap that immediately halts speech and dismisses the notch player. |
+| **`Control + S`** | **Speak Selection** | Highlight any paragraph of text and hear it spoken out loud instantly. |
+| **`Control + P`** | **Speak Clipboard** | Reads whatever text is currently copied to your clipboard. |
+| **`Control + G`** | **Toggle Gestures** | Turns camera hand tracking on or off without opening settings. |
+| **`Right Option` (Hold)** | **Push-to-Talk** | Hold to record your voice; release to type text into your active window. |
+| **`Escape`** | **Instant Silence** | Instantly stops speech and dismisses the notch player. |
+
+*(All hotkeys and the push-to-talk trigger key can be customized in the Settings Dashboard).*
 
 ---
 
 ## 💻 Developer CLI (`agentspeak` / `aspk`)
 
-Agent Speak provides a comprehensive CLI utility installed at `~/.local/bin/agentspeak` (and aliased to `aspk`):
+Control Agent Speak from any terminal, script, or agent workflow:
 
 ```bash
-# Check service health, active engine, and socket status
+# Check service health and engine status
 agentspeak status
 
-# Speak custom text through the notch player
-agentspeak say "Deployment completed successfully. All tests passing."
+# Speak custom text out loud
+agentspeak say "Deployment finished. All unit tests passed."
 
-# Speak highlighted text or current clipboard
+# Read highlighted text or clipboard
 agentspeak selected
 agentspeak pb
 
 # Open the settings dashboard
 agentspeak dashboard
 
-# Manage the Holographic Arc Reactor
+# Holographic Arc Reactor controls
 agentspeak hologram on
 agentspeak hologram off
 agentspeak hologram blend screen     # normal, screen, additive, multiply, overlay, colordodge, luminosity
-agentspeak hologram blends           # list all supported blending modes
-agentspeak hologram opacity 80       # 10 to 100 percent
-agentspeak hologram color cyan       # amber, cyan, green, red, purple, white
 agentspeak hologram zoom 0.5         # set scale / zoom (0.0 to 1.0, 0.5 = 100% normal)
 agentspeak hologram pos 0 0          # set X and Y pixel offsets
 agentspeak hologram reset            # reset HUD transform to factory defaults
 agentspeak hologram preview          # 5-second live visualizer test
-agentspeak hologram stop             # instantly stop and dismiss live preview
+agentspeak hologram stop             # instantly dismiss preview
+
+# Push-to-Talk Dictation
+agentspeak dictation status
+agentspeak dictation key right-opt   # right-opt, fn, right-ctrl, cmd, shift, f12, grave
 
 # Camera Hand Tracking
-agentspeak gesture status
 agentspeak gesture on
 agentspeak gesture off
 agentspeak gesture toggle
-agentspeak gesture hud on/off        # toggle floating gesture feedback HUD
 
 # Voice Engine & Personas
-agentspeak voice status
-agentspeak voice list                # list all 24 neural and macOS system voices
+agentspeak voice list                # list all 24 neural and system voices
 agentspeak voice set Jarvis_Best
-agentspeak voice vol 120             # volume from 1 to 200 percent
+agentspeak voice vol 120             # volume from 1 to 200%
 
-# Background Music (Iron Man BGM)
+# Background Focus Music
 agentspeak bgm on
 agentspeak bgm off
-agentspeak bgm vol 50
-
-# Dictation
-agentspeak dictation status
-agentspeak dictation toggle
-
-# Signature Greeting
-agentspeak greet                     # trigger active persona's intro greeting
+agentspeak bgm vol 30
 
 # Silence & Lifecycle
-agentspeak stop                      # immediately stop speech
-agentspeak quit                      # terminate the background service
+agentspeak stop                      # stop speech immediately
+agentspeak quit                      # stop the background service
 ```
 
 ---
 
 ## 🤖 Agent Integration & Voice-First Protocol
 
-To make your AI coding assistants speak naturally without reading code blocks or syntax, configure them with the **Voice-First Output Protocol**:
-
-### System Prompt for AI Agents
-Add this block to your agent configuration (`CLAUDE.md`, `.cursorrules`, `AGENTS.md`, or system prompt):
+To give your AI coding assistant a natural voice that explains solutions without reading raw code syntax aloud, add this block to your agent's system prompt (e.g. `CLAUDE.md`, `.cursorrules`, `AGENTS.md`, or project instructions):
 
 ```markdown
 # Voice-First & Text-to-Speech Output Protocol (Agent Speak)
 
 - **Voice-First Prose (Text-to-Speech Optimized)**:
-  All conversational text is automatically read aloud by macOS Text-to-Speech and Agent Speak. Every message MUST be written purely for the human ear (natural spoken English, as if speaking on a call).
-  - Speak in a concise, warm, conversational tone.
-  - Never read out raw URLs, long directory paths, camelCase identifiers, or punctuation chains in spoken text.
+  All conversational text is automatically read aloud by macOS Text-to-Speech and Agent Speak. Every message MUST be written purely for the human ear (natural spoken English, as if talking on a call).
+  - Speak in a concise, warm, natural tone.
+  - Never read out raw URLs, long directory paths, camelCase code words, or technical symbols in spoken sentences.
 
 - **Strict Code & Command Quarantine (CRITICAL RULE)**:
   - NEVER write code snippets, terminal commands, file paths, programming syntax, or technical symbols inline inside conversational sentences or paragraphs.
@@ -219,131 +235,38 @@ Add this block to your agent configuration (`CLAUDE.md`, `.cursorrules`, `AGENTS
   - Keep conversational explanations concise and actionable.
 ```
 
-*(See [SYSTEM_PROMPT.md](SYSTEM_PROMPT.md) for full documentation and tool-specific setup guides).*
+*(See [SYSTEM_PROMPT.md](SYSTEM_PROMPT.md) for full configuration guides across Cursor, Claude Code, and Antigravity).*
 
 ---
 
-## 🔌 Socket Protocol Reference (`/tmp/agentspeak.sock`)
+## 🔒 100% Private & On-Device
 
-Agent Speak runs a high-speed UNIX domain socket at `/tmp/agentspeak.sock`. Any terminal script or custom agent can send commands:
-
-```bash
-# Queue speech synthesis
-echo "say:Task finished successfully" | nc -U /tmp/agentspeak.sock
-
-# Immediately silence playback
-echo "stop" | nc -U /tmp/agentspeak.sock
-
-# Query daemon status JSON
-echo "status" | nc -U /tmp/agentspeak.sock
-
-# Switch voice engine
-echo "engine:pocket_tts" | nc -U /tmp/agentspeak.sock
-
-# Change hologram blending mode
-echo "hologram:blend:screen" | nc -U /tmp/agentspeak.sock
-```
+Your code and your voice are private. Agent Speak is designed with privacy as the core foundation:
+- **100% Local Execution**: Speech synthesis, neural voice cloning, and camera vision tracking run completely on your Mac.
+- **Zero Cloud Network Calls**: Your code, transcripts, and voice embeddings never leave your computer.
+- **Zero Tracking**: No telemetry, no usage analytics, and no tracking cookies.
+- **Sandboxed Storage**: All settings and voice profiles live strictly in `~/.agentspeak/`. It never touches your personal documents.
 
 ---
 
-## 🏗️ Architecture Overview
+## 🛡️ macOS Permissions & Gatekeeper
 
-```
-[Agent Transcripts / Hotkeys / CLI / Fn Dictation]
-                       │
-                       ▼
-            /tmp/agentspeak.sock (UNIX Domain Socket)
-                       │
-                       ▼
-             [TextSanitizer.swift] (Markdown tables, code quarantine, URLs)
-                       │
-                       ▼
-          [SpeechQueueManager.swift] (FIFO sequential queue)
-            │                     │
-            ▼                     ▼
-   [Apple AVFoundation]  [Pocket-TTS Neural Extension]
-     (Zero-CPU Native)     (24 Offline Cloned Personas)
-            │                     │
-            └──────────┬──────────┘
-                       │
-                       ▼
-          [StreamingAudioManager.swift] (JIT Rolling Lookahead Engine, 95% CPU savings)
-                       │
-                       ▼
-         [NotchWindowController.swift] & [HologramManager.swift]
-           • 120 FPS Liquid Glass Notch HUD (ProMotion)
-           • Full-Screen Holographic Arc Reactor (6 Themes, 7 Blending Modes)
-```
-
----
-
-## 🛡️ macOS Permissions & Gatekeeper Bypass
-
-### Gatekeeper Quarantine Removal
-If you downloaded `Agent-Speak.dmg` directly from GitHub Releases, macOS Gatekeeper may show:
+Because Agent Speak is an open-source, independently distributed app, macOS Gatekeeper may show a notice on first launch:
 *"Agent Speak is damaged and can't be opened"* or *"cannot be opened because it is from an unidentified developer"*.
 
-Run this command once in Terminal to clear the quarantine flag:
+### 1-Click Fix
+Double-click the **`Setup & Bypass Gatekeeper.command`** helper included inside the DMG.
+
+### Or Run in Terminal
 ```bash
 xattr -cr "/Applications/Agent Speak.app"
 ```
-*(Or double-click `Setup & Bypass Gatekeeper.command` inside the DMG).*
 
 ### System Permissions
 Open **macOS System Settings > Privacy & Security**:
-- **Accessibility**: Required for global hotkeys (`Control+S` to read selection, `Control+P` for clipboard, `Escape` to silence).
-- **Camera**: Required only if you enable dual-hand 10-finger camera gesture tracking.
-- **Microphone**: Required only if you use Push-to-Talk Fn dictation.
-
----
-
-## 📁 Repository Structure
-
-```
-Agent-Speak/
-├── .github/
-│   └── workflows/
-│       └── release.yml          # Automated DMG release CI/CD workflow
-├── docs/
-│   └── assets/                  # Banner and logo visual assets
-├── Resources/
-│   ├── Agent-Speak-Banner.png   # App banner
-│   ├── Agent-Speak-logo.png     # 1024x1024 application icon
-│   ├── bgm/                     # Iron Man focus soundtrack
-│   ├── install_pocket_tts.sh    # On-demand neural engine installer
-│   └── voices/                  # 24 neural cloned voice profiles (.safetensors)
-├── Sources/
-│   ├── main.swift               # App entrypoint and lifecycle
-│   ├── AppDelegate.swift        # Tray item, hotkey bindings, global event taps
-│   ├── DashboardView.swift      # Modern Raycast-grade SwiftUI settings window
-│   ├── NotchWindowController.swift # 120 FPS ProMotion liquid glass notch HUD
-│   ├── HologramManager.swift    # Hologram overlay lifecycle & blending modes
-│   ├── CameraGestureManager.swift # Apple Vision 10-finger hand tracking
-│   ├── GestureClassifier.swift  # Pinch, drag, two-finger scroll classifier
-│   ├── StreamingAudioManager.swift # JIT lookahead streaming audio synthesizer
-│   ├── PocketTTSManager.swift   # Kyutai FlowLM offline neural cloner
-│   ├── VoiceCloningStudioView.swift # Interactive voice cloning studio
-│   ├── FnDictationController.swift # Push-to-Talk Fn key dictation
-│   ├── BackgroundMusicManager.swift # Ambient focus soundtrack engine
-│   ├── TextSanitizer.swift      # Code block quarantine and prose cleaner
-│   └── SpeechQueueManager.swift # Sequential thread-safe speech FIFO queue
-├── CLI/
-│   └── main.swift               # Native Swift CLI controller (`agentspeak`)
-├── scripts/
-│   └── build_dmg.sh             # Automated DMG packaging script
-├── SYSTEM_PROMPT.md             # AI Agent Voice-First prompt guide
-├── AGENTS.md                    # Developer and AI agent reference
-├── install.sh                   # Native build and background service installer
-└── uninstall.sh                 # Complete system uninstaller
-```
-
----
-
-## 🔒 Privacy & On-Device Security
-
-- **100% On-Device Execution**: All synthesis, neural cloner inference, and hand gesture vision tracking run locally on Apple Silicon.
-- **Zero Cloud Network Calls**: Your code, transcripts, and voice data never leave your computer.
-- **Zero Analytics**: No telemetry, trackers, or hidden tracking.
+- **Accessibility**: Needed for global hotkeys (`Control+S`, `Control+P`, and `Escape`).
+- **Microphone**: Needed only if you use Push-to-Talk dictation.
+- **Camera**: Needed only if you turn on touchless hand gestures.
 
 ---
 

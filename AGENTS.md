@@ -3,8 +3,8 @@
 > **Project**: Agent Speak  
 > **Platform**: macOS 14.0+ (Sonoma & Sequoia)  
 > **Core Stack**: Pure Swift, SwiftUI, AppKit, AVFoundation, Metal/ProMotion CADisplayLink, Apple Vision  
-> **Status**: Active Production  
-> **Last Updated**: 2026-09-16 09:00:00  
+> **Status**: Active Production (v1.2.0)  
+> **Last Updated**: 2026-09-28 06:45:00  
 
 ---
 
@@ -53,6 +53,7 @@ See `SYSTEM_PROMPT.md` for copy-paste prompts for Cursor, Claude, and Antigravit
          [NotchWindowController.swift] & [HologramManager.swift]
            • 120 FPS Liquid Glass Notch HUD (ProMotion)
            • Full-Screen Holographic Arc Reactor (6 Palettes, 7 Blending Modes)
+           • DaVinci Resolve-Style 3-Axis Transform Controls (Zoom Z, Pos X, Pos Y)
 ```
 
 ---
@@ -70,8 +71,9 @@ See `SYSTEM_PROMPT.md` for copy-paste prompts for Cursor, Claude, and Antigravit
 ### 2. HUD & Holographic Visualizers
 - `Sources/NotchWindowController.swift`: 120 FPS ProMotion liquid glass notch HUD docking window.
 - `Sources/NotchBarView.swift`: Waveform frequency visualizer, scrub bar, speed and replay buttons.
-- `Sources/HologramManager.swift`: Full-screen overlay window controller with 100% click-through transparency.
+- `Sources/HologramManager.swift`: Full-screen overlay window controller with 100% click-through transparency and 3-axis transform state.
 - `Sources/HologramSkinModels.swift`: Skin presets, color palettes, and 7 blending modes (Screen, Multiply, Additive, Overlay, Color Dodge, Luminosity, Normal).
+- `Sources/HUDTransformCardView.swift`: DaVinci Resolve-style 3-axis transform controls (Z-Zoom up to 2.8x, X-Pos, Y-Pos, and Master Reset).
 - `Sources/HologramLifecycleTracker.swift`: Audio sync and ambient reverb fade-out.
 - `Sources/Skin*.swift`: Specialized shader and canvas renderers for Jarvis, Ultron, Gemini, and GLM visualizer skins.
 
@@ -81,12 +83,13 @@ See `SYSTEM_PROMPT.md` for copy-paste prompts for Cursor, Claude, and Antigravit
 - `Sources/MouseCursorController.swift`: Adaptive One-Euro filter for jitter-free pointer tracking.
 - `Sources/HandSkeletonCanvasView.swift` & `Sources/TraySkeletonHUDController.swift`: Live skeletal joint visualizers.
 - `Sources/GestureHUDController.swift`: Floating feedback pill for real-time gesture status.
+- `Sources/GestureReferenceCardView.swift`: Interactive gesture reference and visual cheat sheet.
 
 ### 4. Neural Voice Cloning & Audio Inputs
 - `Sources/PocketTTSManager.swift`: Kyutai FlowLM offline neural engine with 24 voice personas.
 - `Sources/VoiceCloningStudioView.swift` & `Sources/AudioWaveformTrimmerView.swift`: 1-click zero-shot voice cloning from audio snippets.
 - `Sources/PersonaGreetingManager.swift`: Signature persona greetings and profile registry.
-- `Sources/FnDictationController.swift`: Push-to-Talk Fn key dictation event tap.
+- `Sources/FnDictationController.swift`: Push-to-Talk hardware dictation with CoreGraphics single-channel event engine.
 - `Sources/GroqWhisperManager.swift`: High-speed cloud Whisper transcription with local fallback.
 - `Sources/BackgroundMusicManager.swift` & `Sources/BackgroundMusicView.swift`: Iron Man ambient focus soundtrack with auto-ducking.
 
