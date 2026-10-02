@@ -19,6 +19,7 @@ public class PocketTTSManager: ObservableObject {
     
     @Published public var isCloning: Bool = false
     @Published public var cloneMessage: String = ""
+    @Published public var lastError: String? = nil
     
     private var cancellables = Set<AnyCancellable>()
     
@@ -139,25 +140,33 @@ public class PocketTTSManager: ObservableObject {
         
         DispatchQueue.main.async {
             self.isInstalling = true
-            self.installProgress = "Initializing neural installer..."
+            self.installProgress = "Initializing Custom Voice installer..."
+            self.lastError = nil
         }
         
         DispatchQueue.global(qos: .userInitiated).async {
             var trustedScript: String? = nil
-            if let bundleScript = Bundle.main.path(forResource: "install_pocket_tts", ofType: "sh"), FileManager.default.fileExists(atPath: bundleScript) {
-                trustedScript = bundleScript
-            } else {
-                let localInstall = self.extensionDir + "/install.sh"
-                if FileManager.default.fileExists(atPath: localInstall) {
-                    trustedScript = localInstall
+            let scriptCandidates = [
+                Bundle.main.path(forResource: "install_pocket_tts", ofType: "sh"),
+                Bundle.main.resourcePath.map { $0 + "/install_pocket_tts.sh" },
+                FileManager.default.homeDirectoryForCurrentUser.path + "/Applications/Agent Speak.app/Contents/Resources/install_pocket_tts.sh",
+                "/Applications/Agent Speak.app/Contents/Resources/install_pocket_tts.sh",
+                self.extensionDir + "/install.sh"
+            ]
+            
+            for candidate in scriptCandidates {
+                if let path = candidate, FileManager.default.fileExists(atPath: path) {
+                    trustedScript = path
+                    break
                 }
             }
             
             guard let script = trustedScript else {
                 DispatchQueue.main.async {
                     self.isInstalling = false
-                    self.installProgress = "Installer script not found in trusted bundle."
-                    completion(false, "Installer script not found in trusted bundle.")
+                    self.lastError = "Installer script not found in application bundle."
+                    self.installProgress = "Installer script not found."
+                    completion(false, "Installer script not found in application bundle.")
                 }
                 return
             }
@@ -172,11 +181,13 @@ public class PocketTTSManager: ObservableObject {
             
             pipe.fileHandleForReading.readabilityHandler = { handle in
                 let data = handle.availableData
-                if let str = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), !str.isEmpty {
-                    DispatchQueue.main.async {
-                        let lines = str.components(separatedBy: "\n")
-                        if let last = lines.last(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) {
-                            self.installProgress = last
+                if let rawStr = String(data: data, encoding: .utf8), !rawStr.isEmpty {
+                    // Strip ANSI escape sequences and carriage returns for clean HUD display
+                    let cleaned = rawStr.replacingOccurrences(of: #"\x1B\[[0-?]*[ -/]*[@-~]"#, with: "", options: .regularExpression)
+                    let lines = cleaned.components(separatedBy: CharacterSet.newlines)
+                    if let last = lines.last(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) {
+                        DispatchQueue.main.async {
+                            self.installProgress = last.trimmingCharacters(in: .whitespaces)
                         }
                     }
                 }
@@ -191,14 +202,20 @@ public class PocketTTSManager: ObservableObject {
                 DispatchQueue.main.async {
                     self.isInstalling = false
                     self.refreshState()
-                    let msg = success ? "Pocket-TTS installed successfully!" : "Installation failed (Code \(proc.terminationStatus))"
+                    let msg = success ? "Custom Voice installed successfully!" : "Installation failed (Code \(proc.terminationStatus))"
                     self.installProgress = msg
+                    if !success {
+                        self.lastError = msg
+                    } else {
+                        self.lastError = nil
+                    }
                     completion(success, msg)
                 }
             } catch {
                 pipe.fileHandleForReading.readabilityHandler = nil
                 DispatchQueue.main.async {
                     self.isInstalling = false
+                    self.lastError = error.localizedDescription
                     self.installProgress = "Error: \(error.localizedDescription)"
                     completion(false, error.localizedDescription)
                 }

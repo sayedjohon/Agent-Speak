@@ -31,7 +31,7 @@ public struct PocketTTSExtensionCardView: View {
                         
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text("Pocket-TTS Neural Extension")
+                                Text("Custom Voice Neural Extension")
                                     .font(.system(size: 13, weight: .bold))
                                     .foregroundColor(.primary)
                                 
@@ -90,7 +90,7 @@ public struct PocketTTSExtensionCardView: View {
                             Text("Automatic Multilingual Fallback")
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(.cyan)
-                            Text("Pocket-TTS synthesizes English neural clones. If Bengali, Hindi, Arabic, or other non-English languages are detected, speech automatically transfers to high-clarity native macOS voices.")
+                            Text("Custom Voice synthesizes English neural clones. If Bengali, Hindi, Arabic, or other non-English languages are detected, speech automatically transfers to high-clarity native macOS voices.")
                                 .font(.system(size: 9.5))
                                 .foregroundColor(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -123,28 +123,41 @@ public struct PocketTTSExtensionCardView: View {
                         }
                         .padding(.vertical, 4)
                     } else {
-                        HStack {
-                            Button(action: {
-                                manager.installExtension { success, msg in
-                                    if success {
-                                        onSave()
-                                    }
-                                }
-                            }) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            if let err = manager.lastError, !err.isEmpty {
                                 HStack(spacing: 6) {
-                                    Image(systemName: "arrow.down.circle.fill")
-                                    Text("Download & Set Up Neural Engine (~650MB)")
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundColor(.orange)
+                                        .font(.system(size: 11))
+                                    Text(err)
+                                        .font(.system(size: 10.5))
+                                        .foregroundColor(.red)
+                                        .lineLimit(2)
                                 }
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 7)
-                                .background(LinearGradient(colors: [Color.purple, Color.indigo], startPoint: .leading, endPoint: .trailing))
-                                .cornerRadius(7)
                             }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            Spacer()
+                            HStack {
+                                Button(action: {
+                                    manager.installExtension { success, msg in
+                                        if success {
+                                            onSave()
+                                        }
+                                    }
+                                }) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "arrow.down.circle.fill")
+                                        Text("Download & Set Up Custom Voice (~650MB)")
+                                    }
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 7)
+                                    .background(LinearGradient(colors: [Color.purple, Color.indigo], startPoint: .leading, endPoint: .trailing))
+                                    .cornerRadius(7)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                
+                                Spacer()
+                            }
                         }
                     }
                 }
@@ -163,7 +176,7 @@ public struct PocketTTSExtensionCardView: View {
                         
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 6) {
-                                Text("Pocket-TTS Neural Extension")
+                                Text("Custom Voice Neural Extension")
                                     .font(.system(size: 13, weight: .bold))
                                     .foregroundColor(.primary)
                                 
@@ -480,7 +493,7 @@ public struct CloningGuideModalView: View {
                     icon: "play.circle.fill",
                     color: .cyan,
                     title: "Audition First Before Saving",
-                    desc: "Type any test sentence into the preview box and click '▶ Audition Preview'. Pocket-TTS generates a quick sample and plays it out loud so you can verify how it sounds before saving."
+                    desc: "Type any test sentence into the preview box and click '▶ Audition Preview'. Custom Voice generates a quick sample and plays it out loud so you can verify how it sounds before saving."
                 )
                 
                 stepCard(
@@ -497,7 +510,7 @@ public struct CloningGuideModalView: View {
                 Image(systemName: "cpu")
                     .font(.system(size: 9))
                     .foregroundColor(.orange)
-                Text("Performance Note: Pocket-TTS uses CPU compute for neural generation. For completely zero CPU impact and maximum battery life, use the MacBook Built-in Voice.")
+                Text("Performance Note: Custom Voice uses CPU compute for neural generation. For completely zero CPU impact and maximum battery life, use the MacBook Built-in Voice.")
                     .font(.system(size: 9.5))
                     .foregroundColor(.secondary)
                 Spacer()

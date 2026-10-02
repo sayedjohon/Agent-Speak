@@ -24,26 +24,26 @@ echo -e "${BLUE}Zero-Latency • 100% Offline Neural Voice Cloning • Apple Sil
 mkdir -p "$EXT_DIR"
 mkdir -p "$VOICES_DIR"
 
-# 1. Detect Python 3.10 - 3.13
+# 1. Detect Python 3.10 - 3.14+
 echo -e "${CYAN}→ [1/5] Detecting compatible Python runtime...${NC}"
 PYTHON_BIN=""
 
 # Check potential locations
 CANDIDATES=(
-    "/opt/homebrew/bin/python3.11"
+    "/opt/homebrew/bin/python3"
     "/opt/homebrew/bin/python3.12"
+    "/opt/homebrew/bin/python3.11"
     "/opt/homebrew/bin/python3.10"
-    "$(which python3.11 2>/dev/null || true)"
+    "$(which python3 2>/dev/null || true)"
     "$(which python3.12 2>/dev/null || true)"
+    "$(which python3.11 2>/dev/null || true)"
     "$(which python3.10 2>/dev/null || true)"
     "/usr/local/bin/python3"
-    "$(which python3 2>/dev/null || true)"
 )
 
 for cand in "${CANDIDATES[@]}"; do
-    if [[ -x "$cand" ]]; then
-        VER=$("$cand" -c 'import sys; print(sys.version_info[0]*10 + sys.version_info[1])' 2>/dev/null || echo "0")
-        if [[ "$VER" -ge 310 && "$VER" -le 313 ]]; then
+    if [[ -n "$cand" && -x "$cand" ]]; then
+        if "$cand" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; then
             PYTHON_BIN="$cand"
             break
         fi
@@ -51,16 +51,22 @@ for cand in "${CANDIDATES[@]}"; do
 done
 
 if [[ -z "$PYTHON_BIN" ]]; then
-    echo -e "${YELLOW}Compatible Python (3.10 - 3.12) not detected.${NC}"
+    echo -e "${YELLOW}Compatible Python (3.10+) not detected.${NC}"
     if command -v brew >/dev/null 2>&1; then
-        echo -e "${CYAN}→ Installing python@3.11 via Homebrew...${NC}"
-        brew install python@3.11
-        PYTHON_BIN="/opt/homebrew/bin/python3.11"
-    else
-        echo -e "${RED}Error: Python 3.10+ or Homebrew required to install neural extension.${NC}"
-        echo -e "Please run: brew install python@3.11"
-        exit 1
+        echo -e "${CYAN}→ Installing python via Homebrew...${NC}"
+        NONINTERACTIVE=1 HOMEBREW_NO_AUTO_UPDATE=1 brew install python@3.12 2>&1 || true
+        for cand in "/opt/homebrew/bin/python3.12" "/opt/homebrew/bin/python3" "/usr/local/bin/python3"; do
+            if [[ -n "$cand" && -x "$cand" ]] && "$cand" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; then
+                PYTHON_BIN="$cand"
+                break
+            fi
+        done
     fi
+fi
+
+if [[ -z "$PYTHON_BIN" ]]; then
+    echo -e "${RED}Error: Python 3.10+ required. Please run: brew install python${NC}"
+    exit 1
 fi
 
 echo -e "${GREEN}✓ Using Python: $PYTHON_BIN ($($PYTHON_BIN --version))${NC}"
@@ -74,18 +80,21 @@ echo -e "${GREEN}✓ Virtual environment created at $VENV_DIR${NC}"
 
 # 3. Pip Packages
 echo -e "${CYAN}→ [3/5] Installing neural engine libraries (pocket-tts, scipy, safetensors, soundfile)...${NC}"
-"$VENV_DIR/bin/pip" install --quiet --upgrade pip
-"$VENV_DIR/bin/pip" install --quiet pocket-tts scipy safetensors soundfile
+"$VENV_DIR/bin/pip" install --upgrade pip
+"$VENV_DIR/bin/pip" install pocket-tts scipy safetensors soundfile
 echo -e "${GREEN}✓ Neural engine dependencies installed successfully.${NC}"
 
 # 4. Copy scripts into extension dir
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEV_DIR="$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd || echo "")"
 
 CANDIDATE_SCRIPTS=(
     "$SCRIPT_DIR/speak.py"
     "$SCRIPT_DIR/../Resources/speak.py"
-    "/Applications/Agent Speak.app/Contents/Resources/speak.py"
+    "$SCRIPT_DIR/../../Resources/speak.py"
+    "$DEV_DIR/Resources/speak.py"
     "$HOME/Applications/Agent Speak.app/Contents/Resources/speak.py"
+    "/Applications/Agent Speak.app/Contents/Resources/speak.py"
 )
 for sp in "${CANDIDATE_SCRIPTS[@]}"; do
     if [[ -f "$sp" ]]; then
@@ -97,8 +106,10 @@ done
 CANDIDATE_CLONES=(
     "$SCRIPT_DIR/clone_voice.py"
     "$SCRIPT_DIR/../Resources/clone_voice.py"
-    "/Applications/Agent Speak.app/Contents/Resources/clone_voice.py"
+    "$SCRIPT_DIR/../../Resources/clone_voice.py"
+    "$DEV_DIR/Resources/clone_voice.py"
     "$HOME/Applications/Agent Speak.app/Contents/Resources/clone_voice.py"
+    "/Applications/Agent Speak.app/Contents/Resources/clone_voice.py"
 )
 for cp_s in "${CANDIDATE_CLONES[@]}"; do
     if [[ -f "$cp_s" ]]; then

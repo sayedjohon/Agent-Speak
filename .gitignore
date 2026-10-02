@@ -17,3 +17,6 @@ state.json
 # Build & Distribution Artifacts
 build/
 dist/
+outputs/
+**/outputs/
+*.wav

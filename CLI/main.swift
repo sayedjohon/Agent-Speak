@@ -119,7 +119,7 @@ case "status":
     let info = getActiveConfigInfo()
     if isRunning {
         print("Agent Speak Status: 🟢 RUNNING (100% Native Swift)")
-        print("Voice Engine:       \(info.engine == "pocket_tts" ? "Pocket-TTS Neural Extension" : "Default System Voice (macOS)")")
+        print("Voice Engine:       \(info.engine == "pocket_tts" ? "Custom Voice (Neural AI)" : "Default System Voice (macOS)")")
         print("Active Voice:       \(info.voice)")
         print("IPC Socket:         \(socketPath) (\(socketResponds ? "Healthy" : "Connecting..."))")
     } else {
@@ -250,7 +250,7 @@ case "voice":
 
     if sub == "status" || sub == "info" {
         print("─── Voice Engine Status ───")
-        print("Active Engine:      \(info.engine == "pocket_tts" ? "Pocket-TTS Neural Extension" : "Default macOS System Voice")")
+        print("Active Engine:      \(info.engine == "pocket_tts" ? "Custom Voice (Neural AI)" : "Default macOS System Voice")")
         print("Active Voice:       \(info.voice)")
         print("Neural Extension:   \(isExtInstalled ? "🟢 INSTALLED (\(extDir))" : "🟡 NOT INSTALLED (On-Demand)")")
         
@@ -273,7 +273,7 @@ case "voice":
         print("• Daniel (British English)")
         print("• Samantha (American English)")
         print("• Rishi (Indian English)")
-        print("\n─── Pocket-TTS Neural Extension Personas ───")
+        print("\n─── Custom Voice Personas ───")
         if isExtInstalled {
             let voicesDir = "\(extDir)/voices"
             if let files = try? FileManager.default.contentsOfDirectory(atPath: voicesDir) {
@@ -286,7 +286,7 @@ case "voice":
             print("(Extension not installed. Run 'aspk voice install' to download on-demand)")
         }
     } else if sub == "install" || sub == "install-extension" {
-        print("[Agent Speak] Starting Pocket-TTS Neural Extension setup on your Mac...")
+        print("[Agent Speak] Starting Custom Voice Neural Extension setup on your Mac...")
         let scriptCandidates = [
             "\(extDir)/install.sh",
             "\(home)/Applications/Agent Speak.app/Contents/Resources/install_pocket_tts.sh",
@@ -315,7 +315,7 @@ case "voice":
         let py = extPython
         
         guard FileManager.default.fileExists(atPath: py) else {
-            print("Error: Pocket-TTS runtime not found. Run 'aspk voice install' first.")
+            print("Error: Custom Voice runtime not found. Run 'aspk voice install' first.")
             exit(1)
         }
         
@@ -327,13 +327,14 @@ case "voice":
         p.waitUntilExit()
     } else if sub == "set" {
         guard args.count >= 4 else {
-            print("Usage: aspk voice set <macos|pocket> [voice_name]")
-            print("Example: aspk voice set pocket Sayed_Johon_Primary")
+            print("Usage: aspk voice set <macos|custom> [voice_name]")
+            print("Example: aspk voice set custom Jarvis_Best")
             print("Example: aspk voice set macos Daniel")
             exit(1)
         }
-        let targetEngine = args[3].lowercased().contains("pocket") ? "pocket_tts" : "macos_default"
-        let targetVoice = args.count >= 5 ? args[4] : (targetEngine == "pocket_tts" ? "Sayed_Johon_Primary" : "default")
+        let lowerEngine = args[3].lowercased()
+        let targetEngine = (lowerEngine.contains("pocket") || lowerEngine.contains("custom")) ? "pocket_tts" : "macos_default"
+        let targetVoice = args.count >= 5 ? args[4] : (targetEngine == "pocket_tts" ? "Jarvis_Best" : "default")
         
         let cfgURL = URL(fileURLWithPath: "\(home)/.agentspeak/config.json")
         if let data = try? Data(contentsOf: cfgURL),

@@ -180,15 +180,10 @@ public struct DashboardView: View {
             SystemVoiceItem(tag: "default", label: "Default (System Default)")
         ]
         let curated: [(tag: String, label: String)] = [
-            ("Samantha", "Samantha (US English)"),
-            ("Daniel", "Daniel (British English)"),
-            ("Karen", "Karen (Australian English)"),
-            ("Moira", "Moira (Irish English)"),
-            ("Rishi", "Rishi (Indian English)"),
-            ("Tessa", "Tessa (South African English)"),
-            ("Fred", "Fred (Classic macOS)"),
-            ("Piya", "Piya (Bengali)"),
-            ("Alex", "Alex (Natural US)")
+            ("Samantha", "Samantha (US English)"), ("Daniel", "Daniel (British English)"),
+            ("Karen", "Karen (Australian English)"), ("Moira", "Moira (Irish English)"),
+            ("Rishi", "Rishi (Indian English)"), ("Tessa", "Tessa (South African English)"),
+            ("Fred", "Fred (Classic macOS)"), ("Piya", "Piya (Bengali)"), ("Alex", "Alex (Natural US)")
         ]
         var seen = Set<String>(["default"])
         for c in curated {
@@ -407,7 +402,7 @@ public struct DashboardView: View {
     
     private var tabSubtitle: String {
         switch selectedTab {
-        case .voice: return "Select native Apple Silicon voice or neural Pocket-TTS extension."
+        case .voice: return "Select native Apple Silicon voice or Custom Voice neural extension."
         case .bgm: return "Play soundtrack audio behind speech with shuffle, random offset, and reverb decay."
         case .workspaces: return "Monitors text output from local AI assistants. Never accesses microphone."
         case .hardware: return "Customize dynamic camera notch HUD and menu bar status icon."
@@ -429,7 +424,7 @@ public struct DashboardView: View {
                 
                 Picker("Speech Engine", selection: $voiceEngine) {
                     Text("MacBook Built-in (Zero CPU)").tag("macos_default")
-                    Text("Pocket-TTS Neural AI").tag("pocket_tts")
+                    Text("Custom Voice (Neural AI)").tag("pocket_tts")
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: voiceEngine) {
@@ -514,7 +509,7 @@ public struct DashboardView: View {
                                     }
                                     
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text("Pocket-TTS Neural Extension Required")
+                                        Text("Custom Voice Neural Extension Required")
                                             .font(.system(size: 13, weight: .semibold))
                                             .foregroundColor(.primary)
                                         Text("Kyutai FlowLM models run 100% offline on Apple Silicon (~650MB setup).")
@@ -533,29 +528,43 @@ public struct DashboardView: View {
                                             .lineLimit(1)
                                     }
                                 } else {
-                                    Button(action: {
-                                        pocketTTS.installExtension { success, _ in
-                                            if success { saveConfig() }
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        if let err = pocketTTS.lastError, !err.isEmpty {
+                                            HStack(spacing: 6) {
+                                                Image(systemName: "exclamationmark.triangle.fill")
+                                                    .foregroundColor(.orange)
+                                                    .font(.system(size: 11))
+                                                Text(err)
+                                                    .font(.system(size: 11))
+                                                    .foregroundColor(.red)
+                                                    .lineLimit(2)
+                                            }
                                         }
-                                    }) {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: "arrow.down.circle.fill")
-                                            Text("Download & Set Up Engine (~650MB)")
+                                        
+                                        Button(action: {
+                                            pocketTTS.installExtension { success, _ in
+                                                if success { saveConfig() }
+                                            }
+                                        }) {
+                                            HStack(spacing: 6) {
+                                                Image(systemName: "arrow.down.circle.fill")
+                                                Text("Download & Set Up Custom Voice (~650MB)")
+                                            }
+                                            .font(.system(size: 12, weight: .medium))
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .background(Color.purple)
+                                            .foregroundColor(.white)
+                                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                         }
-                                        .font(.system(size: 12, weight: .medium))
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 6)
-                                        .background(Color.purple)
-                                        .foregroundColor(.white)
-                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
                                 }
                             }
                             .padding(.horizontal, 14)
                             .padding(.vertical, 12)
                         } else {
-                            // Installed Pocket-TTS Row
+                            // Installed Custom Voice Row
                             HStack(spacing: 12) {
                                 ZStack {
                                     RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -567,10 +576,10 @@ public struct DashboardView: View {
                                 }
                                 
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Neural Persona")
+                                    Text("Custom Voice Persona")
                                         .font(.system(size: 13, weight: .medium))
                                         .foregroundColor(.primary)
-                                    Text("On-device Kyutai neural clone")
+                                    Text("On-device neural clone")
                                         .font(.system(size: 11))
                                         .foregroundColor(.secondary)
                                 }
@@ -844,23 +853,17 @@ public struct DashboardView: View {
                     let textToSpeak = customTestText.trimmingCharacters(in: .whitespacesAndNewlines)
                     let prompt = textToSpeak.isEmpty ? "Hello! This is a real-time preview of your active voice persona. Pacing, tone, and inflection are synthesized on-device with zero cloud latency." : textToSpeak
                     LastVoiceManager.shared.prepareForNewVoice(text: prompt)
-                    SpeechQueueManager.shared.enqueue(
-                        source: "Voice Test",
-                        text: prompt
-                    )
+                    SpeechQueueManager.shared.enqueue(source: "Voice Test", text: prompt)
                 },
-                onStop: {
-                    SpeechQueueManager.shared.stopCurrent()
-                }
+                onStop: { SpeechQueueManager.shared.stopCurrent() }
             )
             
-            // MARK: - Section 5: Last Voice Player, Scrubber & Download (Shown only when available)
+            // MARK: - Section 5: Last Voice Player, Scrubber & Download
             LastVoiceCardView()
         }
     }
     
-    // MARK: - Tab 2: Connected AI
-    
+    // MARK: - Subtabs
     private var workspacesTab: some View {
         DashboardWorkspacesView(
             watchAntigravity: $watchAntigravity,
@@ -870,8 +873,6 @@ public struct DashboardView: View {
         )
     }
     
-    // MARK: - Tab 3: Notch & Menu Bar
-    
     private var hardwareTab: some View {
         DashboardHardwareView(
             showTrayIcon: $showTrayIcon,
@@ -879,8 +880,6 @@ public struct DashboardView: View {
             onSaveConfig: { saveConfig() }
         )
     }
-    
-    // MARK: - Tab 4: Shortcuts & CLI
     
     private var shortcutsTab: some View {
         DashboardShortcutsView()
