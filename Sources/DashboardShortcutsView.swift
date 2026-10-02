@@ -58,6 +58,8 @@ public struct DashboardShortcutsView: View {
                     Divider()
                     cliRow(cmd: "aspk replay", desc: "Re-listen to the last spoken message through notch player")
                     Divider()
+                    cliRow(cmd: "aspk dictation retry", desc: "Retry failed transcription and copy text to clipboard")
+                    Divider()
                     cliRow(cmd: "aspk bgm on | off", desc: "Toggle background soundtrack playback")
                     Divider()
                     cliRow(cmd: "aspk bgm vol <0-100>", desc: "Set music volume percentage (e.g. aspk bgm vol 25)")

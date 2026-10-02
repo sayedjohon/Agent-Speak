@@ -39,7 +39,7 @@
 | :--- | :--- | :--- |
 | **🗣️ Real AI Agent Voice** | Automatically speaks answers from Antigravity, Claude Code, Cursor, and terminals. Skips code blocks so you only hear the explanation. | 100% Local on Mac |
 | **🧬 Offline Voice Cloning** | Clone any voice in 10 seconds (Jarvis, Storyteller, or your own voice). Zero cloud fees, zero subscriptions. | Apple Silicon Neural Engine |
-| **🎤 Push-to-Talk Dictation** | Hold Right Option (or Fn, Ctrl) and talk. Transcribes instantly and types right where your cursor is with zero double-paste. | Groq Whisper + Local Fallback |
+| **🎤 Push-to-Talk Dictation** | Hold Right Option (or Fn, Ctrl) and talk. Transcribes instantly and types right where your cursor is. If network drops, audio is preserved with 1-click Notch Bar retry and clipboard copy. | Groq Whisper + Local Fallback |
 | **⚛️ Holographic Arc Reactor** | Floating Iron Man visualizer with DaVinci Resolve-style 3-axis zoom and position sliders. | Metal GPU Overlay |
 | **🖐️ Touchless Hand Gestures** | Pinch to click, move two fingers to scroll, and hold a fist to dictate hands-free via your Mac camera. | Apple Vision Neural Engine |
 | **🎵 Dynamic Focus Music** | Ambient Iron Man soundtrack that plays while your agent thinks and auto-ducks the moment it speaks. | Native CoreAudio |
@@ -191,6 +191,7 @@ agentspeak hologram stop             # instantly dismiss preview
 # Push-to-Talk Dictation
 agentspeak dictation status
 agentspeak dictation key right-opt   # right-opt, fn, right-ctrl, cmd, shift, f12, grave
+agentspeak dictation retry           # retry failed transcription & copy text to clipboard
 
 # Camera Hand Tracking
 agentspeak gesture on

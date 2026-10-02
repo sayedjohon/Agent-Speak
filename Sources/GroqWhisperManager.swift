@@ -278,6 +278,8 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
     
     private var audioRecorder: AVAudioRecorder?
     private let recordingURL = URL(fileURLWithPath: "/tmp/agentspeak_dictation.wav")
+    private let backupRecordingURL = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".agentspeak/last_dictation.wav")
     private let workQueue = DispatchQueue(label: "com.agentspeak.dictation", qos: .userInitiated)
     
     // Apple On-Device Speech Recognizer
@@ -390,6 +392,16 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
         audioRecorder?.stop()
         audioRecorder = nil
         
+        // Preserve audio backup in case network or API fails
+        if FileManager.default.fileExists(atPath: recordingURL.path) {
+            let dir = backupRecordingURL.deletingLastPathComponent()
+            if !FileManager.default.fileExists(atPath: dir.path) {
+                try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            }
+            try? FileManager.default.removeItem(at: backupRecordingURL)
+            try? FileManager.default.copyItem(at: recordingURL, to: backupRecordingURL)
+        }
+        
         DispatchQueue.main.async {
             self.isRecording = false
             self.isTranscribing = true
@@ -402,9 +414,9 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
             
             switch self.engineMode {
             case .groqCloud, .localEndpoint:
-                self.transcribeWithCloudWhisper()
+                self.transcribeWithCloudWhisper(isRetry: false)
             case .appleOnDevice:
-                self.transcribeWithAppleOnDevice()
+                self.transcribeWithAppleOnDevice(isRetry: false)
             case .modifierHold:
                 DispatchQueue.main.async {
                     self.isTranscribing = false
@@ -414,7 +426,7 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
     }
     
     // MARK: - Cloud Groq Whisper Transcription with Multi-Key Fallback
-    private func transcribeWithCloudWhisper() {
+    private func transcribeWithCloudWhisper(isRetry: Bool = false) {
         let candidateKeys: [String]
         if engineMode == .localEndpoint && !customApiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             candidateKeys = [customApiKey.trimmingCharacters(in: .whitespacesAndNewlines)]
@@ -463,7 +475,8 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
             attempts: 0,
             url: url,
             audioData: audioData,
-            model: targetModel
+            model: targetModel,
+            isRetry: isRetry
         )
     }
     
@@ -473,7 +486,8 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
         attempts: Int,
         url: URL,
         audioData: Data,
-        model: String
+        model: String,
+        isRetry: Bool = false
     ) {
         let totalKeys = candidateKeys.count
         guard attempts < totalKeys else {
@@ -544,7 +558,8 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
                         attempts: attempts + 1,
                         url: url,
                         audioData: audioData,
-                        model: model
+                        model: model,
+                        isRetry: isRetry
                     )
                 }
                 return
@@ -580,7 +595,8 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
                             attempts: attempts + 1,
                             url: url,
                             audioData: audioData,
-                            model: model
+                            model: model,
+                            isRetry: isRetry
                         )
                     }
                     return
@@ -594,7 +610,12 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
                 DispatchQueue.main.async {
                     self.activeKeyIndex = keyIndex
                 }
-                self.deliverTranscription(text.trimmingCharacters(in: .whitespacesAndNewlines))
+                let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if isRetry {
+                    self.deliverRetrySuccess(cleanText)
+                } else {
+                    self.deliverTranscription(cleanText)
+                }
             } else {
                 self.notifyFailure("No speech detected")
             }
@@ -603,7 +624,7 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
     }
     
     // MARK: - Apple Silicon On-Device Transcription (100% Offline)
-    private func transcribeWithAppleOnDevice() {
+    private func transcribeWithAppleOnDevice(isRetry: Bool = false) {
         guard let recognizer = speechRecognizer, recognizer.isAvailable else {
             notifyFailure("Apple Speech unavailable")
             return
@@ -624,7 +645,11 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
             
             if let result = result, result.isFinal {
                 let text = result.bestTranscription.formattedString
-                self.deliverTranscription(text)
+                if isRetry {
+                    self.deliverRetrySuccess(text)
+                } else {
+                    self.deliverTranscription(text)
+                }
             }
         }
     }
@@ -662,13 +687,79 @@ public class GroqWhisperManager: NSObject, ObservableObject, AVAudioRecorderDele
         NSLog("[GroqWhisper] Transcribed: '%@'", text)
     }
     
+    // MARK: - Deliver & Copy to Clipboard for Retry
+    private func deliverRetrySuccess(_ text: String) {
+        DispatchQueue.main.async {
+            self.isTranscribing = false
+            self.lastTranscription = text
+            self.statusMessage = "Copied to clipboard"
+            
+            // Put on clipboard
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(text, forType: .string)
+            
+            // Audio earcon feedback: gentle chime
+            NSSound(named: "Glass")?.play()
+            
+            // Update Notch Bar
+            DictationNotchState.shared.showSuccess(text: text)
+        }
+        NSLog("[GroqWhisper] Retry succeeded, copied to clipboard: '%@'", text)
+    }
+    
     private func notifyFailure(_ message: String) {
         DispatchQueue.main.async {
             self.isTranscribing = false
             self.statusMessage = message
             GestureHUDState.shared.showGesture(.clutch, label: message)
+            DictationNotchState.shared.showError(message: message)
         }
         NSLog("[GroqWhisper] Failed: %@", message)
+    }
+    
+    // MARK: - Retry Dictation Transcription
+    public func retryLastDictation() {
+        guard !isTranscribing else { return }
+        
+        let sourceURL: URL
+        if FileManager.default.fileExists(atPath: backupRecordingURL.path),
+           (try? Data(contentsOf: backupRecordingURL))?.count ?? 0 > 4100 {
+            sourceURL = backupRecordingURL
+        } else if FileManager.default.fileExists(atPath: recordingURL.path),
+                  (try? Data(contentsOf: recordingURL))?.count ?? 0 > 4100 {
+            sourceURL = recordingURL
+        } else {
+            notifyFailure("No saved voice audio found")
+            return
+        }
+        
+        if sourceURL.path != recordingURL.path {
+            try? FileManager.default.removeItem(at: recordingURL)
+            try? FileManager.default.copyItem(at: sourceURL, to: recordingURL)
+        }
+        
+        loadConfig()
+        
+        DispatchQueue.main.async {
+            self.isTranscribing = true
+            self.statusMessage = "Retrying transcription..."
+            DictationNotchState.shared.showRetrying()
+        }
+        
+        workQueue.async { [weak self] in
+            guard let self = self else { return }
+            switch self.engineMode {
+            case .groqCloud, .localEndpoint:
+                self.transcribeWithCloudWhisper(isRetry: true)
+            case .appleOnDevice:
+                self.transcribeWithAppleOnDevice(isRetry: true)
+            case .modifierHold:
+                DispatchQueue.main.async {
+                    self.isTranscribing = false
+                }
+            }
+        }
     }
     
     // MARK: - Configuration I/O

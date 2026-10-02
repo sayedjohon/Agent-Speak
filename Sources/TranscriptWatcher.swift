@@ -672,21 +672,17 @@ public class TranscriptWatcher {
                             SpeechQueueManager.shared.stopCurrent()
                         }
                     } else if raw == "__CMD_REPLAY__" || raw == "replay" || raw == "relisten" {
-                        DispatchQueue.main.async {
-                            LastVoiceManager.shared.replayVoice()
-                        }
+                        DispatchQueue.main.async { LastVoiceManager.shared.replayVoice() }
+                    } else if raw == "__CMD_DICTATION_RETRY__" || raw == "dictation:retry" {
+                        DispatchQueue.main.async { GroqWhisperManager.shared.retryLastDictation() }
+                    } else if raw == "__CMD_DICTATION_TEST_ERROR__" {
+                        DispatchQueue.main.async { DictationNotchState.shared.showError(message: "Connection Error (Check Wi-Fi)") }
                     } else if raw == "__CMD_SPEAK_CODE_ON__" {
-                        DispatchQueue.main.async {
-                            CodeSpeechManager.shared.setSpeakCodeBlocks(true)
-                        }
+                        DispatchQueue.main.async { CodeSpeechManager.shared.setSpeakCodeBlocks(true) }
                     } else if raw == "__CMD_SPEAK_CODE_OFF__" {
-                        DispatchQueue.main.async {
-                            CodeSpeechManager.shared.setSpeakCodeBlocks(false)
-                        }
+                        DispatchQueue.main.async { CodeSpeechManager.shared.setSpeakCodeBlocks(false) }
                     } else if raw == "__CMD_TOGGLE_SPEAK_CODE__" {
-                        DispatchQueue.main.async {
-                            CodeSpeechManager.shared.toggle()
-                        }
+                        DispatchQueue.main.async { CodeSpeechManager.shared.toggle() }
                     } else if raw == "__CMD_TEST_JARVIS__" {
                         let jarvisPaths = [
                             Bundle.main.bundlePath + "/Contents/Resources/voices/Jarvis.wav",

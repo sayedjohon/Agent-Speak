@@ -91,7 +91,8 @@ See `SYSTEM_PROMPT.md` for copy-paste prompts for Cursor, Claude, and Antigravit
 - `Sources/VoiceCloningStudioView.swift` & `Sources/AudioWaveformTrimmerView.swift`: 1-click zero-shot voice cloning from audio snippets.
 - `Sources/PersonaGreetingManager.swift`: Signature persona greetings and profile registry.
 - `Sources/FnDictationController.swift`: Push-to-Talk hardware dictation with CoreGraphics single-channel event engine.
-- `Sources/GroqWhisperManager.swift`: High-speed cloud Whisper transcription with local fallback.
+- `Sources/GroqWhisperManager.swift`: High-speed cloud Whisper transcription with local fallback & persistent audio backup.
+- `Sources/DictationNotchBarView.swift`: Liquid glass notch HUD for dictation errors, 1-click retry reload button, and clipboard copy confirmation.
 - `Sources/BackgroundMusicManager.swift` & `Sources/BackgroundMusicView.swift`: Iron Man ambient focus soundtrack with auto-ducking.
 
 ### 5. Multi-Agent Workspace Watchers
@@ -120,6 +121,7 @@ The daemon exposes a lightweight UNIX domain socket at `/tmp/agentspeak.sock`. A
 | `say:<text>` | Queues text for speech synthesis | `echo "say:Build succeeded" \| nc -U /tmp/agentspeak.sock` |
 | `stop` | Halts current speech and clears queue | `echo "stop" \| nc -U /tmp/agentspeak.sock` |
 | `replay` | Replays the last spoken or interrupted audio | `echo "replay" \| nc -U /tmp/agentspeak.sock` |
+| `dictation:retry` | Retries failed dictation and copies text to clipboard | `echo "dictation:retry" \| nc -U /tmp/agentspeak.sock` |
 | `status` | Returns JSON status of daemon | `echo "status" \| nc -U /tmp/agentspeak.sock` |
 | `dashboard` | Opens settings dashboard | `echo "dashboard" \| nc -U /tmp/agentspeak.sock` |
 | `engine:<name>`| Switches active engine (`native` or `pocket-tts`) | `echo "engine:pocket_tts" \| nc -U /tmp/agentspeak.sock` |

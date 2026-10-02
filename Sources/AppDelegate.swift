@@ -346,6 +346,18 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         replayItem.isEnabled = LastVoiceManager.shared.hasVoice || !rawPrompt.isEmpty
         menu.addItem(replayItem)
         
+        // 5. Retry Last Dictation
+        let backupVoicePath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".agentspeak/last_dictation.wav").path
+        let hasSavedVoice = FileManager.default.fileExists(atPath: backupVoicePath)
+        let retryDictItem = NSMenuItem(title: "Retry Last Dictation", action: #selector(retryLastDictation), keyEquivalent: "")
+        if let icon = NSImage(systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: "Retry Last Dictation") {
+            icon.isTemplate = true
+            retryDictItem.image = icon
+        }
+        retryDictItem.target = self
+        retryDictItem.isEnabled = hasSavedVoice
+        menu.addItem(retryDictItem)
+        
         menu.addItem(NSMenuItem.separator())
         
         // 4. Speak Code Blocks Toggle (curly braces icon, checkmark state)
@@ -718,6 +730,10 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         LastVoiceManager.shared.replayVoice()
     }
     
+    @objc func retryLastDictation() {
+        GroqWhisperManager.shared.retryLastDictation()
+    }
+    
     @objc func toggleSpeakCodeBlocks() {
         CodeSpeechManager.shared.toggle()
         let state = CodeSpeechManager.shared.speakCodeBlocks ? "ENABLED" : "DISABLED"
@@ -823,23 +839,14 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         // Redundant NSEvent Global Monitor for Control + G and Control + R
         globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard event.modifierFlags.contains(.control), let key = event.charactersIgnoringModifiers?.lowercased() else { return }
-            if key == "g" || event.keyCode == 5 {
-                DispatchQueue.main.async { self?.toggleHandsFreeGestures() }
-            } else if key == "r" || event.keyCode == 15 {
-                DispatchQueue.main.async { self?.replayLastSpeech() }
-            }
+            if key == "g" || event.keyCode == 5 { DispatchQueue.main.async { self?.toggleHandsFreeGestures() } }
+            else if key == "r" || event.keyCode == 15 { DispatchQueue.main.async { self?.replayLastSpeech() } }
         }
         
-        // Redundant NSEvent Local Monitor (when Agent Speak itself is focused)
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard event.modifierFlags.contains(.control), let key = event.charactersIgnoringModifiers?.lowercased() else { return event }
-            if key == "g" || event.keyCode == 5 {
-                DispatchQueue.main.async { self?.toggleHandsFreeGestures() }
-                return nil
-            } else if key == "r" || event.keyCode == 15 {
-                DispatchQueue.main.async { self?.replayLastSpeech() }
-                return nil
-            }
+            if key == "g" || event.keyCode == 5 { DispatchQueue.main.async { self?.toggleHandsFreeGestures() }; return nil }
+            else if key == "r" || event.keyCode == 15 { DispatchQueue.main.async { self?.replayLastSpeech() }; return nil }
             return event
         }
     }
@@ -847,14 +854,11 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
     @objc func confirmHideTrayIcon() {
         let alert = NSAlert()
         alert.messageText = "Hide Agent Speak from Menu Bar?"
-        alert.informativeText = "Agent Speak will continue running in the background. You can restore the menu bar icon anytime from the Agent Speak Dashboard or by running 'agentspeak tray on' in Terminal."
+        alert.informativeText = "Agent Speak will continue running in the background. You can restore the icon from Dashboard or via 'agentspeak tray on'."
         alert.addButton(withTitle: "Hide Icon")
         alert.addButton(withTitle: "Cancel")
         alert.alertStyle = .informational
-        
-        if alert.runModal() == .alertFirstButtonReturn {
-            setTrayIconVisible(false)
-        }
+        if alert.runModal() == .alertFirstButtonReturn { setTrayIconVisible(false) }
     }
     
     @objc func quitApp() {

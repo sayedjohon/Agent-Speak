@@ -28,6 +28,7 @@ public class NotchWindowController {
     public static let shared = NotchWindowController()
     
     private var window: KeyablePanel?
+    private var dictationWindow: KeyablePanel?
     private var audioManager: StreamingAudioManager?
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -37,7 +38,7 @@ public class NotchWindowController {
     private var eventHandlerRef: EventHandlerRef?
     
     public var isPresenting: Bool {
-        return window != nil || (audioManager?.isPlaying == true)
+        return window != nil || dictationWindow != nil || (audioManager?.isPlaying == true)
     }
     
     private init() {}
@@ -208,6 +209,85 @@ public class NotchWindowController {
         }
     }
     
+    public static func hasNotch(screen: NSScreen? = nil) -> Bool {
+        let target = screen ?? NSScreen.main ?? NSScreen.screens.first
+        guard let s = target else { return false }
+        if #available(macOS 12.0, *) {
+            return s.safeAreaInsets.top > 0 || s.auxiliaryTopLeftArea != nil
+        }
+        return false
+    }
+    
+    public func presentDictationBar(hasNotch: Bool) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            if let panel = self.dictationWindow {
+                panel.orderFront(nil)
+                return
+            }
+            
+            let mouseLoc = NSEvent.mouseLocation
+            let targetScreen = NSScreen.screens.first(where: { NSMouseInRect(mouseLoc, $0.frame, false) }) ?? NSScreen.main ?? NSScreen.screens[0]
+            
+            let hasScreenNotch = Self.hasNotch(screen: targetScreen)
+            let barWidth: CGFloat = 300.0
+            let barHeight: CGFloat = 32.0
+            let windowWidth = barWidth + 24.0
+            let windowHeight = barHeight + 20.0
+            
+            let x = targetScreen.frame.origin.x + (targetScreen.frame.width - windowWidth) / 2
+            let topOfScreen = targetScreen.frame.origin.y + targetScreen.frame.height
+            let topOfVisible = targetScreen.visibleFrame.origin.y + targetScreen.visibleFrame.height
+            
+            let y: CGFloat
+            if hasScreenNotch {
+                let notchHeight: CGFloat = targetScreen.safeAreaInsets.top > 0 ? targetScreen.safeAreaInsets.top : 32.0
+                y = topOfScreen - notchHeight - windowHeight
+            } else {
+                if topOfVisible < topOfScreen - 5 {
+                    y = topOfVisible - windowHeight - 4.0
+                } else {
+                    y = topOfScreen - windowHeight - 8.0
+                }
+            }
+            
+            let frame = NSRect(x: x, y: y, width: windowWidth, height: windowHeight)
+            let panel = KeyablePanel(
+                contentRect: frame,
+                styleMask: [.borderless, .nonactivatingPanel],
+                backing: .buffered,
+                defer: false
+            )
+            panel.isFloatingPanel = true
+            panel.level = .statusBar + 1
+            panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+            panel.backgroundColor = .clear
+            panel.isOpaque = false
+            panel.hasShadow = false
+            
+            let hosting = NSHostingView(
+                rootView: DictationNotchBarView(hasNotch: hasScreenNotch)
+            )
+            hosting.frame = NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight)
+            hosting.wantsLayer = true
+            panel.contentView = hosting
+            panel.orderFront(nil)
+            self.dictationWindow = panel
+            
+            self.setupEscapeKeyTap()
+            self.registerGlobalEscapeHotKey()
+        }
+    }
+    
+    public func dismissDictationBarOnly() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.dictationWindow?.orderOut(nil)
+            self.dictationWindow = nil
+        }
+    }
+    
     public func dismissNotchBarOnly() {
         unregisterGlobalEscapeHotKey()
         window?.orderOut(nil)
@@ -229,6 +309,9 @@ public class NotchWindowController {
         
         window?.orderOut(nil)
         window = nil
+        
+        dictationWindow?.orderOut(nil)
+        dictationWindow = nil
         
         if BackgroundMusicManager.shared.isPlaying || BackgroundMusicManager.shared.isFadingOut {
             // Start smooth 3.0s window fade in lockstep with background music
@@ -270,6 +353,12 @@ public class NotchWindowController {
                     if keyCode == 53 { // Escape
                         if let refcon = refcon {
                             let controller = Unmanaged<NotchWindowController>.fromOpaque(refcon).takeUnretainedValue()
+                            if controller.dictationWindow != nil {
+                                DispatchQueue.main.async {
+                                    DictationNotchState.shared.dismiss()
+                                }
+                                return nil
+                            }
                             if controller.window != nil || SpeechQueueManager.shared.isSpeaking {
                                 DispatchQueue.main.async {
                                     SpeechQueueManager.shared.stopCurrent()
@@ -300,6 +389,12 @@ public class NotchWindowController {
             globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 if event.keyCode == 53 { // Escape
                     guard let self = self else { return }
+                    if self.dictationWindow != nil {
+                        DispatchQueue.main.async {
+                            DictationNotchState.shared.dismiss()
+                        }
+                        return
+                    }
                     if self.window != nil || SpeechQueueManager.shared.isSpeaking {
                         DispatchQueue.main.async {
                             SpeechQueueManager.shared.stopCurrent()
@@ -314,6 +409,12 @@ public class NotchWindowController {
             localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 if event.keyCode == 53 { // Escape
                     guard let self = self else { return event }
+                    if self.dictationWindow != nil {
+                        DispatchQueue.main.async {
+                            DictationNotchState.shared.dismiss()
+                        }
+                        return nil
+                    }
                     if self.window != nil || SpeechQueueManager.shared.isSpeaking {
                         DispatchQueue.main.async {
                             SpeechQueueManager.shared.stopCurrent()
@@ -339,6 +440,12 @@ public class NotchWindowController {
             GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
             
             if hotKeyID.signature == 0x4153504B && hotKeyID.id == 53 {
+                if NotchWindowController.shared.dictationWindow != nil {
+                    DispatchQueue.main.async {
+                        DictationNotchState.shared.dismiss()
+                    }
+                    return noErr
+                }
                 DispatchQueue.main.async {
                     SpeechQueueManager.shared.stopCurrent()
                 }

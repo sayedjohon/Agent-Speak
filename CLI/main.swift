@@ -793,9 +793,21 @@ case "dictation", "fn", "ptt":
         let keyArg = args[3]
         _ = sendSocketMessage("__CMD_DICTATION_KEY__:\(keyArg)")
         print("✓ Push-to-Talk trigger key updated to: \(keyArg)")
+    } else if sub == "retry" {
+        if ensureAppRunningAndSend("__CMD_DICTATION_RETRY__") {
+            print("[Agent Speak] Retrying last dictation transcription from saved audio...")
+        } else {
+            print("Error: Could not connect to Agent Speak socket.")
+        }
+    } else if sub == "test-error" {
+        if ensureAppRunningAndSend("__CMD_DICTATION_TEST_ERROR__") {
+            print("[Agent Speak] Displaying test dictation error bar in notch area.")
+        } else {
+            print("Error: Could not connect to Agent Speak socket.")
+        }
     } else {
         print("Unknown dictation subcommand: \(sub)")
-        print("Usage: agentspeak dictation <on | off | toggle | status | key <preset>>")
+        print("Usage: agentspeak dictation <on | off | toggle | status | key <preset> | retry>")
     }
 
 case "greet", "welcome", "intro":

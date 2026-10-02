@@ -281,6 +281,7 @@ public class FnDictationController {
         
         DispatchQueue.main.async {
             // Interruption / Barge-in: If agent is speaking, reading observations, or queued, stop immediately!
+            DictationNotchState.shared.dismiss()
             if SpeechQueueManager.shared.isSpeaking || SpeechQueueManager.shared.queueCount > 0 || NotchWindowController.shared.isPresenting {
                 NSLog("[FnDictation] Barge-in triggered: cancelling speech playback and starting dictation.")
                 SpeechQueueManager.shared.stopCurrent()
