@@ -327,6 +327,25 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         stopItem.isEnabled = isSpeaking
         menu.addItem(stopItem)
         
+        // 4. Re-listen to Last Speech (arrow.counterclockwise.circle, ⌃R)
+        let rawPrompt = LastVoiceManager.shared.textPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let previewTitle: String
+        if rawPrompt.isEmpty {
+            previewTitle = "Re-listen to Last Speech"
+        } else {
+            let truncated = rawPrompt.count > 34 ? String(rawPrompt.prefix(32)) + "…" : rawPrompt
+            previewTitle = "Replay: \"\(truncated)\""
+        }
+        let replayItem = NSMenuItem(title: previewTitle, action: #selector(replayLastSpeech), keyEquivalent: "r")
+        replayItem.keyEquivalentModifierMask = [.control]
+        if let icon = NSImage(systemSymbolName: "arrow.counterclockwise.circle", accessibilityDescription: "Re-listen to Last Speech") {
+            icon.isTemplate = true
+            replayItem.image = icon
+        }
+        replayItem.target = self
+        replayItem.isEnabled = LastVoiceManager.shared.hasVoice || !rawPrompt.isEmpty
+        menu.addItem(replayItem)
+        
         menu.addItem(NSMenuItem.separator())
         
         // 4. Speak Code Blocks Toggle (curly braces icon, checkmark state)
@@ -695,6 +714,10 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
         SpeechQueueManager.shared.stopCurrent()
     }
     
+    @objc func replayLastSpeech() {
+        LastVoiceManager.shared.replayVoice()
+    }
+    
     @objc func toggleSpeakCodeBlocks() {
         CodeSpeechManager.shared.toggle()
         let state = CodeSpeechManager.shared.speakCodeBlocks ? "ENABLED" : "DISABLED"
@@ -772,6 +795,9 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
                 case 5: // Ctrl + G: Toggle Camera Gestures
                     NSLog("[AgentSpeak] Carbon HotKey Ctrl+G fired.")
                     appDelegate.toggleHandsFreeGestures()
+                case 6: // Ctrl + R: Replay Last Speech
+                    NSLog("[AgentSpeak] Carbon HotKey Ctrl+R fired.")
+                    appDelegate.replayLastSpeech()
                 default:
                     break
                 }
@@ -779,58 +805,40 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWin
             return noErr
         }, 1, &eventType, nil, &eventHandlerRef)
         
-        // 1. Ctrl + S (Speak Selection)
-        var ref1: EventHotKeyRef?
-        if RegisterEventHotKey(UInt32(kVK_ANSI_S), UInt32(controlKey), EventHotKeyID(signature: sig, id: 1), target, 0, &ref1) == noErr, let r = ref1 {
-            hotKeyRefs.append(r)
+        let hotkeys: [(Int, Int)] = [
+            (kVK_ANSI_S, 1),      // Ctrl + S (Speak Selection)
+            (kVK_ANSI_P, 2),      // Ctrl + P (Speak Clipboard)
+            (kVK_ANSI_Comma, 3),  // Ctrl + , (Settings)
+            (kVK_ANSI_X, 4),      // Ctrl + X (Stop Speech)
+            (kVK_ANSI_G, 5),      // Ctrl + G (Toggle Camera Gestures)
+            (kVK_ANSI_R, 6)       // Ctrl + R (Replay Last Speech)
+        ]
+        for (vk, hid) in hotkeys {
+            var ref: EventHotKeyRef?
+            if RegisterEventHotKey(UInt32(vk), UInt32(controlKey), EventHotKeyID(signature: sig, id: UInt32(hid)), target, 0, &ref) == noErr, let r = ref {
+                hotKeyRefs.append(r)
+            }
         }
         
-        // 2. Ctrl + P (Speak Clipboard)
-        var ref2: EventHotKeyRef?
-        if RegisterEventHotKey(UInt32(kVK_ANSI_P), UInt32(controlKey), EventHotKeyID(signature: sig, id: 2), target, 0, &ref2) == noErr, let r = ref2 {
-            hotKeyRefs.append(r)
-        }
-        
-        // 3. Ctrl + , (Settings)
-        var ref3: EventHotKeyRef?
-        if RegisterEventHotKey(UInt32(kVK_ANSI_Comma), UInt32(controlKey), EventHotKeyID(signature: sig, id: 3), target, 0, &ref3) == noErr, let r = ref3 {
-            hotKeyRefs.append(r)
-        }
-        
-        // 4. Ctrl + X (Stop Speech)
-        var ref4: EventHotKeyRef?
-        if RegisterEventHotKey(UInt32(kVK_ANSI_X), UInt32(controlKey), EventHotKeyID(signature: sig, id: 4), target, 0, &ref4) == noErr, let r = ref4 {
-            hotKeyRefs.append(r)
-        }
-        
-        // 5. Ctrl + G (Toggle Camera Gestures)
-        var ref5: EventHotKeyRef?
-        if RegisterEventHotKey(UInt32(kVK_ANSI_G), UInt32(controlKey), EventHotKeyID(signature: sig, id: 5), target, 0, &ref5) == noErr, let r = ref5 {
-            hotKeyRefs.append(r)
-        }
-        
-        // Redundant NSEvent Global Monitor for Control + G
+        // Redundant NSEvent Global Monitor for Control + G and Control + R
         globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.modifierFlags.contains(.control) {
-                let key = event.charactersIgnoringModifiers?.lowercased()
-                if key == "g" || event.keyCode == 5 {
-                    DispatchQueue.main.async {
-                        self?.toggleHandsFreeGestures()
-                    }
-                }
+            guard event.modifierFlags.contains(.control), let key = event.charactersIgnoringModifiers?.lowercased() else { return }
+            if key == "g" || event.keyCode == 5 {
+                DispatchQueue.main.async { self?.toggleHandsFreeGestures() }
+            } else if key == "r" || event.keyCode == 15 {
+                DispatchQueue.main.async { self?.replayLastSpeech() }
             }
         }
         
         // Redundant NSEvent Local Monitor (when Agent Speak itself is focused)
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.modifierFlags.contains(.control) {
-                let key = event.charactersIgnoringModifiers?.lowercased()
-                if key == "g" || event.keyCode == 5 {
-                    DispatchQueue.main.async {
-                        self?.toggleHandsFreeGestures()
-                    }
-                    return nil
-                }
+            guard event.modifierFlags.contains(.control), let key = event.charactersIgnoringModifiers?.lowercased() else { return event }
+            if key == "g" || event.keyCode == 5 {
+                DispatchQueue.main.async { self?.toggleHandsFreeGestures() }
+                return nil
+            } else if key == "r" || event.keyCode == 15 {
+                DispatchQueue.main.async { self?.replayLastSpeech() }
+                return nil
             }
             return event
         }

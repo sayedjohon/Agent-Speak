@@ -62,7 +62,8 @@ See `SYSTEM_PROMPT.md` for copy-paste prompts for Cursor, Claude, and Antigravit
 
 ### 1. Core Lifecycle & Audio Routing
 - `Sources/main.swift`: Application initialization and daemon lifecycle.
-- `Sources/AppDelegate.swift`: Menu bar tray icon, hotkey bindings, global event taps (including instant `Escape` silence).
+- `Sources/AppDelegate.swift`: Menu bar tray icon, dynamic last speech re-listen menu, hotkey bindings (Control+S speak selection, Control+P speak clipboard, Control+R replay, Escape silence).
+- `Sources/LastVoiceManager.swift`: Single-segment audio cache and prompt persistence for zero-latency replay and interruption recovery.
 - `Sources/SpeechQueueManager.swift`: Central sequential speech dispatch and engine coordination.
 - `Sources/TextSanitizer.swift`: Markdown table, code block quarantine, link sanitization, and unclosed block containment.
 - `Sources/SpeechLanguageDetector.swift`: Clause segmentation and smart chunk subdivision.
@@ -118,6 +119,7 @@ The daemon exposes a lightweight UNIX domain socket at `/tmp/agentspeak.sock`. A
 | :--- | :--- | :--- |
 | `say:<text>` | Queues text for speech synthesis | `echo "say:Build succeeded" \| nc -U /tmp/agentspeak.sock` |
 | `stop` | Halts current speech and clears queue | `echo "stop" \| nc -U /tmp/agentspeak.sock` |
+| `replay` | Replays the last spoken or interrupted audio | `echo "replay" \| nc -U /tmp/agentspeak.sock` |
 | `status` | Returns JSON status of daemon | `echo "status" \| nc -U /tmp/agentspeak.sock` |
 | `dashboard` | Opens settings dashboard | `echo "dashboard" \| nc -U /tmp/agentspeak.sock` |
 | `engine:<name>`| Switches active engine (`native` or `pocket-tts`) | `echo "engine:pocket_tts" \| nc -U /tmp/agentspeak.sock` |

@@ -160,6 +160,9 @@ public class SpeechQueueManager: ObservableObject {
                 finishHandler()
             }
             
+            if item.source != "Replay" {
+                LastVoiceManager.shared.prepareForNewVoice(text: trimmed)
+            }
             NotchWindowController.shared.presentSpeech(text: trimmed, project: item.source) {
                 finishHandler()
             }

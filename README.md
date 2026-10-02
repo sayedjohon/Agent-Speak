@@ -151,6 +151,7 @@ Coding with music helps you stay in the zone.
 | :--- | :--- | :--- |
 | **`Control + S`** | **Speak Selection** | Highlight any paragraph of text and hear it spoken out loud instantly. |
 | **`Control + P`** | **Speak Clipboard** | Reads whatever text is currently copied to your clipboard. |
+| **`Control + R`** | **Re-listen / Replay** | Instantly re-listens to the last spoken or interrupted speech segment. |
 | **`Control + G`** | **Toggle Gestures** | Turns camera hand tracking on or off without opening settings. |
 | **`Right Option` (Hold)** | **Push-to-Talk** | Hold to record your voice; release to type text into your active window. |
 | **`Escape`** | **Instant Silence** | Instantly stops speech and dismisses the notch player. |
@@ -207,6 +208,7 @@ agentspeak bgm off
 agentspeak bgm vol 30
 
 # Silence & Lifecycle
+agentspeak replay                    # re-listen to last spoken or interrupted segment
 agentspeak stop                      # stop speech immediately
 agentspeak quit                      # stop the background service
 ```

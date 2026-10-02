@@ -52,6 +52,7 @@ func printHelp() {
       gesture     Control camera hand tracking (status | on | off | toggle | preview on/off | hud on/off | list)
       dictation   Control Push-to-Talk Fn dictation (status | on | off | toggle)
       greet       Speak active persona's signature greeting (alias: intro)
+      replay      Re-listen / repeat the last spoken message (alias: repeat, relisten)
       test-jarvis Test playback of the Jarvis voice sample in the Notch Player
       stop        Stop current speech and dismiss the notch player
       quit        Terminate the Agent Speak application
@@ -800,6 +801,13 @@ case "dictation", "fn", "ptt":
 case "greet", "welcome", "intro":
     if ensureAppRunningAndSend("__CMD_GREET__") {
         print("[Agent Speak] Triggered persona signature greeting.")
+    } else {
+        print("Error: Could not connect to Agent Speak socket.")
+    }
+
+case "replay", "repeat", "relisten":
+    if ensureAppRunningAndSend("__CMD_REPLAY__") {
+        print("[Agent Speak] Replaying last spoken message.")
     } else {
         print("Error: Could not connect to Agent Speak socket.")
     }

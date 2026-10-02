@@ -667,9 +667,13 @@ public class TranscriptWatcher {
                             let cur = AppDelegate.shared?.isTrayIconVisible ?? true
                             AppDelegate.shared?.setTrayIconVisible(!cur)
                         }
-                    } else if raw == "__CMD_STOP_SPEECH__" {
+                    } else if raw == "__CMD_STOP_SPEECH__" || raw == "stop" {
                         DispatchQueue.main.async {
                             SpeechQueueManager.shared.stopCurrent()
+                        }
+                    } else if raw == "__CMD_REPLAY__" || raw == "replay" || raw == "relisten" {
+                        DispatchQueue.main.async {
+                            LastVoiceManager.shared.replayVoice()
                         }
                     } else if raw == "__CMD_SPEAK_CODE_ON__" {
                         DispatchQueue.main.async {

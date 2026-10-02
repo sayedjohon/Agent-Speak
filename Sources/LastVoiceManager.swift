@@ -66,9 +66,22 @@ public class LastVoiceManager: NSObject, ObservableObject, AVAudioPlayerDelegate
     
     public func prepareForNewVoice(text: String) {
         DispatchQueue.main.async { [weak self] in
-            self?.isSynthesizing = true
-            self?.textPrompt = text
-            self?.pause()
+            guard let self = self else { return }
+            self.isSynthesizing = true
+            self.textPrompt = text
+            self.hasVoice = false
+            self.pause()
+            
+            self.ioQueue.async {
+                let meta: [String: Any] = [
+                    "text": text,
+                    "timestamp": Date().timeIntervalSince1970,
+                    "duration": 0.0
+                ]
+                if let data = try? JSONSerialization.data(withJSONObject: meta, options: .prettyPrinted) {
+                    try? data.write(to: self.metaFile)
+                }
+            }
         }
     }
     
@@ -358,6 +371,26 @@ public class LastVoiceManager: NSObject, ObservableObject, AVAudioPlayerDelegate
                 if self?.downloadStatusMessage == "Copied audio file to clipboard!" {
                     self?.downloadStatusMessage = nil
                 }
+            }
+        }
+    }
+    
+    // MARK: - Instant Replay Last Spoken Message
+    
+    public func replayVoice() {
+        let rawText = textPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard hasVoice || !rawText.isEmpty else { return }
+        
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            let fileManager = FileManager.default
+            let hasValidFile = self.hasVoice && fileManager.fileExists(atPath: self.lastVoiceFile.path) &&
+                ((try? fileManager.attributesOfItem(atPath: self.lastVoiceFile.path)[.size] as? Int64) ?? 0) > 500
+            
+            if hasValidFile {
+                SpeechQueueManager.shared.playAudioFile(filePath: self.lastVoiceFile.path, source: "Replay")
+            } else if !rawText.isEmpty {
+                SpeechQueueManager.shared.enqueue(source: "Replay", text: rawText, immediate: true)
             }
         }
     }
