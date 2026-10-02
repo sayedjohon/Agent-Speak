@@ -13,12 +13,14 @@ YELLOW="\033[1;33m"
 RED="\033[0;31m"
 NC="\033[0m"
 
+export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:$HOME/.local/bin:$HOME/.pyenv/shims:$PATH"
+
 EXT_DIR="$HOME/.agentspeak/extensions/pocket-tts"
 VENV_DIR="$EXT_DIR/venv"
 VOICES_DIR="$EXT_DIR/voices"
 CONFIG_FILE="$HOME/.agentspeak/config.json"
 
-echo -e "\n${CYAN}${BOLD}✦ Pocket-TTS Neural Extension Installer ✦${NC}"
+echo -e "\n${CYAN}${BOLD}✦ Custom Voice Neural Extension Installer ✦${NC}"
 echo -e "${BLUE}Zero-Latency • 100% Offline Neural Voice Cloning • Apple Silicon${NC}\n"
 
 mkdir -p "$EXT_DIR"
@@ -28,17 +30,27 @@ mkdir -p "$VOICES_DIR"
 echo -e "${CYAN}→ [1/5] Detecting compatible Python runtime...${NC}"
 PYTHON_BIN=""
 
-# Check potential locations
+# Check potential locations (Apple Silicon Homebrew, Intel Mac Homebrew, pyenv, conda, PATH)
 CANDIDATES=(
     "/opt/homebrew/bin/python3"
+    "/opt/homebrew/bin/python3.13"
     "/opt/homebrew/bin/python3.12"
     "/opt/homebrew/bin/python3.11"
     "/opt/homebrew/bin/python3.10"
+    "/usr/local/bin/python3"
+    "/usr/local/bin/python3.13"
+    "/usr/local/bin/python3.12"
+    "/usr/local/bin/python3.11"
+    "/usr/local/bin/python3.10"
+    "$HOME/.pyenv/shims/python3"
+    "$HOME/miniforge3/bin/python3"
+    "$HOME/miniconda3/bin/python3"
+    "$HOME/anaconda3/bin/python3"
     "$(which python3 2>/dev/null || true)"
+    "$(which python3.13 2>/dev/null || true)"
     "$(which python3.12 2>/dev/null || true)"
     "$(which python3.11 2>/dev/null || true)"
     "$(which python3.10 2>/dev/null || true)"
-    "/usr/local/bin/python3"
 )
 
 for cand in "${CANDIDATES[@]}"; do

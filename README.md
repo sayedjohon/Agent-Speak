@@ -11,7 +11,7 @@
 [![Swift](https://img.shields.io/badge/Swift-5.9%2B-F05138?style=for-the-badge&logo=swift&logoColor=white)](https://swift.org)
 [![Agents](https://img.shields.io/badge/Supports-Antigravity%20%7C%20Claude%20%7C%20Cursor-blueviolet?style=for-the-badge)](#-works-instantly-with-your-favorite-ai-tools)
 [![Engine](https://img.shields.io/badge/Engine-Zero_CPU_Native-success?style=for-the-badge)](#-built-for-speed-on-apple-silicon)
-[![Pocket-TTS](https://img.shields.io/badge/Offline_Cloning-Pocket--TTS-6366f1?style=for-the-badge)](#-offline-voice-cloning-in-10-seconds)
+[![Custom Voice](https://img.shields.io/badge/Offline_Cloning-Custom_Voice-6366f1?style=for-the-badge)](#-offline-voice-cloning-in-10-seconds)
 [![Release](https://img.shields.io/github/v/release/sayedjohon/Agent-Speak?style=for-the-badge&color=orange)](https://github.com/sayedjohon/Agent-Speak/releases)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 

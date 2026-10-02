@@ -175,6 +175,12 @@ public class PocketTTSManager: ObservableObject {
             proc.executableURL = URL(fileURLWithPath: "/bin/bash")
             proc.arguments = [script]
             
+            var env = ProcessInfo.processInfo.environment
+            let home = FileManager.default.homeDirectoryForCurrentUser.path
+            let standardPath = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:\(home)/.local/bin:\(home)/.pyenv/shims"
+            env["PATH"] = standardPath + (env["PATH"].map { ":" + $0 } ?? "")
+            proc.environment = env
+            
             let pipe = Pipe()
             proc.standardOutput = pipe
             proc.standardError = pipe
