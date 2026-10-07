@@ -114,7 +114,7 @@ public class UniversalConnectorWatcher {
                 
                 let tsVal = (msg["ts"] as? Double) ?? 0.0
                 let tsSec = tsVal > 100000000000 ? (tsVal / 1000.0) : tsVal
-                let isFresh = (now - tsSec <= 30.0) && (tsSec >= (appStartTime - 5.0))
+                let isFresh = (tsSec >= (appStartTime - 10.0)) && ((now - tsSec <= 1800.0 && now - modTime <= 120.0) || (now - tsSec <= 120.0))
                 
                 let rawId = "\(fPath)_\(tsVal)_\(text.prefix(60))"
                 let convKey = "\(connector.id)_\(taskFolder.lastPathComponent)"
@@ -176,7 +176,7 @@ public class UniversalConnectorWatcher {
                 let cleanText = text!
                 let rawId = "\(fPath)_\(cleanText.prefix(60))"
                 let convKey = "\(connector.id)_\(file.lastPathComponent)"
-                let isFresh = (now - modTime <= 30.0) && (modTime >= (appStartTime - 5.0))
+                let isFresh = (now - modTime <= 120.0) && (modTime >= (appStartTime - 10.0))
                 
                 stateLock.lock()
                 let lastId = state[convKey]
@@ -227,7 +227,7 @@ public class UniversalConnectorWatcher {
         
         let rawId = "\(fPath)_\(bodyLines.prefix(60))"
         let convKey = connector.id
-        let isFresh = (now - modTime <= 25.0) && (modTime >= (appStartTime - 5.0))
+        let isFresh = (now - modTime <= 120.0) && (modTime >= (appStartTime - 10.0))
         
         stateLock.lock()
         let lastId = state[convKey]
@@ -311,7 +311,7 @@ public class UniversalConnectorWatcher {
                 if let txt = foundText {
                     let rawId = "\(fPath)_\(txt.prefix(60))"
                     let convKey = "\(connector.id)_\(ws.lastPathComponent)"
-                    let isFresh = (now - modTime <= 25.0) && (modTime >= (appStartTime - 5.0))
+                    let isFresh = (now - modTime <= 120.0) && (modTime >= (appStartTime - 10.0))
                     
                     stateLock.lock()
                     let lastId = state[convKey]
@@ -432,7 +432,7 @@ public class UniversalConnectorWatcher {
         if let txt = assistantText?.trimmingCharacters(in: .whitespacesAndNewlines), !txt.isEmpty {
             let rawId = "\(fPath)_\(txt.prefix(60))"
             let convKey = "\(connector.id)_\(fileURL.lastPathComponent)"
-            let isFresh = (now - modTime <= 30.0) && (modTime >= (appStartTime - 5.0))
+            let isFresh = (now - modTime <= 120.0) && (modTime >= (appStartTime - 10.0))
             
             stateLock.lock()
             let lastId = state[convKey]

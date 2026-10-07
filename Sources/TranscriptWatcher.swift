@@ -30,6 +30,16 @@ public class TranscriptWatcher {
         return Self.isoFormatterStandard.date(from: str)
     }
     
+    private func isFreshMessage(createdAtStr: String?, timeSinceMod: TimeInterval, now: TimeInterval) -> Bool {
+        if let str = createdAtStr, let msgDate = parseISO8601Date(str) {
+            let age = now - msgDate.timeIntervalSince1970
+            let isAfterLaunch = (msgDate.timeIntervalSince1970 >= (appStartTime - 10.0))
+            let isRecentWrite = (timeSinceMod <= 120.0)
+            return isAfterLaunch && ((age >= -10.0 && age <= 1800.0 && isRecentWrite) || (age >= -10.0 && age <= 120.0))
+        }
+        return timeSinceMod <= 120.0
+    }
+    
     private var activeAntigravityTranscripts: [(url: URL, convId: String)] = []
     private var lastAntigravityRefresh: TimeInterval = 0
     
@@ -196,14 +206,7 @@ public class TranscriptWatcher {
                 let text = resolveUntruncatedAntigravityText(convId: convId, stepIndex: latestStep, fallbackText: rawText)
                 let rawId = "\(latestCreatedAt)_\(latestStep)_\(text.prefix(60))"
                 
-                var isFresh = false
-                if let msgDate = parseISO8601Date(latestCreatedAt) {
-                    let age = now - msgDate.timeIntervalSince1970
-                    let isAfterAppLaunch = (msgDate.timeIntervalSince1970 >= (appStartTime - 5.0))
-                    isFresh = (age >= -5.0 && age <= 30.0 && isAfterAppLaunch)
-                } else {
-                    isFresh = (timeSinceMod <= 30.0)
-                }
+                let isFresh = isFreshMessage(createdAtStr: latestCreatedAt, timeSinceMod: timeSinceMod, now: now)
                 
                 stateLock.lock()
                 let lastId = state[convKey]
@@ -352,14 +355,7 @@ public class TranscriptWatcher {
                 if let text = latestAssistantText, !latestMsgId.isEmpty {
                     let rawId = "\(latestMsgId)_\(text.prefix(60))"
                     
-                    var isFresh = false
-                    if let msgDate = parseISO8601Date(latestMsgCreatedAt) {
-                        let age = now - msgDate.timeIntervalSince1970
-                        let isAfterAppLaunch = (msgDate.timeIntervalSince1970 >= (appStartTime - 5.0))
-                        isFresh = (age >= -5.0 && age <= 30.0 && isAfterAppLaunch)
-                    } else {
-                        isFresh = (timeSinceMod <= 30.0)
-                    }
+                    let isFresh = isFreshMessage(createdAtStr: latestMsgCreatedAt, timeSinceMod: timeSinceMod, now: now)
                     
                     stateLock.lock()
                     let lastId = state[convKey]
@@ -457,10 +453,11 @@ public class TranscriptWatcher {
         var isFresh = false
         if createdSec > 0 {
             let age = now - createdSec
-            let isAfterLaunch = (createdSec >= (appStartTime - 5.0))
-            isFresh = (age >= -5.0 && age <= 30.0 && isAfterLaunch)
+            let isAfterLaunch = (createdSec >= (appStartTime - 10.0))
+            let isRecentWrite = (timeSinceMod <= 120.0)
+            isFresh = isAfterLaunch && ((age >= -10.0 && age <= 1800.0 && isRecentWrite) || (age >= -10.0 && age <= 120.0))
         } else {
-            isFresh = (timeSinceMod <= 30.0)
+            isFresh = (timeSinceMod <= 120.0)
         }
         
         let convKey = "opencode_sqlite_latest"
@@ -537,15 +534,7 @@ public class TranscriptWatcher {
                let text = json["content"] as? String, !text.isEmpty {
                 let rawId = "\(file.path)_\(text.prefix(60))"
                 
-                var isFresh = false
-                if let tsStr = json["timestamp"] as? String ?? json["created_at"] as? String,
-                   let msgDate = parseISO8601Date(tsStr) {
-                    let age = now - msgDate.timeIntervalSince1970
-                    let isAfterAppLaunch = (msgDate.timeIntervalSince1970 >= (appStartTime - 5.0))
-                    isFresh = (age >= -5.0 && age <= 30.0 && isAfterAppLaunch)
-                } else {
-                    isFresh = (timeSinceMod <= 30.0)
-                }
+                let isFresh = isFreshMessage(createdAtStr: json["timestamp"] as? String ?? json["created_at"] as? String, timeSinceMod: timeSinceMod, now: now)
                 
                 stateLock.lock()
                 let lastId = state[convKey]
