@@ -19,7 +19,8 @@ struct PointyTopNotchBarView: View {
                 Image(systemName: state.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 9.5, weight: .bold))
                     .foregroundColor(.white)
-                    .frame(width: 16, height: 16)
+                    .frame(width: 18, height: 18)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             
@@ -28,7 +29,8 @@ struct PointyTopNotchBarView: View {
                 Image(systemName: "gobackward.\(state.skipSeconds)")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundColor(.white.opacity(0.95))
-                    .frame(width: 16, height: 16)
+                    .frame(width: 18, height: 18)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             
@@ -77,16 +79,18 @@ struct PointyTopNotchBarView: View {
                 Image(systemName: "goforward.\(state.skipSeconds)")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundColor(.white.opacity(0.95))
-                    .frame(width: 16, height: 16)
+                    .frame(width: 18, height: 18)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             
             // Close Button
-            Button(action: { state.close() }) {
+            Button(action: { SpeechQueueManager.shared.stopCurrent() }) {
                 Image(systemName: "xmark")
                     .font(.system(size: 8.5, weight: .bold))
                     .foregroundColor(.white.opacity(0.9))
-                    .frame(width: 16, height: 16)
+                    .frame(width: 20, height: 20)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }

@@ -37,14 +37,28 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
     var onClose: (() -> Void)?
     
     private var isCancelled = false
-    private var activeRenderProcess: Process?
-    private let renderQueue = DispatchQueue(label: "com.agentspeak.speech.render", qos: .userInitiated)
+    private var activeRenderProcesses: [Process] = []
+    private let processesLock = NSLock()
+    private let renderQueue = DispatchQueue(label: "com.agentspeak.speech.render", qos: .userInitiated, attributes: .concurrent)
     private var documentLanguage: String = "en"
     
     private var renderingIndices = Set<Int>()
     private let renderStateLock = NSLock()
-    private let maxLookahead = 2
+    private let maxLookahead = 6
+    private let maxConcurrentRenders = 2
     private var fullSpokenText: String = ""
+    
+    private func registerProcess(_ proc: Process) {
+        processesLock.lock()
+        activeRenderProcesses.append(proc)
+        processesLock.unlock()
+    }
+    
+    private func unregisterProcess(_ proc: Process) {
+        processesLock.lock()
+        activeRenderProcesses.removeAll(where: { $0 === proc })
+        processesLock.unlock()
+    }
     
     static func loadSkipSeconds() -> Int {
         let configPath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".agentspeak/config.json")
@@ -118,6 +132,11 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 }
             }
         }
+        
+        // Immediately kick off parallel lookahead for upcoming chunks while chunk 0 renders
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            self?.triggerLookaheadRendering()
+        }
     }
     
     init(audioFilePath: String, onClose: (() -> Void)?) {
@@ -185,10 +204,10 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 let proc = Process()
                 proc.executableURL = URL(fileURLWithPath: py)
                 proc.arguments = [script, c.text, "--voice", voice, "--output", c.filePath, "--no-play", "--no-gain"]
-                self.activeRenderProcess = proc
+                self.registerProcess(proc)
                 try? proc.run()
                 proc.waitUntilExit()
-                self.activeRenderProcess = nil
+                self.unregisterProcess(proc)
                 
                 if FileManager.default.fileExists(atPath: c.filePath),
                    let attrs = try? FileManager.default.attributesOfItem(atPath: c.filePath),
@@ -218,10 +237,10 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 args.append(contentsOf: ["-o", c.filePath, c.text])
                 proc.arguments = args
                 
-                self.activeRenderProcess = proc
+                self.registerProcess(proc)
                 try? proc.run()
                 proc.waitUntilExit()
-                self.activeRenderProcess = nil
+                self.unregisterProcess(proc)
                 
                 if FileManager.default.fileExists(atPath: c.filePath),
                    let attrs = try? FileManager.default.attributesOfItem(atPath: c.filePath),
@@ -253,15 +272,19 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 }
                 aiffArgs.append(c.text)
                 proc.arguments = aiffArgs
+                self.registerProcess(proc)
                 try? proc.run()
                 proc.waitUntilExit()
+                self.unregisterProcess(proc)
                 
                 if FileManager.default.fileExists(atPath: tmpAiff) {
                     let conv = Process()
                     conv.executableURL = URL(fileURLWithPath: "/usr/bin/afconvert")
                     conv.arguments = ["-f", "WAVE", "-d", "LEI16@22050", tmpAiff, c.filePath]
+                    self.registerProcess(conv)
                     try? conv.run()
                     conv.waitUntilExit()
+                    self.unregisterProcess(conv)
                     try? FileManager.default.removeItem(atPath: tmpAiff)
                     
                     if FileManager.default.fileExists(atPath: c.filePath),
@@ -324,6 +347,10 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 renderStateLock.unlock()
                 break
             }
+            if renderingIndices.count >= maxConcurrentRenders {
+                renderStateLock.unlock()
+                break
+            }
             if chunks[idx].isReady || renderingIndices.contains(idx) {
                 renderStateLock.unlock()
                 continue
@@ -350,8 +377,6 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
                     self.triggerLookaheadRendering()
                 }
             }
-            // Queue only one chunk at a time to prevent CPU spikes
-            break
         }
     }
     
@@ -372,11 +397,11 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         stopTimer()
         if #available(macOS 14.0, *), let screen = NSScreen.main {
             let l = screen.displayLink(target: self, selector: #selector(displayTick))
-            l.preferredFrameRateRange = CAFrameRateRange(minimum: 80, maximum: 120, preferred: 120)
+            l.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 60, preferred: 60)
             l.add(to: .main, forMode: .common)
             self.displayLink = l
         } else {
-            let t = Timer.scheduledTimer(withTimeInterval: 1.0 / 120.0, repeats: true) { [weak self] _ in
+            let t = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
                 self?.tick()
             }
             RunLoop.main.add(t, forMode: .common)
@@ -402,11 +427,14 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
             return
         }
         let chunkStart = chunks[currentChunkIndex].startTime
-        globalCurrentTime = chunkStart + p.currentTime
+        let newCurrentTime = chunkStart + p.currentTime
+        if abs(newCurrentTime - globalCurrentTime) >= 0.03 {
+            globalCurrentTime = newCurrentTime
+        }
         
-        // Dynamic JIT 5-second Lookahead Trigger
+        // Dynamic JIT 6-second Lookahead Trigger
         let remaining = p.duration - p.currentTime
-        if remaining <= 5.0 {
+        if remaining <= 6.0 {
             triggerLookaheadRendering()
         }
         
@@ -439,11 +467,13 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 p.volume = VoiceVolumeManager.shared.playerVolume
                 if p.play() {
                     isPlaying = true
+                    triggerLookaheadRendering()
                     return
                 } else {
                     p.prepareToPlay()
                     if p.play() {
                         isPlaying = true
+                        triggerLookaheadRendering()
                         return
                     }
                 }
@@ -455,15 +485,19 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
             if nextIndex < chunks.count {
                 currentChunkIndex = nextIndex
                 playChunkWhenReady(index: nextIndex)
+                triggerLookaheadRendering()
             } else {
                 finishPlayback()
             }
             return
         }
         
-        // Wait for background chunk rendering with 8.0s watchdog timeout (160 * 50ms)
-        if attempts < 160 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+        // Ensure background rendering is actively triggered
+        triggerLookaheadRendering()
+        
+        // Wait for background chunk rendering with 8.0s watchdog timeout (80 * 100ms)
+        if attempts < 80 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                 self?.playChunkWhenReady(index: index, attempts: attempts + 1)
             }
         } else {
@@ -472,6 +506,7 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
             if nextIndex < chunks.count {
                 currentChunkIndex = nextIndex
                 playChunkWhenReady(index: nextIndex)
+                triggerLookaheadRendering()
             } else {
                 finishPlayback()
             }
@@ -563,8 +598,18 @@ class StreamingAudioManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
     func close() {
         guard !isCancelled else { return }
         isCancelled = true
-        activeRenderProcess?.terminate()
-        activeRenderProcess = nil
+        
+        processesLock.lock()
+        for proc in activeRenderProcesses {
+            proc.terminate()
+            let pid = proc.processIdentifier
+            if pid > 0 {
+                kill(pid, SIGKILL)
+            }
+        }
+        activeRenderProcesses.removeAll()
+        processesLock.unlock()
+        
         renderStateLock.lock()
         renderingIndices.removeAll()
         renderStateLock.unlock()

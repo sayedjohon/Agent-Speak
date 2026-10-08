@@ -12,6 +12,11 @@ class KeyablePanel: NSPanel {
     override var canBecomeKey: Bool { return true }
     override var canBecomeMain: Bool { return true }
     
+    override func mouseDown(with event: NSEvent) {
+        self.makeKey()
+        super.mouseDown(with: event)
+    }
+    
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 53 { // Escape
             DispatchQueue.main.async {
@@ -292,6 +297,7 @@ public class NotchWindowController {
         unregisterGlobalEscapeHotKey()
         window?.orderOut(nil)
         window = nil
+        audioManager = nil
         HologramManager.shared.onSpeechFinished()
     }
     

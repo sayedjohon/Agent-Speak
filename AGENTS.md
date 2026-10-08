@@ -3,8 +3,8 @@
 > **Project**: Agent Speak  
 > **Platform**: macOS 14.0+ (Sonoma & Sequoia)  
 > **Core Stack**: Pure Swift, SwiftUI, AppKit, AVFoundation, Metal/ProMotion CADisplayLink, Apple Vision  
-> **Status**: Active Production (v1.5.0)  
-> **Last Updated**: 2026-10-07 20:35:00  
+> **Status**: Active Production (v1.5.1)  
+> **Last Updated**: 2026-10-09 05:25:00  
 
 ---
 
