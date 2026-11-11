@@ -153,6 +153,10 @@ public struct DashboardView: View {
         audio["pocket_tts"] = ptts
         json["audio"] = audio
         
+        if voiceEngine != "pocket_tts" {
+            PocketTTSManager.shared.stopBackgroundDaemon()
+        }
+        
         var general = json["general"] as? [String: Any] ?? [:]
         general["show_tray_icon"] = showTrayIcon
         general["enabled"] = isEnabled

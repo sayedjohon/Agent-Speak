@@ -10,7 +10,10 @@ echo "Uninstalling Agent Speak..."
 # Stop running processes & unload LaunchAgent
 launchctl unload "$HOME/Library/LaunchAgents/com.agentspeak.app.plist" 2>/dev/null || true
 rm -f "$HOME/Library/LaunchAgents/com.agentspeak.app.plist"
+launchctl unload "$HOME/Library/LaunchAgents/com.juno.pocket-tts.plist" 2>/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/com.juno.pocket-tts.plist"
 pkill -9 -f "AgentSpeak" 2>/dev/null || true
+pkill -f "pocket_bridge_api.py" 2>/dev/null || true
 
 # Remove Login Item
 osascript -e '

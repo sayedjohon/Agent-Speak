@@ -27,6 +27,64 @@ public class PocketTTSManager: ObservableObject {
         let installed = (activePythonPath != nil && activeScriptPath != nil)
         self.isInstalled = installed
         loadVoices()
+        cleanupIfInactive()
+    }
+    
+    public func cleanupIfInactive() {
+        let configPath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".agentspeak/config.json")
+        if let data = try? Data(contentsOf: configPath),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let audio = json["audio"] as? [String: Any] {
+            let engine = audio["engine"] as? String ?? "macos_default"
+            let ptts = audio["pocket_tts"] as? [String: Any] ?? [:]
+            let enabled = ptts["enabled"] as? Bool ?? false
+            if engine != "pocket_tts" || !enabled {
+                stopBackgroundDaemon()
+            }
+        } else {
+            stopBackgroundDaemon()
+        }
+    }
+    
+    public func stopBackgroundDaemon() {
+        DispatchQueue.global(qos: .utility).async {
+            // 1. Stop PM2 managed process if running
+            let pm2Candidates = ["/opt/homebrew/bin/pm2", "/usr/local/bin/pm2"]
+            for pm2 in pm2Candidates {
+                if FileManager.default.fileExists(atPath: pm2) {
+                    let pStop = Process()
+                    pStop.executableURL = URL(fileURLWithPath: pm2)
+                    pStop.arguments = ["stop", "pocket-tts-mac-m4"]
+                    try? pStop.run()
+                    pStop.waitUntilExit()
+                    
+                    let pSave = Process()
+                    pSave.executableURL = URL(fileURLWithPath: pm2)
+                    pSave.arguments = ["save"]
+                    try? pSave.run()
+                    pSave.waitUntilExit()
+                    break
+                }
+            }
+            
+            // 2. Unload legacy launchd service if registered
+            let plistPath = FileManager.default.homeDirectoryForCurrentUser.path + "/Library/LaunchAgents/com.juno.pocket-tts.plist"
+            if FileManager.default.fileExists(atPath: plistPath) {
+                let proc = Process()
+                proc.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+                proc.arguments = ["unload", "-w", plistPath]
+                try? proc.run()
+                proc.waitUntilExit()
+                try? FileManager.default.removeItem(atPath: plistPath)
+            }
+            
+            // 3. Terminate background python daemon to reclaim RAM
+            let killProc = Process()
+            killProc.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+            killProc.arguments = ["-f", "pocket_bridge_api.py"]
+            try? killProc.run()
+            killProc.waitUntilExit()
+        }
     }
     
     public var extensionDir: String {

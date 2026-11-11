@@ -125,6 +125,9 @@ launchctl unload "$HOME/Library/LaunchAgents/com.sayedjohon.antigravity-voice-wa
 rm -f "$HOME/Library/LaunchAgents/com.sayedjohon.antigravity-voice-watcher.plist"
 launchctl unload "$HOME/Library/LaunchAgents/com.antigravity.jarvis.plist" 2>/dev/null || true
 rm -f "$HOME/Library/LaunchAgents/com.antigravity.jarvis.plist"
+launchctl unload "$HOME/Library/LaunchAgents/com.juno.pocket-tts.plist" 2>/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/com.juno.pocket-tts.plist"
+pkill -f "pocket_bridge_api.py" 2>/dev/null || true
 
 # Remove obsolete legacy Login Item and processes
 osascript -e '
